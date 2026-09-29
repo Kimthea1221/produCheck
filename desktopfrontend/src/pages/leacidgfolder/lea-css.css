@@ -702,7 +702,7 @@
   background: #FDFDFD;
   border-radius: 12px;
   padding: 32px 32px 0 32px;
-  width: 700px;
+  width: 750px;
   max-width: 92vw;
   max-height: 90vh;
   overflow-y: auto;
@@ -1162,17 +1162,10 @@
 
 .VerificationTabs {
     display: flex;
-    gap: 8px;
     margin-bottom: 20px;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.VerificationTabs::-webkit-scrollbar {
-    display: none;
+    overflow: visible;
 }
 
 .VerificationTabsButton {
@@ -1188,6 +1181,14 @@
     gap: 4px;
     flex-wrap: nowrap;
     white-space: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.VerificationTabsButton::-webkit-scrollbar {
+    display: none;
 }
 
 .ButtonTab {

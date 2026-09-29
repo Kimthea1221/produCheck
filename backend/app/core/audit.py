@@ -11,9 +11,11 @@ from uuid import UUID
 
 from fastapi import Request
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone 
 
 from app.models.audit_logs import AuditLog
 from app.models.regions import Region
+from app.core.constants import AuditAction
 
 
 def get_user_region_code(db: Session, user) -> Optional[str]:
@@ -64,3 +66,28 @@ def write_audit_log(
     db.commit()
     db.refresh(entry)
     return entry
+
+
+
+# Keep in sync with PASSWORD_RESET_COOLDOWN_MS in profile-setting.jsx
+RESET_REQUEST_COOLDOWN = timedelta(hours=8)
+
+
+def reset_request_retry_after(db, user_id) -> int:
+    """Seconds until this user may request a password reset again; 0 if allowed now."""
+    last = (
+        db.query(AuditLog.performed_at)
+        .filter(
+            AuditLog.action == AuditAction.PERSONNEL_REQUEST_PASSWORD_UPDATE,
+            AuditLog.target_id == user_id,
+        )
+        .order_by(AuditLog.performed_at.desc())
+        .first()
+    )
+    if not last:
+        return 0
+    last_at = last[0]
+    if last_at.tzinfo is None:  # naive timestamps: treat as UTC
+        last_at = last_at.replace(tzinfo=timezone.utc)
+    remaining = RESET_REQUEST_COOLDOWN - (datetime.now(timezone.utc) - last_at)
+    return max(0, int(remaining.total_seconds()))

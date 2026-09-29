@@ -20,7 +20,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "src/images/producheck_logo.ico"
+      "icon": "src/images/icmda_logo.ico"
     },
     "directories": {
       "output": "release"

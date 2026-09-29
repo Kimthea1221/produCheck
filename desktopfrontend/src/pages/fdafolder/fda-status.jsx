@@ -280,6 +280,12 @@ function FdaStatus() {
       return;
     }
 
+    if (outgoingMessage && outgoingMessage.length > 500) {
+      setToastVariant("danger");
+      setToastError("Dismissal reason must be 500 characters or fewer.");
+      return;
+    }
+
     // const previousStatus = selectedComplaint.status;
 
     // setComplaints((prev) =>
@@ -691,7 +697,18 @@ function FdaStatus() {
                             placeholder="Write or edit the reason the consumer will see..."
                             value={dismissNote}
                             onChange={(e) => setDismissNote(e.target.value)}
+                            maxLength={500}
                           />
+                          <div
+                            style={{
+                              fontSize: 11,
+                              textAlign: "right",
+                              marginTop: 4,
+                              color: dismissNote.length >= 500 ? "#B91C1C" : "rgba(31,41,55,0.5)",
+                            }}
+                          >
+                            {dismissNote.length}/500
+                          </div>
                         </div>
                       )}
 
@@ -751,6 +768,13 @@ function FdaStatus() {
                           setToastError("Please choose or write a reason for dismissing this complaint.");
                           return;
                         }
+                        
+                        if (outgoingMessage && outgoingMessage.length > 500) {
+                          setToastVariant("danger");
+                          setToastError("Dismissal reason must be 500 characters or fewer.");
+                          return;
+                        }
+
                         setToastError(null);
                         setToastVariant("danger");
                         setShowConfirmModal(true);

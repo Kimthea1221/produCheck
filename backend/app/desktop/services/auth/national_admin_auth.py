@@ -10,12 +10,17 @@ from app.core.constants import Role, UserStatus, AuditAction
 from app.core.audit import write_audit_log
 from app.desktop.services.admin_notifications import admin_notification_service as notification_service
 from app.desktop.schemas.admin_notifications.notification_enums import NotificationEventType
+from app.desktop.services.auth.login_throttle import (
+    LoginThrottledError, LOCK_AFTER_ATTEMPTS, WARN_FROM_ATTEMPTS, THROTTLE_SECONDS,
+    ACCOUNT_LOCKED_MESSAGE,
+    attempts_left_message, check_throttle, record_failed_attempt, reset_login_state,
+)
 
 
-class NationalAdminThrottledError(Exception):
-    def __init__(self, retry_after_seconds: int):
-        self.retry_after_seconds = retry_after_seconds
-        super().__init__(f"Too many failed attempts. Try again in {retry_after_seconds} seconds.")
+
+class NationalAdminThrottledError(LoginThrottledError):
+    pass
+
 
 
 _DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-timing-safety-only")
@@ -80,16 +85,9 @@ def _try_hard_lock_if_not_last_national_admin(db: Session, user: User) -> bool:
 
 
 def _record_failed_attempt_atomic(db: Session, user: User) -> int:
-    stmt = (
-        update(User)
-        .where(User.user_id == user.user_id)
-        .values(failed_login_attempts=User.failed_login_attempts + 1)
-        .execution_options(synchronize_session="fetch")
-    )
-    db.execute(stmt)
+    attempts = record_failed_attempt(db, user.user_id)
     db.commit()
-    db.refresh(user)
-    return user.failed_login_attempts
+    return attempts
 
 
 def authenticate_national_admin(db: Session, email: str, password: str, http_request: Request | None = None) -> User:
@@ -99,12 +97,10 @@ def authenticate_national_admin(db: Session, email: str, password: str, http_req
         verify_password(password, user.password_hash if user else _DUMMY_PASSWORD_HASH)
         raise ValueError("Invalid credentials")
 
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds())
-        raise NationalAdminThrottledError(retry_after_seconds=remaining)
-
     if user.is_locked:
-        raise ValueError("Account is locked. Please contact your administrator.")
+        raise ValueError(ACCOUNT_LOCKED_MESSAGE)
+
+    check_throttle(user, error_cls=NationalAdminThrottledError)
 
     password_ok = verify_password(password, user.password_hash)
 
@@ -118,11 +114,9 @@ def authenticate_national_admin(db: Session, email: str, password: str, http_req
     if not user.is_active:
         raise ValueError("Account is inactive")
 
-    user.failed_login_attempts = 0
-    user.locked_until = None
-    user.last_login = datetime.now(timezone.utc)
-    db.commit()
+    reset_login_state(db, user.user_id)
     return user
+    
 
 
 def _handle_failed_attempt(db: Session, user: User, http_request: Request | None = None) -> None:
@@ -150,6 +144,7 @@ def _handle_failed_attempt(db: Session, user: User, http_request: Request | None
             )
         else:
             db.refresh(user)  # local ORM object is stale after the raw UPDATE
+            user.locked_until = None  # a lock must never look like a throttle
             user_id = user.user_id
             user_email = user.email
             db.commit()
@@ -173,13 +168,20 @@ def _handle_failed_attempt(db: Session, user: User, http_request: Request | None
                 user_role_override=Role.NATIONAL_ADMIN,
                 user_id_override=user_id,
             )
-    elif attempts == 3:
+            raise ValueError(ACCOUNT_LOCKED_MESSAGE)  # show the lock message on the 5th attempt
+
+    elif (hint := attempts_left_message(attempts)):
+        user_email = user.email
+        user.locked_until = datetime.now(timezone.utc) + timedelta(seconds=THROTTLE_SECONDS)
         db.commit()
-        notification_service.notify_self_service_account_event(
-            db=db, target=user,
-            event_type=NotificationEventType.FAILED_LOGIN_WARNING,
-            title="Repeated failed login attempts",
-            message=f"{attempts} failed attempts on {user.email}.",
-        )
+        if attempts == WARN_FROM_ATTEMPTS:
+            notification_service.notify_self_service_account_event(
+                db=db, target=user,
+                event_type=NotificationEventType.FAILED_LOGIN_WARNING,
+                title="Repeated failed login attempts",
+                message=f"{attempts} failed attempts on {user_email}.",
+            )
+        raise NationalAdminThrottledError(THROTTLE_SECONDS, f"Invalid email or password. {hint}")
+
     else:
         db.commit()

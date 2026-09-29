@@ -8,7 +8,7 @@ from sqlalchemy import cast, Date
 from app.models.verification_requests import VerificationRequest
 from app.models.complaints import Complaint
 from app.models.users import User
-from app.core.user_display import format_officer_display_name
+from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import (
     FdaVerificationCompletedListItem,
     FdaVerificationCompletedListResponse,
@@ -140,8 +140,8 @@ def get_fda_verification_completed_detail(
         manufacturer=complaint.manufacturer,
         product_category=complaint.product_category,
         requested_at=verification_request.requested_at,
-        requested_by_name=format_officer_display_name(requester),
-        verification_result=(
+        # CHANGED — was format_officer_display_name(requester), which is None under RLS
+        requested_by_name=get_display_name_across_agencies(db, verification_request.requested_by),        verification_result=(
             "registered"
             if verification_request.verification_request_status == "confirmed_registered"
             else "unregistered"
@@ -212,8 +212,8 @@ def get_fda_verification_rejected_detail(
         manufacturer=complaint.manufacturer,
         product_category=complaint.product_category,
         requested_at=verification_request.requested_at,
-        requested_by_name=format_officer_display_name(requester),
-        rejected_by_name=format_officer_display_name(responder),
+        # CHANGED — was format_officer_display_name(requester), which is None under RLS
+        requested_by_name=get_display_name_across_agencies(db, verification_request.requested_by),        rejected_by_name=format_officer_display_name(responder),
         responded_at=verification_request.responded_at,
         rejection_reason=verification_request.rejection_reason,
     )

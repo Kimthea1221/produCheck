@@ -1,4 +1,4 @@
-const API_BASE = 'https://everify.store'; // will be changed to real url during development (same with in the manifest)
+const API_BASE = 'https://everify.store'; // https://everify.store http://localhost:8001 will be changed to real url during development (same with in the manifest) 
 
 export class UnauthorizedError extends Error {
   constructor(message) {

@@ -158,7 +158,7 @@ function DeepLinkListener() {
 
   useEffect(() => {
     window.electronAPI.onDeepLinkToken((token) => {
-      fetch(`http://localhost:8000/registration/validate/${token}`)
+      fetch(`https://everify.store/registration/validate/${token}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.status === 'valid') {
@@ -221,7 +221,7 @@ switching between "no value yet" and "a real value" partway through.
 `handleSubmit` was updated to actually call the backend instead of just
 showing the success screen immediately:
 ```javascript
-fetch('http://localhost:8000/registration/complete', { ... })
+fetch('https://everify.store/registration/complete', { ... })
   .then((res) => {
     if (!res.ok) throw new Error('Submission failed')
     return res.json()
@@ -273,7 +273,7 @@ still fully intact in the same file, but it's now called from the
 
 ```javascript
 buttonAction: () => {
-    fetch('http://localhost:8000/registration/request-resend', {
+    fetch('https://everify.store/registration/request-resend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_token }),

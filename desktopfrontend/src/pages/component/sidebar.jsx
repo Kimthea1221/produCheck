@@ -21,6 +21,7 @@ import {
 // Images
 import CIDGLogo from '../../images/pnp-cidg.jpg'
 import FDALogo from '../../images/FDA.png'
+import ICMDALogo from '../../images/icmda_logo.png'
 
 const NationalAdminMenuItems = [
     { icon: UserCog, label: 'Interagency Admin Management', path: '/nationaladminfolder/national-admin-interagency-admin-management' },
@@ -85,12 +86,32 @@ const sidebarStyles = `
   justify-content: center;
   gap: 10px;
   align-items: center;
-  padding: 20px 10px;
+  padding: 10px;
   color: #fdfdfd;
   font-size: small;
   font-weight: 600;
   border-bottom: 1px solid rgba(253, 253, 253, 0.2);
   box-sizing: border-box;
+}
+
+.NationalAdminSidebarTop .SidebarLogoWrapper,
+.SuperAdminSidebarTop .SidebarLogoWrapper {
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1.5px rgba(253, 253, 253, 0.2);
+}
+
+.NationalAdminSidebarTop img,
+.SuperAdminSidebarTop img,
+.FdaAdminSidebarTop img,
+.FdaSidebarTop img,
+.LeaAdminSidebarTop img,
+.LeaSidebarTop img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .NationalAdminSidebarMenu,
@@ -575,6 +596,8 @@ const sidebarStyles = `
   }
 
   .SidebarLogoWrapper img,
+  .NationalAdminSidebarTop img,
+  .SuperAdminSidebarTop img,
   .FdaAdminSidebarTop img,
   .FdaSidebarTop img,
   .LeaAdminSidebarTop img,
@@ -1030,6 +1053,7 @@ function Sidebar({ sidebarType, role, agency }) {
                 />
                 <div className={`NationalAdminSidebarMain SuperAdminSidebarMain ${menuOpen ? 'MenuOpen' : ''}`} ref={sidebarRef}>
                     <div className='NationalAdminSidebarTop SuperAdminSidebarTop'>
+                        <div className='SidebarLogoWrapper'><img src={ICMDALogo} alt="ICMDA Logo" /></div>
                         <p className='SidebarWorkspaceTitle'>National Admin Workspace</p>
                     </div>
                     <button

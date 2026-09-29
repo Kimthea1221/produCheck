@@ -183,3 +183,8 @@ class FdaComplaintDetailResponse(BaseModel):
     created_at: datetime
     description: str | None
     attached_files: list[SharedFileResponse]
+
+# fda-status description schema
+class StatusUpdateRequest(BaseModel):
+    status: str
+    change_note: str | None = Field(default=None, max_length=500)

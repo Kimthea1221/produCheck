@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from fastapi import Request
-from app.core.audit import write_audit_log, get_user_region_code
+from app.core.audit import write_audit_log, get_user_region_code, reset_request_retry_after
 from app.core.constants import AuditAction, Role
 
 from app.database.sessions import get_db
@@ -257,6 +257,15 @@ def request_password_reset(
             detail="This action is only available to personnel accounts.",
         )
 
+    retry_after = reset_request_retry_after(db, current_user.user_id)
+    if retry_after > 0:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": "You already sent a request recently. Please wait before trying again.",
+                "retry_after_seconds": retry_after,
+            },
+        )
 
     write_audit_log(
         db,

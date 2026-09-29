@@ -2326,7 +2326,7 @@ function LeaVerificationRequest() {
                              reason_detail replaces the hardcoded ternary strings */}
       {viewCaseModalData && (
         <div className="ModalOverlay">
-          <div className="ModalViewButton" style={{ width: '600px' }}>
+          <div className="ModalViewButton" style={{ width: '740px', maxWidth: '92vw' }}>
             <h4 style={{ fontFamily: 'Poppins', fontSize: '20px', fontWeight: '700', color: '#13213C', marginBottom: '16px' }}>
               Case Details — {viewCaseModalData.case_reference}
             </h4>

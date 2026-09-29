@@ -1,6 +1,7 @@
 // header.js
 import { whenSessionReady, isUserLoggedIn, getCurrentUser, logoutUser, updateUsername, deleteAccount } from "../scripts/session.js";
 import { loadPartial } from "./partial-loader.js";
+import { LIMITS, validateUsername, liveLengthCheck } from "../utils/validation.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
   whenSessionReady(async () => {
@@ -94,9 +95,16 @@ function initProfileActions() {
   const confirmDeleteBtn = document.getElementById('btn-confirm-delete');
   const cancelDeleteBtn = document.getElementById('btn-cancel-delete');
 
+  const newUsernameError = document.getElementById('new-username-error');
+  liveLengthCheck(newUsernameInput, newUsernameError, 'Username', LIMITS.USERNAME_MAX);
+
   if (editBtn) {
     editBtn.addEventListener('click', () => {
-      if (newUsernameInput) newUsernameInput.value = getCurrentUser().username;
+      if (newUsernameInput) {
+        newUsernameInput.value = getCurrentUser().username;
+        newUsernameInput.classList.remove('is-invalid');
+      }
+      if (newUsernameError) newUsernameError.textContent = '';
       showProfileView('profile-edit-view');
     });
   }
@@ -182,17 +190,26 @@ function initProfileActions() {
     confirmUsernameBtn.addEventListener('click', () => {
       const newValue = newUsernameInput ? newUsernameInput.value.trim() : '';
 
-      if (!newValue) {
+      const usernameMsg = validateUsername(newValue);
+      if (usernameMsg) {
+        if (newUsernameError) newUsernameError.textContent = usernameMsg;
         if (newUsernameInput) newUsernameInput.classList.add('is-invalid');
         return;
       }
+      if (newUsernameError) newUsernameError.textContent = '';
       if (newUsernameInput) newUsernameInput.classList.remove('is-invalid');
 
-      updateUsername(newValue, (success) => {
+      updateUsername(newValue, (success, error) => {
         if (success) {
           renderProfileContent();
           if (typeof applyAuthView === 'function') applyAuthView();
           showProfileView('profile-main-view');
+          return;
+        }
+        // previously nothing happened on failure (e.g. "username taken")
+        if (newUsernameError) {
+          newUsernameError.textContent =
+            (typeof error === 'string' ? error : error?.message) || 'Could not update username. Please try again.';
         }
       });
     });

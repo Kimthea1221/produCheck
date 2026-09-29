@@ -43,5 +43,8 @@ class WorkspaceLocation(Base):
 
     __table_args__ = (
         CheckConstraint("agency IN ('FDA', 'LEA-CIDG')", name="ck_workspace_locations_agency"),
+        CheckConstraint("latitude >= -90.0 AND latitude <= 90.0", name="ck_workspace_locations_latitude_range"),
+        CheckConstraint("longitude >= -180.0 AND longitude <= 180.0", name="ck_workspace_locations_longitude_range"),
+        CheckConstraint("radius_meters >= 1 AND radius_meters <= 50000", name="ck_workspace_locations_radius_range"),
         UniqueConstraint("agency", "region_id", name="uq_workspace_locations_agency_region"),
     )

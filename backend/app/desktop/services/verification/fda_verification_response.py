@@ -23,7 +23,7 @@ from app.desktop.services.notifications.notification_service import (
 
 from app.models.users import User
 from app.models.shared_files import SharedFile
-from app.core.user_display import format_officer_display_name
+from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import FdaVerificationRequestDetailResponse
 from app.desktop.schemas.verification.verification import (
     FdaVerificationSubmitRequest,
@@ -258,7 +258,8 @@ def get_fda_verification_request_detail(
     requesting_officer = db.query(User).filter(
         User.user_id == verification_request.requested_by
     ).first()
-    requested_by_name = format_officer_display_name(requesting_officer)
+    
+    requested_by_name = get_display_name_across_agencies(db, verification_request.requested_by)
 
     files = db.query(SharedFile).filter(
         SharedFile.complaint_id == complaint.complaint_id

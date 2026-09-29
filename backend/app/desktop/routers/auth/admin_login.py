@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from app.database.sessions import get_db, set_bypass_rls
 from app.desktop.schemas.auth.admin_login import AdminLoginRequest, AdminOTPVerifyRequest
 from app.desktop.services.auth.admin_auth import authenticate_admin, AGENCY_ROLE_MAP
+from app.desktop.services.auth.login_throttle import LoginThrottledError 
 from app.desktop.services.auth.otp_service import create_otp_for_user, verify_otp_for_user
 from app.desktop.services.auth.email import send_admin_otp_email
 from app.models.users import User
@@ -28,11 +29,27 @@ async def admin_login(
     set_bypass_rls(db, True)
     try:
         user = authenticate_admin(db, request.email, request.password, request.agency, http_request)
+    except LoginThrottledError as exc:
+        # Throttled after the 3rd/4th wrong password: return 429 with a real
+        # retry_after_seconds field so the frontend can run the countdown.
+        failed_user = db.query(User).filter(User.email == request.email).first()
+        role_override = failed_user.role if failed_user else AGENCY_ROLE_MAP.get(request.agency)
+        write_audit_log(
+            db,
+            user=failed_user,
+            action=AuditAction.LOGIN_FAILED,
+            target_table="users",
+            target_reference=request.email,
+            new_value={"reason": exc.message, "retry_after_seconds": exc.retry_after_seconds},
+            request=http_request,
+            region_code=get_user_region_code(db, failed_user) if failed_user else None,
+            user_role_override=role_override,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail={"message": exc.message, "retry_after_seconds": exc.retry_after_seconds},
+        )
     except ValueError as exc:
-        # Attribute to the agency the person selected, even if the email
-        # doesn't match a real admin — same pattern as personnel_login.py.
-        # This now also covers the "account locked" case: admins always
-        # hard-lock (no throttle), so that message arrives here too.
         failed_user = db.query(User).filter(User.email == request.email).first()
         role_override = failed_user.role if failed_user else AGENCY_ROLE_MAP.get(request.agency)
         write_audit_log(

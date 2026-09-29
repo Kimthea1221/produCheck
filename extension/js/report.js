@@ -1,5 +1,9 @@
 // extension/js/report.js
 import { whenSessionReady, isUserLoggedIn, getCurrentUser, submitComplaint } from "../scripts/session.js";
+import {
+  LIMITS, validateProductName, validateUrl, validateStoreName,
+  validateDescription, validateImageFile, liveLengthCheck
+} from "../utils/validation.js";
 
 let currentVerificationResult = 'unregistered';
 
@@ -33,8 +37,23 @@ function initAttachBoxes() {
     attachBox.addEventListener('click', () => attachInput.click());
 
     attachInput.addEventListener('change', () => {
+      const errorEl = document.getElementById('report-attach-error');
+      if (errorEl) errorEl.textContent = '';
+
       if (attachInput.files.length > 0) {
         const file = attachInput.files[0];
+
+        const fileError = validateImageFile(file);
+        if (fileError) {
+          if (errorEl) errorEl.textContent = fileError;
+          attachInput.value = '';                                  // discard the invalid file
+          const oldPreview = attachBox.querySelector('.attach-preview-img');
+          if (oldPreview) oldPreview.remove();                     // and any earlier preview
+          if (attachText) attachText.classList.remove('hidden');
+          if (uploadIcon) uploadIcon.classList.remove('hidden');
+          return;
+        }
+
         const reader = new FileReader();
 
         reader.onload = () => {
@@ -86,6 +105,23 @@ function getActiveAttachment() {
 //   return { productName, link, storeName, description, attachment };
 // }
 
+function validateReportForm({ productNameInput, productUrlInput, storeNameInput, descriptionInput }) {
+  const checks = [
+    [productNameInput, 'complaint-product-name-error', validateProductName(productNameInput.value)],
+    [productUrlInput, 'complaint-product-url-error', validateUrl(productUrlInput.value)],
+    [storeNameInput, 'store-name-error', validateStoreName(storeNameInput.value)],
+    [descriptionInput, 'complaint-description-error', validateDescription(descriptionInput.value)],
+  ];
+  let isValid = true;
+  checks.forEach(([input, errorId, message]) => {
+    const errorEl = document.getElementById(errorId);
+    if (errorEl) errorEl.textContent = message;
+    input.classList.toggle('is-invalid', Boolean(message));
+    if (message) isValid = false;
+  });
+  return isValid;
+}
+
 function clearReportForm(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -99,6 +135,14 @@ function clearReportForm(containerId) {
   if (urlEl) urlEl.value = '';
   if (storeEl) storeEl.value = '';
   if (descEl) descEl.value = '';
+
+  // clear leftover red error texts and red borders
+  ['complaint-product-name-error', 'complaint-product-url-error', 'store-name-error',
+   'complaint-description-error', 'report-attach-error'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+  [nameEl, urlEl, storeEl, descEl].forEach((el) => { if (el) el.classList.remove('is-invalid'); });
 
   const attachBox = container.querySelector('.report-attach-box');
   if (attachBox) {
@@ -120,6 +164,14 @@ document.addEventListener('DOMContentLoaded', () => {
   whenSessionReady(() => {
      initAttachBoxes();
 
+    [
+      ['complaint-product-name-user', 'complaint-product-name-error', 'Product name', LIMITS.PRODUCT_NAME_MAX],
+      ['complaint-product-url-user', 'complaint-product-url-error', 'Link/URL', LIMITS.URL_MAX],
+      ['store-name-user', 'store-name-error', 'Store name', LIMITS.STORE_NAME_MAX],
+      ['complaint-description-user', 'complaint-description-error', 'Description', LIMITS.DESCRIPTION_MAX],
+    ].forEach(([inputId, errorId, label, max]) =>
+      liveLengthCheck(document.getElementById(inputId), document.getElementById(errorId), label, max));
+
     document.querySelectorAll('.report-cancel-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const isGuest = !isUserLoggedIn();
@@ -135,23 +187,25 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const isGuest = !isUserLoggedIn();
-        showReportView(isGuest ? 'report-success-view-guest' : 'report-success-view');
-
         let productNameInput = isActive('complaint-product-name');
         let productUrlInput = isActive('complaint-product-url');
         let storeNameInput = isActive('store-name');
         let descriptionInput = isActive('complaint-description');
 
-        let url = sanitizeUrl(productUrlInput.value);
+        // stop here if anything is invalid (red text is shown under the fields)
+        if (!validateReportForm({ productNameInput, productUrlInput, storeNameInput, descriptionInput })) return;
+
+        showReportView('report-success-view');
+
+        let url = sanitizeUrl(productUrlInput.value.trim());
         const attachment = getActiveAttachment();
 
         submitComplaint({ 
-            productName: productNameInput.value, 
+            productName: productNameInput.value.trim(),
             productUrl: url, 
-            storeName: storeNameInput.value, 
+            storeName: storeNameInput.value.trim(),
             platform: platform(url),
-            description: descriptionInput.value, 
+            description: descriptionInput.value.trim(),
             verificationResult: currentVerificationResult,
             attachmentData: attachment.data,      
             attachmentName: attachment.name

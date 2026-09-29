@@ -257,8 +257,21 @@ function ProfileSetting() {
   // Personnel Password Reset Request Modal & Notification States
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
-  const [requestSentSuccess, setRequestSentSuccess] = useState(false);
-  const [requestTimestamp, setRequestTimestamp] = useState(null);
+  const [cooldownUntil, setCooldownUntil] = useState(null);
+  const requestSentSuccess = cooldownUntil !== null;
+  const requestTimestamp = cooldownUntil
+    ? new Date(cooldownUntil - PASSWORD_RESET_COOLDOWN_MS).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  // Per-user key so a shared machine doesn't leak one person's cooldown to another
+  const cooldownKey = savedProfile.email
+    ? `${PASSWORD_RESET_COOLDOWN_KEY}:${savedProfile.email}`
+    : null;
+
+  function startCooldown(untilMs) {
+    if (cooldownKey) localStorage.setItem(cooldownKey, String(untilMs));
+    setCooldownUntil(untilMs);
+  }
   
 
   // Workspace configuration: maps layout classes, sidebar/topbar types, and theme palette
@@ -346,30 +359,27 @@ function ProfileSetting() {
   }, [currentWorkspace]);
 
   // Restore an in-progress "request already sent" cooldown across reloads/navigation
+  // Load this user's stored cooldown once the profile (and email) is known
   useEffect(() => {
-    const storedUntil = localStorage.getItem(PASSWORD_RESET_COOLDOWN_KEY);
-    if (!storedUntil) return;
-
-    const until = parseInt(storedUntil, 10);
-    const remaining = until - Date.now();
-
-    if (remaining <= 0) {
-      localStorage.removeItem(PASSWORD_RESET_COOLDOWN_KEY);
-      return;
+    if (!cooldownKey) return;
+    const stored = parseInt(localStorage.getItem(cooldownKey) || '', 10);
+    if (stored && stored > Date.now()) {
+      setCooldownUntil(stored);
+    } else {
+      localStorage.removeItem(cooldownKey);
+      setCooldownUntil(null);
     }
+  }, [cooldownKey]);
 
-    setRequestSentSuccess(true);
-    setRequestTimestamp(
-      new Date(until - PASSWORD_RESET_COOLDOWN_MS).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    );
-
-    const timer = setTimeout(() => {
-      setRequestSentSuccess(false);
-      localStorage.removeItem(PASSWORD_RESET_COOLDOWN_KEY);
-    }, remaining);
-
-    return () => clearTimeout(timer);
-  }, []);
+  // Expire it (timer is cleaned up on unmount / change)
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const t = setTimeout(() => {
+      setCooldownUntil(null);
+      if (cooldownKey) localStorage.removeItem(cooldownKey);
+    }, Math.max(0, cooldownUntil - Date.now()));
+    return () => clearTimeout(t);
+  }, [cooldownUntil, cooldownKey]);
 
   
   
@@ -659,33 +669,29 @@ function ProfileSetting() {
   };
 
   // Personnel: Confirm Password Reset Request Handler
-  const handleConfirmPersonnelResetRequest = async () => {
-    setIsSubmittingRequest(true);
-    try {
-      const res = await apiFetch('/profile/request-password-reset', {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(errData, 'Failed to send request.'));
+  // Personnel: Confirm Password Reset Request Handler
+const handleConfirmPersonnelResetRequest = async () => {
+  setIsSubmittingRequest(true);
+  try {
+    const res = await apiFetch('/profile/request-password-reset', { method: 'POST' });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const retryAfter = errData?.detail?.retry_after_seconds;
+      if (res.status === 429 && retryAfter) {
+        // Server says we're still in cooldown (e.g. storage was cleared): sync up
+        startCooldown(Date.now() + retryAfter * 1000);
+        setIsRequestModalOpen(false);
+        return;
       }
-      setIsRequestModalOpen(false);
-      setRequestSentSuccess(true);
-      setRequestTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-      const until = Date.now() + PASSWORD_RESET_COOLDOWN_MS;
-      localStorage.setItem(PASSWORD_RESET_COOLDOWN_KEY, String(until));
-      setTimeout(() => {
-        setRequestSentSuccess(false);
-        localStorage.removeItem(PASSWORD_RESET_COOLDOWN_KEY);
-      }, PASSWORD_RESET_COOLDOWN_MS);
-    } catch (err) {
-      // surface the error somehow — e.g. reuse requestStatus/profileStatus state,
-      // or a simple alert, depending on what error-display pattern this component uses elsewhere
-      console.error('Password reset request failed:', err);
-    } finally {
-      setIsSubmittingRequest(false);
+      throw new Error(extractErrorMessage(errData, 'Failed to send request.'));
     }
+    setIsRequestModalOpen(false);
+    startCooldown(Date.now() + PASSWORD_RESET_COOLDOWN_MS);
+  } catch (err) {
+    console.error('Password reset request failed:', err);
+  } finally {
+    setIsSubmittingRequest(false);
+  }
 };
 
   return (
@@ -1241,7 +1247,7 @@ function ProfileSetting() {
                         </button>
                         <p className="PersonnelActionHelperText">
                           {requestSentSuccess
-                            ? 'You can send another request later today.'
+                            ? 'You can send another request after the cooldown period (about 8 hours).'
                             : `An administrative notification will be dispatched to the ${layoutConfig.agencyDisplay} management team.`}
                         </p>
                       </div>

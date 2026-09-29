@@ -14,8 +14,13 @@ import {
   loginUser,
   googleLogin
 } from "../scripts/session.js";
+import {
+  LIMITS, PASSWORD_RULE_MESSAGE, validateUsername, validateEmail,
+  validatePasswordStrength, liveLengthCheck
+} from "../utils/validation.js";
 
 document.addEventListener('DOMContentLoaded', () => {
+  const GOOGLE_LOGIN_ENABLED = false;
   const emailField = document.getElementById('email-field');
   const otpField = document.getElementById('otp-field');
   const otpDigitInputs = Array.from(document.querySelectorAll('#otp-field .otp-digit-input'));
@@ -73,6 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const otpUsernameFixError = document.getElementById('otp-username-fix-error');
   const otpUsernameFixButton = document.getElementById('otp-username-fix-button');
 
+  // live red text if the user types past the limit
+  liveLengthCheck(usernameInput, usernameError, 'Username', LIMITS.USERNAME_MAX);
+  liveLengthCheck(emailInput, emailError, 'Email', LIMITS.EMAIL_MAX);
+  liveLengthCheck(otpNewUsernameInput, otpUsernameFixError, 'Username', LIMITS.USERNAME_MAX);
 
   // --- Password show/hide eye icon toggle ---
   document.querySelectorAll('.toggle-password-visibility').forEach(btn => {
@@ -136,17 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // --- if the email is valid ---
-  const isValidEmail = (value) => /^\S+@\S+\.\S+$/.test(value);
-
-  // --- password rule ---
-  const isStrongPassword = (value) => {
-    const hasMinimumLength = value.length >= 8;
-    const hasLetter = /[A-Z]/.test(value);
-    const hasNumber = /\d/.test(value);
-
-    return hasMinimumLength && hasLetter && hasNumber;
-  };
+  // --- email / password rules now come from utils/validation.js ---
+  const isValidEmail = (value) => validateEmail(value) === '';
+  const isStrongPassword = (value) => validatePasswordStrength(value) === '';
 
   // Switches the whole form between "Sign In" view and "Sign Up" view
   const updateMode = (mode) => {
@@ -191,12 +192,19 @@ document.addEventListener('DOMContentLoaded', () => {
       forgotLink.hidden = mode === 'signup';
     }
 
-    // hide sign in with google on sign up page
-    if (currentMode === 'signup') {
-      googleLoginBtn.style.display = "none";
-    } else if (currentMode === 'signin') {
-      googleLoginBtn.style.display = "block";
+    // temporary hide the sign in with google
+    const GOOGLE_LOGIN_ENABLED = false;
+    if (googleLoginBtn) {
+      googleLoginBtn.style.display =
+        GOOGLE_LOGIN_ENABLED && currentMode === 'signin' ? 'flex' : 'none';
     }
+    
+    // hide sign in with google on sign up page
+    // if (currentMode === 'signup') {
+    //   googleLoginBtn.style.display = "none";
+    // } else if (currentMode === 'signin') {
+    //   googleLoginBtn.style.display = "block";
+    // }
 
     clearErrors();
 
@@ -554,14 +562,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailValue = emailInput ? emailInput.value.trim() : '';
     let isValid = true;
 
-    if (!emailValue) {
-      setError(emailError, 'Email is required.');
-      if (emailInput) {
-        emailInput.classList.add('is-invalid');
-      }
-      isValid = false;
-    } else if (!isValidEmail(emailValue)) {
-      setError(emailError, 'Enter a valid email address.');
+    const emailMsg = validateEmail(emailValue);
+    if (emailMsg) {
+      setError(emailError, emailMsg);
       if (emailInput) {
         emailInput.classList.add('is-invalid');
       }
@@ -570,12 +573,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Extra checks that only apply when signing up (not signing in)
     if (currentMode === 'signup') {
-      const usernameValue = usernameInput ? usernameInput.value.trim() : '';
-        if (!usernameValue) {
-          setError(usernameError, 'Username is required.');
-          if (usernameInput) usernameInput.classList.add('is-invalid');
-          isValid = false;
-        }
+      const usernameMsg = validateUsername(usernameInput ? usernameInput.value : '');
+      if (usernameMsg) {
+        setError(usernameError, usernameMsg);
+        if (usernameInput) usernameInput.classList.add('is-invalid');
+        isValid = false;
+      }
       const createPasswordValue = createPasswordInput ? createPasswordInput.value : '';
       const confirmPasswordValue = confirmPasswordInput ? confirmPasswordInput.value : '';
 
@@ -586,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         isValid = false;
       } else if (!isStrongPassword(createPasswordValue)) {
-        setError(createPasswordError, 'The password must be at least 8 characters long and include at least one uppercase letter and one number.');
+        setError(createPasswordError, PASSWORD_RULE_MESSAGE);
         if (createPasswordInput) {
           createPasswordInput.classList.add('is-invalid');
         }
@@ -695,8 +698,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearErrors();
         const emailValue = emailInput ? emailInput.value.trim() : '';
 
-        if (!emailValue || !isValidEmail(emailValue)) {
-          setError(emailError, 'Enter a valid email address.');
+        const emailMsg = validateEmail(emailValue);
+        if (emailMsg) {
+          setError(emailError, emailMsg);
           if (emailInput) emailInput.classList.add('is-invalid');
           return;
         }
@@ -763,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (newPasswordInput) newPasswordInput.classList.add('is-invalid');
           isValid = false;
         } else if (!isStrongPassword(newPassword)) {
-          setError(newPasswordError, 'The password must be at least 8 characters long and include at least one uppercase letter and one number.');
+          setError(newPasswordError, PASSWORD_RULE_MESSAGE);
           if (newPasswordInput) newPasswordInput.classList.add('is-invalid');
           isValid = false;
         }
@@ -886,8 +890,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (otpUsernameFixButton) otpUsernameFixError.textContent = '';
       const newUsername = otpNewUsernameInput.value.trim();
 
-      if (!newUsername) {
-        setError(otpUsernameFixError, 'Enter a new username.');
+      const usernameMsg = validateUsername(newUsername);
+      if (usernameMsg) {
+        setError(otpUsernameFixError, usernameMsg);
         return;
       }
 
@@ -1042,33 +1047,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // sign in with google (connected to the backend)
-  googleLoginBtn.addEventListener("click", () => {
-    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-      if (chrome.runtime.lastError || !token) {
-        setError(googleError, "Google sign-in failed. Please try again.");
-        return;
-      }
-
-      googleLogin(token, (success, error, email, errObj) => {
-        if (success) {
-          window.location.href = 'report-complaint.html';
+  if (googleLoginBtn && GOOGLE_LOGIN_ENABLED) {
+    googleLoginBtn.addEventListener("click", () => {
+      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+          setError(googleError, "Google sign-in failed. Please try again.");
           return;
-        } 
-        
-        if (handleRateLimitError(errObj, null, googleError)) return;
-
-        if (error && error.toLowerCase().includes('verify')) {
-          if (googleError){
-            googleError.innerHTML ='Please verify your email before signing in. ' + 
-              '<a href="#" id="verify-now-link" style="color:#1F2937; font-weight:700; text-decoration:underline; cursor:pointer;">Verify now</a>';
-          }
-          
-          reVerifyEmail(email, googleError);
-        } else {
-          setError(googleError, error || "Google sign-in failed. Please try again.")
         }
+
+        googleLogin(token, (success, error, email, errObj) => {
+          if (success) {
+            window.location.href = 'report-complaint.html';
+            return;
+          } 
+          
+          if (handleRateLimitError(errObj, null, googleError)) return;
+
+          if (error && error.toLowerCase().includes('verify')) {
+            if (googleError){
+              googleError.innerHTML ='Please verify your email before signing in. ' + 
+                '<a href="#" id="verify-now-link" style="color:#1F2937; font-weight:700; text-decoration:underline; cursor:pointer;">Verify now</a>';
+            }
+            
+            reVerifyEmail(email, googleError);
+          } else {
+            setError(googleError, error || "Google sign-in failed. Please try again.")
+          }
+        });
       });
     });
-  });
+  }
   
 });

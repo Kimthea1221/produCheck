@@ -42,28 +42,33 @@
                 <div class="field">
                   <label class="field-label" for="complaint-product-name">Product Name/Title</label>
                   <textarea id="complaint-product-name-user" class="complaint-input" placeholder="Enter Product Name/Title"></textarea>
+                  <div class="field-error" id="complaint-product-name-error" aria-live="polite"></div>
                 </div>
 
                 <div class="field">
                   <label class="field-label" for="complaint-product-url">Link/URL</label>
                   <textarea id="complaint-product-url-user" class="complaint-input" placeholder="Enter Product Link/URL"></textarea>
+                  <div class="field-error" id="complaint-product-url-error" aria-live="polite"></div>
                 </div>
                 
                 <div class="field">
                   <label class="field-label" for="store-name">Name of the Store</label>
                   <textarea id="store-name-user" class="complaint-input" placeholder="Enter Store Name"></textarea>
+                  <div class="field-error" id="store-name-error" aria-live="polite"></div>
                 </div>
 
                 <div class="field">
                   <label class="field-label" for="complaint-description">Description (optional)</label>
                   <textarea id="complaint-description-user" class="complaint-input" placeholder="Tell us what made this product look suspicious..."></textarea>
+                  <div class="field-error" id="complaint-description-error" aria-live="polite"></div>
                 </div>
 
                 <div class="attach-box report-attach-box" role="button" tabindex="0">
-                  <input type="file" class="report-attach-input hidden" accept="image/*" />
+                  <input type="file" class="report-attach-input hidden" accept="image/png,image/jpeg,image/webp" />
                   <img src="../assets/images/upload_icon.png" alt="Upload Icon" class="upload-icon report-upload-icon" />
                   <span class="attach-text report-attach-text">Attach screenshot (optional)</span>
                 </div>
+                <div class="field-error" id="report-attach-error" aria-live="polite"></div>
 
                 <div class="action-row">
                   <button class="btn-cancel report-cancel-btn" type="button">Cancel</button>

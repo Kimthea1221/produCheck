@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, AlertCircle, Users, ShieldCheck, Building2, CheckCircle2 } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Users, ShieldCheck, Building2, CheckCircle2, AlertTriangle, Send } from 'lucide-react'
 import FDALogo from '../images/FDA.png'
 import PNPLogo from '../images/pnp-cidg.jpg'
 import { API_BASE_URL } from '../utils/apiConfig'
@@ -32,6 +33,16 @@ function extractErrorMessage(errorData, fallback) {
     return detail.msg || detail.message || JSON.stringify(detail);
   }
   return fallback;
+}
+
+function getRetryAfterSeconds(errorData) {
+  const s = errorData?.detail?.retry_after_seconds;
+  return Number.isFinite(s) && s > 0 ? Math.ceil(s) : 0;
+}
+
+function withCountdown(message, seconds) {
+  if (!message || seconds <= 0) return message;
+  return `${message} Please wait ${seconds}s before trying again.`;
 }
 
 function UniversalLogin() {
@@ -857,6 +868,192 @@ function UniversalLogin() {
 
         @keyframes universalLoginFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* ===== PERSONNEL REQUEST RESET PASSWORD CONFIRMATION MODAL ===== */
+        .universal-login-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          animation: universalLoginModalFade 0.2s ease-out;
+        }
+        @keyframes universalLoginModalFade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .universal-login-modal {
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+          width: 100%;
+          max-width: 480px;
+          overflow: hidden;
+          animation: universalLoginModalUp 0.22s ease-out;
+          color: #0f172a;
+          box-sizing: border-box;
+        }
+        @keyframes universalLoginModalUp {
+          from { opacity: 0; transform: translateY(14px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .universal-login-modal-header {
+          padding: 28px 28px 16px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .universal-login-modal-icon-wrap {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: rgba(245, 158, 11, 0.12);
+          color: #d97706;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 14px;
+        }
+        .universal-login-modal-icon-wrap.success {
+          background: rgba(16, 185, 129, 0.12);
+          color: #10b981;
+        }
+        .universal-login-modal-title {
+          font-family: 'Poppins', sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 8px;
+          letter-spacing: -0.2px;
+        }
+        .universal-login-modal-subtitle {
+          font-size: 13.5px;
+          color: #64748b;
+          margin: 0;
+          line-height: 1.5;
+        }
+        .universal-login-modal-body {
+          padding: 10px 28px 20px;
+        }
+        .universal-login-modal-text {
+          font-size: 13.5px;
+          color: #475569;
+          line-height: 1.55;
+          margin: 0;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 14px 16px;
+        }
+        .universal-login-modal-notice {
+          font-size: 13px;
+          color: #92400e;
+          line-height: 1.55;
+          margin: 0;
+          background: #fffbeb;
+          border: 1.5px solid #fde68a;
+          border-radius: 10px;
+          padding: 14px 16px;
+        }
+        .universal-login-modal-notice strong {
+          color: #78350f;
+        }
+        .universal-login-modal-verify-box {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 14px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .universal-login-modal-verify-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13.5px;
+        }
+        .universal-login-modal-verify-label {
+          color: #64748b;
+          font-weight: 500;
+        }
+        .universal-login-modal-verify-value {
+          color: #0f172a;
+          font-weight: 600;
+        }
+        .universal-login-modal-verify-warning {
+          font-size: 12.5px;
+          color: #64748b;
+          line-height: 1.5;
+          margin: 0;
+          text-align: center;
+        }
+        .universal-login-modal-footer {
+          padding: 16px 28px 24px;
+          border-top: 1px solid #f1f5f9;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        .universal-login-modal-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 10px 18px;
+          border-radius: 8px;
+          font-size: 13.5px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border: 1.5px solid transparent;
+        }
+        .universal-login-modal-btn-secondary {
+          background: #ffffff;
+          color: #475569;
+          border-color: #cbd5e1;
+        }
+        .universal-login-modal-btn-secondary:hover:not(:disabled) {
+          background: #f8fafc;
+          color: #0f172a;
+          border-color: #94a3b8;
+        }
+        .universal-login-modal-btn-primary {
+          background: #1D3439;
+          color: #ffffff;
+          box-shadow: 0 3px 10px rgba(29, 52, 57, 0.25);
+        }
+        .universal-login-modal-btn-primary:hover:not(:disabled) {
+          background: #27484F;
+          transform: translateY(-1px);
+          box-shadow: 0 5px 14px rgba(29, 52, 57, 0.35);
+        }
+        .universal-login-modal-btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none !important;
+          box-shadow: none !important;
+        }
+        .universal-login-modal-spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid rgba(255, 255, 255, 0.35);
+          border-top-color: #ffffff;
+          border-radius: 50%;
+          animation: universalLoginModalSpin 0.7s linear infinite;
+        }
+        @keyframes universalLoginModalSpin {
+          to { transform: rotate(360deg); }
+        }
+
         /* ===== RESPONSIVENESS ===== */
         @media (max-width: 820px) {
           .universal-login-glass-container {
@@ -1087,7 +1284,7 @@ const getDeviceCoordinates = () => {
         console.warn('Geolocation unavailable during login:', err);
         resolve({ latitude: null, longitude: null, source: 'ip' });
       },
-      { enableHighAccuracy: true, timeout: 6000 }
+      { enableHighAccuracy: false, timeout: 3000, maximumAge: 5 * 60 * 1000 }
     );
   });
 };
@@ -1104,28 +1301,114 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
   const [personnelLoginError, setPersonnelLoginError] = useState('');
   const [personnelRememberMe, setPersonnelRememberMe] = useState(false);
   const [personnelErrors, setPersonnelErrors] = useState({});
+  const [personnelLockoutSeconds, setPersonnelLockoutSeconds] = useState(0);
+
+  useEffect(() => {
+    if (personnelLockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setPersonnelLockoutSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [personnelLockoutSeconds]);
+
+  const displayedPersonnelError = withCountdown(personnelLoginError, personnelLockoutSeconds);
+
+  // Personnel Request Password Reset Modal State
+  const [personnelIsResetModalOpen, setPersonnelIsResetModalOpen] = useState(false);
+  const [personnelResetStep, setPersonnelResetStep] = useState('confirm'); // 'confirm' | 'verify' | 'success'
+  const [personnelIsSubmittingReset, setPersonnelIsSubmittingReset] = useState(false);
+  const [personnelResetError, setPersonnelResetError] = useState('');
+
+  const agencyDisplay = personnelAgency === 'fda' ? 'FDA' : personnelAgency === 'lea' ? 'LEA-CIDG' : '';
+  const isEmailValid = Boolean(personnelEmail.trim() && validateEmail(personnelEmail.trim()) === null);
+  const isPersonnelFormComplete = Boolean(personnelAgency && isEmailValid);
+
+  function handleOpenResetModal() {
+    setPersonnelResetStep('confirm');
+    setPersonnelIsSubmittingReset(false);
+    setPersonnelResetError('');
+    setPersonnelIsResetModalOpen(true);
+  }
+
+  function handleCloseResetModal() {
+    if (personnelIsSubmittingReset) return;
+    setPersonnelIsResetModalOpen(false);
+  }
+
+  function handleOverlayClick() {
+    if (personnelIsSubmittingReset) return;
+    if (personnelResetStep === 'verify') {
+      setPersonnelResetStep('confirm');
+    } else {
+      handleCloseResetModal();
+    }
+  }
+
+  function handleProceedToVerify() {
+    if (!isPersonnelFormComplete) return;
+    setPersonnelResetStep('verify');
+  }
+
+  function handleBackToConfirm() {
+    if (personnelIsSubmittingReset) return;
+    setPersonnelResetError('');
+    setPersonnelResetStep('confirm');
+  }
+
+  async function handleConfirmPersonnelResetRequest() {
+    if (personnelIsSubmittingReset || !isPersonnelFormComplete) return;
+    setPersonnelIsSubmittingReset(true);
+    setPersonnelResetError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/request-password-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: personnelEmail.trim(),
+          agency: personnelAgency,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await safeParseErrorResponse(response);
+        throw new Error(extractErrorMessage(errorData, 'Failed to send request.'));
+      }
+
+      setPersonnelResetStep('success');
+    } catch (err) {
+      setPersonnelResetError(err.message || 'Failed to send request. Please try again.');
+    } finally {
+      setPersonnelIsSubmittingReset(false);
+    }
+  }
 
 
   function rememberedEmailKey(forAgency) {
     return forAgency ? `remembered_email_user_${forAgency}` : null;
   }
 
+  const personnelLastAutoFillRef = useRef('');
+
   useEffect(() => {
     const key = rememberedEmailKey(personnelAgency);
-    if (!key) {
-      setPersonnelEmail('');
-      setPersonnelRememberMe(false);
-      return;
-    }
+    const savedEmail = key ? localStorage.getItem(key) : null;
 
-    const savedEmail = localStorage.getItem(key);
+    // Only touch the field if it's empty, or if it still holds exactly
+    // what we auto-filled last time (i.e. the user hasn't typed their
+    // own value in the meantime) — otherwise leave their input alone.
+    const emailIsUntouched =
+      personnelEmail.trim() === '' || personnelEmail === personnelLastAutoFillRef.current;
 
-    if (savedEmail) {
-      setPersonnelEmail(savedEmail);
-      setPersonnelRememberMe(true);
-    } else {
-      setPersonnelEmail('');
-      setPersonnelRememberMe(false);
+    if (emailIsUntouched) {
+      if (savedEmail) {
+        setPersonnelEmail(savedEmail);
+        setPersonnelRememberMe(true);
+      } else {
+        setPersonnelEmail('');
+        setPersonnelRememberMe(false);
+      }
+      personnelLastAutoFillRef.current = savedEmail || '';
     }
   }, [personnelAgency]);
 
@@ -1133,6 +1416,7 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
   const [personnelOtp, setPersonnelOtp] = useState(new Array(6).fill(''));
   const [personnelTimer, setPersonnelTimer] = useState(300);
   const personnelOtpRefs = useRef([]);
+  const personnelCoordsPromiseRef = useRef(null);
 
   // Notify parent when OTP screen visibility changes
   useEffect(() => {
@@ -1213,6 +1497,7 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
     setPersonnelIsOtpSent(false);
     setPersonnelOtp(new Array(6).fill(''));
     setPersonnelLoginError('');
+    personnelCoordsPromiseRef.current = null;
   }
 
   const formatPersonnelTimer = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -1241,9 +1526,13 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
     if (personnelErrors.password) setPersonnelErrors((prev) => ({ ...prev, password: '' }));
   }
 
- function handlePersonnelAgencyChange(value) {
-  setPersonnelAgency(value);
-  setPersonnelPassword('');
+ function handlePersonnelAgencyChange(newAgency) {
+  if (personnelAgency && personnelAgency !== newAgency) {
+    // Agency was already selected, and it's genuinely changing — clear password only
+    setPersonnelPassword('');
+  }
+  // If personnelAgency was empty (first-time selection) or newAgency === personnelAgency, do nothing to password
+  setPersonnelAgency(newAgency);
 
   if (personnelErrors.agency) {
     setPersonnelErrors((prev) => ({ ...prev, agency: '' }));
@@ -1254,6 +1543,7 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
     if (e && e.preventDefault) e.preventDefault();
 
     if (!personnelIsOtpSent) {
+      if (personnelLockoutSeconds > 0) return;
       const newErrors = {};
 
       if (!personnelAgency) {
@@ -1290,6 +1580,7 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
 
         if (!response.ok) {
           const errorData = await safeParseErrorResponse(response);
+          setPersonnelLockoutSeconds(getRetryAfterSeconds(errorData));
           throw new Error(extractErrorMessage(errorData, 'Invalid email or password.'));
         }
 
@@ -1298,11 +1589,15 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
           if (personnelRememberMe) localStorage.setItem(key, personnelEmail.trim());
           else localStorage.removeItem(key);
         }
+        
+        // Start acquiring location now so it's ready by the time the OTP is typed
+        personnelCoordsPromiseRef.current = getDeviceCoordinates();
 
 
         setPersonnelIsOtpSent(true);
         setPersonnelTimer(300);
         setPersonnelLoginError('');
+        setPersonnelLockoutSeconds(0);
       } catch (err) {
         setPersonnelLoginError(err.message || 'Something went wrong. Please try again.');
       }
@@ -1318,7 +1613,12 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
 
       // REAL BACKEND OTP VERIFICATION
       try {
-        const coords = await getDeviceCoordinates();
+        const coords = await Promise.race([
+          personnelCoordsPromiseRef.current ?? getDeviceCoordinates(),
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ latitude: null, longitude: null, source: 'ip' }), 3500)
+          ),
+        ]);
 
         const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
           method: 'POST',
@@ -1467,20 +1767,20 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
               Remember my email
             </label>
             <a
-              onClick={() => navigate('/forgot-password?from=personnel')}
+              onClick={handleOpenResetModal}
               className="universal-login-forget-pass"
             >
-              Forgot password?
+              Request password reset
             </a>
           </div>
 
-          {personnelLoginError && (
+          {displayedPersonnelError && (
             <div className="universal-login-error-msg-container">
-              <p className="universal-login-error-msg">{personnelLoginError}</p>
+              <p className="universal-login-error-msg">{displayedPersonnelError}</p>
             </div>
           )}
 
-          <button type="submit" className="universal-login-submit-btn">
+          <button type="submit" className="universal-login-submit-btn" disabled={personnelLockoutSeconds > 0}>
             Login
           </button>
 
@@ -1550,6 +1850,136 @@ function PersonnelLoginForm({ navigate, onOtpStateChange, sessionMessage  }) {
           </div>
         </form>
       )}
+
+      {/* Personnel Request Reset Password Confirmation Modal */}
+      {personnelIsResetModalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="universal-login-modal-overlay" onClick={handleOverlayClick}>
+          <div
+            className="universal-login-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="universal-login-reset-title"
+          >
+            <div className="universal-login-modal-header">
+              <div className={`universal-login-modal-icon-wrap ${personnelResetStep === 'success' ? 'success' : ''}`}>
+                {personnelResetStep === 'success' ? (
+                  <CheckCircle2 size={26} />
+                ) : (
+                  <AlertTriangle size={26} />
+                )}
+              </div>
+              <h3 id="universal-login-reset-title" className="universal-login-modal-title">
+                Request Password Reset
+              </h3>
+              <p className="universal-login-modal-subtitle">
+                {personnelResetStep === 'success'
+                  ? 'Your request has been sent to your administrator.'
+                  : personnelResetStep === 'verify'
+                  ? 'Please double-check your account details before sending.'
+                  : 'Are you sure you want to send a request to your administrator to reset your password?'}
+              </p>
+            </div>
+
+            {personnelResetStep === 'confirm' && (
+              <div className="universal-login-modal-body">
+                {isPersonnelFormComplete ? (
+                  <p className="universal-login-modal-text">
+                    A formal request will be submitted to the <strong>{agencyDisplay}</strong> administration team under your account (<strong>{personnelEmail.trim()}</strong>). An administrator will issue an official reset link upon verification.
+                  </p>
+                ) : (
+                  <p className="universal-login-modal-notice">
+                    To submit a password reset request, please select your <strong>Agency</strong> and enter a valid <strong>Email Address</strong> on the login form first so your administrator can identify your account.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {personnelResetStep === 'verify' && (
+              <div className="universal-login-modal-body">
+                <div className="universal-login-modal-verify-box">
+                  <div className="universal-login-modal-verify-row">
+                    <span className="universal-login-modal-verify-label">Agency:</span>
+                    <span className="universal-login-modal-verify-value">{agencyDisplay}</span>
+                  </div>
+                  <div className="universal-login-modal-verify-row">
+                    <span className="universal-login-modal-verify-label">Account Email:</span>
+                    <span className="universal-login-modal-verify-value">{personnelEmail.trim()}</span>
+                  </div>
+                </div>
+                <p className="universal-login-modal-verify-warning">
+                  Make sure these details are correct before proceeding — an incorrect email means your administrator cannot identify your account or issue your reset instructions.
+                </p>
+                {personnelResetError && (
+                  <div className="universal-login-error-msg-container" style={{ marginTop: '12px' }}>
+                    <p className="universal-login-error-msg">{personnelResetError}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="universal-login-modal-footer">
+              {personnelResetStep === 'success' ? (
+                <button
+                  type="button"
+                  className="universal-login-modal-btn universal-login-modal-btn-primary"
+                  onClick={handleCloseResetModal}
+                >
+                  Done
+                </button>
+              ) : personnelResetStep === 'verify' ? (
+                <>
+                  <button
+                    type="button"
+                    className="universal-login-modal-btn universal-login-modal-btn-secondary"
+                    onClick={handleBackToConfirm}
+                    disabled={personnelIsSubmittingReset}
+                  >
+                    Go Back
+                  </button>
+                  <button
+                    type="button"
+                    className="universal-login-modal-btn universal-login-modal-btn-primary"
+                    onClick={handleConfirmPersonnelResetRequest}
+                    disabled={personnelIsSubmittingReset}
+                  >
+                    {personnelIsSubmittingReset ? (
+                      <>
+                        <span className="universal-login-modal-spinner"></span>
+                        Sending Request...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={15} />
+                        Yes, Send Request
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="universal-login-modal-btn universal-login-modal-btn-secondary"
+                    onClick={handleCloseResetModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="universal-login-modal-btn universal-login-modal-btn-primary"
+                    onClick={handleProceedToVerify}
+                    disabled={!isPersonnelFormComplete}
+                  >
+                    Confirm Request
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -1591,13 +2021,7 @@ function SuperAdminLoginForm({ navigate, onOtpStateChange, sessionMessage }) {
   useEffect(() => {
     if (lockoutSeconds <= 0) return;
     const interval = setInterval(() => {
-      setLockoutSeconds((prev) => {
-        if (prev <= 1) {
-          setAdminLoginError('');
-          return 0;
-        }
-        return prev - 1;
-      });
+      setLockoutSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutSeconds]);
@@ -1719,6 +2143,7 @@ function SuperAdminLoginForm({ navigate, onOtpStateChange, sessionMessage }) {
     if (e && e.preventDefault) e.preventDefault();
 
     if (!adminIsOtpSent) {
+      if (lockoutSeconds > 0) return;
       const newErrors = {};
 
       if (!adminEmail.trim()) {
@@ -1813,9 +2238,7 @@ function SuperAdminLoginForm({ navigate, onOtpStateChange, sessionMessage }) {
 
   const formatAdminTimer = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-  const displayedError = lockoutSeconds > 0
-    ? `Too many failed attempts. Try again in ${lockoutSeconds} second${lockoutSeconds === 1 ? '' : 's'}.`
-    : adminLoginError;
+  const displayedError = withCountdown(adminLoginError, lockoutSeconds);
 
   return (
     <div className="universal-login-admin-form">
@@ -2007,21 +2430,25 @@ function InteragencyAdminLoginForm({ navigate, onOtpStateChange, sessionMessage 
     return forAgency ? `remembered_email_admin_${forAgency}` : null;
   }
 
+  const adminLastAutoFillRef = useRef('');
+
   useEffect(() => {
     const key = rememberedEmailKey(agency);
-    if (!key) {
-      return;
+    const savedEmail = key ? localStorage.getItem(key) : null;
+
+    const emailIsUntouched =
+      email.trim() === '' || email === adminLastAutoFillRef.current;
+
+    if (emailIsUntouched) {
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      } else {
+        setEmail('');
+        setRememberMe(false);
+      }
+      adminLastAutoFillRef.current = savedEmail || '';
     }
-    const savedEmail = localStorage.getItem(key);
-    if (savedEmail && email.trim() === '') {
-      // Only auto-fill if the user hasn't already typed something —
-      // never overwrite or clear an in-progress email
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
-    // If there's no saved email for this agency, or the user already has
-    // something typed, leave the email field exactly as it is — do not
-    // clear it and do not touch rememberMe in that case.
   }, [agency]);
 
   // OTP state
@@ -2049,13 +2476,7 @@ function InteragencyAdminLoginForm({ navigate, onOtpStateChange, sessionMessage 
   useEffect(() => {
     if (lockoutSeconds <= 0) return;
     const interval = setInterval(() => {
-      setLockoutSeconds((prev) => {
-        if (prev <= 1) {
-          setLoginError('');
-          return 0;
-        }
-        return prev - 1;
-      });
+      setLockoutSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutSeconds]);
@@ -2091,6 +2512,7 @@ function handleAgencyChange(newAgency) {
   // ---- STEP 1: credentials -> request OTP -------------------------------
   async function handleCredentialsSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
+    if (lockoutSeconds > 0) return;
 
     const newErrors = {};
     if (!agency) newErrors.agency = 'Please select an agency.';
@@ -2270,9 +2692,7 @@ function handleAgencyChange(newAgency) {
     return `${maskedLocal}@${domain}`;
   }
 
-  const displayedLoginError = lockoutSeconds > 0
-    ? `Too many failed attempts. Try again in ${lockoutSeconds} second${lockoutSeconds === 1 ? '' : 's'}.`
-    : loginError;
+  const displayedLoginError = withCountdown(loginError, lockoutSeconds);
 
   return (
     <div className="universal-login-admin-form">

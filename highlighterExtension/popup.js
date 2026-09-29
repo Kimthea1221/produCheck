@@ -74,7 +74,7 @@ document.getElementById('backToComplaintBtn').addEventListener('click', () => {
 //-------------------------------------
 
 //login/signup to backend
-const API_BASE = 'http://localhost:8000'; // will be changed to real url during development (same with in the manifest)
+const API_BASE = 'https://everify.store'; // will be changed to real url during development (same with in the manifest)
 
 //sign up
 document.getElementById('signUpForm').addEventListener('submit', async (e) => {

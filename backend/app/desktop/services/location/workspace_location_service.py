@@ -110,6 +110,24 @@ def save_workspace_location(
             detail="Administrator does not have an assigned region.",
         )
 
+    if payload.latitude < -90.0 or payload.latitude > 90.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Latitude must be between -90 and 90.",
+        )
+
+    if payload.longitude < -180.0 or payload.longitude > 180.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Longitude must be between -180 and 180.",
+        )
+
+    if payload.radius_meters < 1 or payload.radius_meters > 50000:
+        raise HTTPException(
+            status_code=400,
+            detail="Geofence radius must be between 1 and 50,000 meters.",
+        )
+
     region = db.query(Region).filter(Region.region_id == user.region_id).first()
     region_name = region.region_name if region else "Unknown Region"
 

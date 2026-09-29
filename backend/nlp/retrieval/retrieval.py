@@ -41,7 +41,7 @@ unregistered = pd.read_pickle(ASSET_DIR / "Unregistered_cleaned.pkl")
 # UNCHANGED: original retrieval helpers and functions.
 def add_missing_cosine_scores(combined, embeddings, query_vec):
     """Fill in cosine similarity for candidates that BM25 found but FAISS didn't surface."""
-    q = query_vec[0] 
+    q = query_vec[0]
     for idx, scores in combined.items():
         if "faiss_score" not in scores:
             scores["faiss_score"] = float(np.dot(q, embeddings[idx]))
@@ -110,6 +110,7 @@ def retrieve(query, protected_vocab=None):
         "unregistered": candidates_unreg
     }
 
+
 def evaluate_match(query):
     threshold = 0.7
 
@@ -175,6 +176,7 @@ def evaluate_match(query):
     }
 
     # ===== Brand-conflict check — Track 1 ===== #
+
 
 def brand_conflicts(query, candidate_index, registered_df):
     """

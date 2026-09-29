@@ -733,7 +733,7 @@ function FDASavedDraft() {
                 DRAFT STATUS badge reads the real draft_status value (not hardcoded "Draft"). */}
       {viewModalData && (
         <div className="FdaVerifModalOverlay">
-          <div className="FdaRecordModalContainer" style={{ width: "560px" }}>
+          <div className="FdaRecordModalContainer" style={{ width: "700px", maxWidth: "96vw" }}>
             <div className="FdaRecordModalHeader">
               <div className="FdaRecordModalTitleGroup">
                 <Eye size={20} className="FdaVerifGreenIcon" />

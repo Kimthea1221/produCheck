@@ -72,6 +72,34 @@ let lastVerificationStatus;
 let lastAttachmentPath = null; // base64 data URL
 let lastAttachmentName = null;
 
+// Keep in sync with extension/utils/validation.js (content scripts can't import ES modules)
+const RF_LIMITS = { PRODUCT_NAME_MAX: 150, STORE_NAME_MAX: 100, DESCRIPTION_MAX: 500, ATTACHMENT_MAX_MB: 5 };
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+const RF_FIELDS = [
+  { input: '#rf-product-name', error: '#rf-product-name-error', label: 'Product name', max: RF_LIMITS.PRODUCT_NAME_MAX, required: true },
+  { input: '#rf-store-name',   error: '#rf-store-name-error',   label: 'Store name',   max: RF_LIMITS.STORE_NAME_MAX,   required: true },
+  { input: '#rf-description',  error: '#rf-description-error',  label: 'Description',  max: RF_LIMITS.DESCRIPTION_MAX,  required: false },
+];
+
+// live = true while typing: only length is checked, "required" waits for submit
+function validateRfField(cfg, live = false) {
+  const el = modal.querySelector(cfg.input);
+  const errEl = modal.querySelector(cfg.error);
+  const value = el.value.trim();
+  let msg = '';
+  if (!live && cfg.required && !value) msg = `${cfg.label} is required.`;
+  else if (value.length > cfg.max) msg = `${cfg.label} must be ${cfg.max} characters or fewer (currently ${value.length}).`;
+  errEl.textContent = msg;
+  el.classList.toggle('rf-input-invalid', msg !== '');
+  return msg === '';
+}
+
+function validateReportFormModal() {
+  // map() first so every field's error shows at once (not just the first failure)
+  return RF_FIELDS.map((f) => validateRfField(f)).every(Boolean);
+}
+
 function createModal() {
   if (modal) return modal;
 
@@ -233,7 +261,7 @@ function createModal() {
  
         <div class="top-matches-red">
           <div class="top-matches-title-red">Top Matches</div>
-          <div class="top-matches-subtitle-red">Closest UNREGISTERED products to the detected listing.</div>
+          <div class="top-matches-subtitle-red">Closest REGISTERED products to the detected listing.</div>
           <div class="match-legend-red">
             <div class="legend-item-red">
               <span class="legend-dot-red dot-best-red"></span>
@@ -311,6 +339,7 @@ function createModal() {
         <div class="rf-field">
           <label class="rf-field-label" for="rf-product-name">Product Name/Title</label>
           <textarea id="rf-product-name" class="rf-input"></textarea>
+          <div class="rf-field-error" id="rf-product-name-error" aria-live="polite"></div>
         </div>
         <div class="rf-field">
           <label class="rf-field-label" for="rf-product-url">Link/URL</label>
@@ -319,17 +348,21 @@ function createModal() {
         <div class="rf-field">
           <label class="rf-field-label" for="rf-store-name">Store Name</label>
           <textarea id="rf-store-name" class="rf-input" placeholder="Enter Store Name"></textarea>
+          <div class="rf-field-error" id="rf-store-name-error" aria-live="polite"></div>
         </div>
         <div class="rf-field">
           <label class="rf-field-label" for="rf-description">Description (optional)</label>
           <textarea id="rf-description" class="rf-input" placeholder="What made this product look suspicious..."></textarea>
+          <div class="rf-field-error" id="rf-description-error" aria-live="polite"></div>
         </div>
         <div class="rf-attach-box" id="rf-attach-box" role="button" tabindex="0">
-          <input type="file" id="rf-attach-input" accept="image/*" class="hidden" />
+          <input type="file" id="rf-attach-input" accept="image/png,image/jpeg,image/webp" class="hidden" />
           <img class="rf-upload-icon" src="${chrome.runtime.getURL('assets/images/upload_icon.png')}" alt="Upload Icon" />
           <span id="rf-attach-text" class="rf-attach-text">Attach screenshot (optional)</span>
           <img id="rf-attach-preview" class="rf-attach-preview-img" style="display:none;" />
         </div>
+
+        <div class="rf-field-error" id="rf-attach-error" aria-live="polite"></div>
 
         <div class="rf-action-row">
           <button id="rf-cancel" class="rf-btn-cancel" type="button">Return to Results</button>
@@ -373,6 +406,11 @@ function createModal() {
  
   document.body.appendChild(modal);
 
+  // live red text while typing
+  RF_FIELDS.forEach((f) => {
+    modal.querySelector(f.input).addEventListener('input', () => validateRfField(f, true));
+  });
+
   const attachBox = modal.querySelector('#rf-attach-box');
   const attachInput = modal.querySelector('#rf-attach-input');
   const attachPreview = modal.querySelector('#rf-attach-preview');
@@ -381,8 +419,27 @@ function createModal() {
   attachBox.addEventListener('click', () => attachInput.click());
 
   attachInput.addEventListener('change', () => {
+    const attachError = modal.querySelector('#rf-attach-error');
+    attachError.textContent = '';
+
     const file = attachInput.files[0];
     if (!file) return;
+
+    let fileError = '';
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      fileError = 'Only PNG, JPG, or WEBP images are allowed.';
+    } else if (file.size > RF_LIMITS.ATTACHMENT_MAX_MB * 1024 * 1024) {
+      fileError = `Image is too large (${(file.size / 1048576).toFixed(1)} MB). Maximum is ${RF_LIMITS.ATTACHMENT_MAX_MB} MB.`;
+    }
+    if (fileError) {
+      attachError.textContent = fileError;
+      attachInput.value = '';
+      lastAttachmentPath = null;
+      lastAttachmentName = null;
+      attachPreview.style.display = 'none';
+      attachText.style.display = 'block';
+      return;
+    }
 
     lastAttachmentName = file.name;
 
@@ -433,6 +490,12 @@ function createModal() {
        
         modal.querySelector('#rf-store-name').value = '';
         modal.querySelector('#rf-description').value = '';
+
+        RF_FIELDS.forEach((f) => {
+          modal.querySelector(f.error).textContent = '';
+          modal.querySelector(f.input).classList.remove('rf-input-invalid');
+        });
+        modal.querySelector('#rf-attach-error').textContent = '';
        
         showState('state-report-form');
       });
@@ -448,6 +511,7 @@ function createModal() {
   });
 
   modal.querySelector('#rf-submit').addEventListener('click', () => {
+    if (!validateReportFormModal()) return;
     chrome.runtime.sendMessage({ action: "checkAuth" }, (authRes) => {
       if (!authRes?.loggedIn) {
         showState('state-report-unauthorized');
@@ -566,7 +630,7 @@ function populateMatches(stateId, results) {
 }
 
 verifyBtn.addEventListener("click", () => {
-  lastProductTitle = pendingSelection;  
+  lastProductTitle = pendingSelection.trim().slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
   lastProductUrl = location.href;
   verifyBtn.style.display = "none";
  

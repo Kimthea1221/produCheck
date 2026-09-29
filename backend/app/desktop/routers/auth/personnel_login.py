@@ -6,6 +6,7 @@ from sqlalchemy import text
 from app.database.sessions import get_db, set_bypass_rls
 from app.desktop.schemas.auth.personnel_login import PersonnelLoginRequest, PersonnelOTPVerifyRequest
 from app.desktop.services.auth.personnel_auth import authenticate_personnel
+from app.desktop.services.auth.login_throttle import LoginThrottledError 
 from app.desktop.services.auth.otp_service import create_otp_for_user, verify_otp_for_user
 from app.desktop.services.auth.email import send_personnel_otp_email
 from app.models.users import User
@@ -30,9 +31,29 @@ async def personnel_login(
 ):
     try:
         user = authenticate_personnel(db, request.email, request.password, request.agency, http_request)
+    except LoginThrottledError as exc:
+        # Throttled after the 3rd/4th wrong password: return 429 with a real
+        # retry_after_seconds field so the frontend can run the countdown.
+        failed_user = db.query(User).filter(User.email == request.email).first()
+        agency_role_map = {"fda": Role.FDA_PERSONNEL, "lea": Role.LEA_PERSONNEL}
+        write_audit_log(
+            db,
+            user=failed_user,
+            action=AuditAction.LOGIN_FAILED,
+            target_table="users",
+            target_reference=request.email,
+            new_value={"reason": exc.message, "retry_after_seconds": exc.retry_after_seconds},
+            request=http_request,
+            region_code=get_user_region_code(db, failed_user) if failed_user else None,
+            user_role_override=failed_user.role if failed_user else agency_role_map.get(request.agency),
+        )
+        raise HTTPException(
+            status_code=429,
+            detail={"message": exc.message, "retry_after_seconds": exc.retry_after_seconds},
+        )
     except ValueError as exc:
         # Attribute to the agency the person selected, even if the email
-        # doesn't match a real user — so a bad-credentials attempt still
+        # doesn't match a real user, so a bad-credentials attempt still
         # shows up on the right agency's audit tab, not bucketed as "system".
         failed_user = db.query(User).filter(User.email == request.email).first()
         agency_role_map = {"fda": Role.FDA_PERSONNEL, "lea": Role.LEA_PERSONNEL}

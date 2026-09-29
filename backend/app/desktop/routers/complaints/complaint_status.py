@@ -21,6 +21,8 @@ from app.core.constants import AuditAction
 
 from fastapi.responses import FileResponse
 
+from app.desktop.schemas.complaints.complaints import StatusUpdateRequest
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -34,10 +36,6 @@ STATUS_LABELS = {
     "completed": "Completed",
     "dismissed": "Dismissed",
 }
-
-class StatusUpdateRequest(BaseModel):
-    status: str
-    change_note: str | None = None
 
 FINAL_STATUSES = {"completed", "dismissed"}
 

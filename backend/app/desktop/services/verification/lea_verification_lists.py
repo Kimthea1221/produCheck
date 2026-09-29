@@ -10,7 +10,7 @@ from app.models.complaints import Complaint
 from app.models.verification_requests import VerificationRequest
 from app.models.users import User
 from app.models.walkin_complainants import WalkinComplainant
-from app.core.user_display import format_officer_display_name
+from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import (
     LeaVerificationQueueCounts,
     LeaFdaResponseListItem,
@@ -176,8 +176,8 @@ def get_lea_fda_response_detail(
         # "Verified By" for registered/unregistered, "Rejected By" for
         # rejected — same underlying column, the frontend picks the
         # label based on verification_result.
-        verifier_name=format_officer_display_name(responder),
-        # unregistered-only
+        # CHANGED — FDA verifier is invisible to an LEA session under RLS; use the cross-agency helper
+        verifier_name=get_display_name_across_agencies(db, vr.responded_by),        # unregistered-only
         unregistered_reason=vr.unregistered_reason,
         # shared between registered and unregistered — label differs
         # on the frontend ("Advisory & Enforcement Recommendations" vs
