@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend Validation (Python 3.12, Skip NLP)
+    name: Backend Validation
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: backend
@@ -88,3 +88,67 @@ jobs:
           file: ./dockerfile
           push: false
           tags: everifymo:ci
+
+  extension-check:
+    name: Chrome Extension Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate manifest.json and referenced assets
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const manifestPath = path.join('extension', 'manifest.json');
+          if (!fs.existsSync(manifestPath)) {
+            console.error('Error: extension/manifest.json not found!');
+            process.exit(1);
+          }
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          if (manifest.manifest_version !== 3) {
+            console.error('Error: manifest_version must be 3, found:', manifest.manifest_version);
+            process.exit(1);
+          }
+          const filesToCheck = [
+            ...Object.values(manifest.icons || {}),
+            manifest.action?.default_popup,
+            ...(manifest.content_scripts || []).flatMap(cs => [...(cs.js || []), ...(cs.css || [])]),
+            manifest.background?.service_worker
+          ].filter(Boolean);
+          let missing = 0;
+          for (const file of filesToCheck) {
+            const fullPath = path.join('extension', file);
+            if (!fs.existsSync(fullPath)) {
+              console.error('Missing referenced asset:', fullPath);
+              missing++;
+            }
+          }
+          if (missing > 0) {
+            console.error(missing + ' referenced file(s) not found in extension/');
+            process.exit(1);
+          }
+          console.log('Manifest and all referenced files verified successfully.');
+          "
+
+      - name: Check JavaScript syntax
+        run: |
+          find extension -type f -name "*.js" -exec node --check {} +
+
+      - name: Package extension artifact
+        run: |
+          zip -r producheck-extension.zip extension/
+
+      - name: Upload extension package
+        uses: actions/upload-artifact@v4
+        with:
+          name: producheck-extension
+          path: producheck-extension.zip
+          retention-days: 14
+
