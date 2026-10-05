@@ -75,8 +75,8 @@ Thumbs.db
 *.log
 
 #datasets and assets
-backend/nlp/assets/
-backend/nlp/datasets/
+
+
 
 backend/nlp/finetuned_sbert.zip
 backend/nlp/finetuned_sbert.zip:Zone.Identifier

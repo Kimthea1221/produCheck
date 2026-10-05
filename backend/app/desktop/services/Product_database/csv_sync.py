@@ -15,7 +15,7 @@ def clean_title(title: str) -> str:
 # __file__ is backend/app/desktop/services/Product_database/csv_sync.py
 BACKEND_DIR = Path(__file__).resolve().parents[4]
 REGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "Registered_cleaned.csv"
-UNREGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "Unregistered_cleaned.csv"
+UNREGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "unregistered.csv"
 
 def sync_registered_products_to_csv(db: Session):
     """
