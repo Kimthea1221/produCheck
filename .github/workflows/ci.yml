@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend Validation
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/everify_test_db
+      MIGRATIONS_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/everify_test_db
+      SECRET_KEY: ci-testing-dummy-secret-key-32chars
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install PyTorch (CPU)
+        run: pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt pytest
+
+      - name: Syntax and compile check (skipping NLP)
+        run: python -m compileall -x "(^|/|\\\\)nlp($|/|\\\\)" backend
+
+      - name: Run backend tests (skipping NLP)
+        run: pytest backend/tests --ignore=backend/nlp --ignore=backend/tests/test_retrieval.py || [ $? -eq 5 ]
+
+  desktop-frontend:
+    name: Desktop Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktopfrontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktopfrontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend & electron bundle
+        run: npm run build
+
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./dockerfile
+          push: false
+          tags: everifymo:ci
+
+  extension-check:
+    name: Chrome Extension Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate manifest.json and referenced assets
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const manifestPath = path.join('extension', 'manifest.json');
+          if (!fs.existsSync(manifestPath)) {
+            console.error('Error: extension/manifest.json not found!');
+            process.exit(1);
+          }
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          if (manifest.manifest_version !== 3) {
+            console.error('Error: manifest_version must be 3, found:', manifest.manifest_version);
+            process.exit(1);
+          }
+          const filesToCheck = [
+            ...Object.values(manifest.icons || {}),
+            manifest.action?.default_popup,
+            ...(manifest.content_scripts || []).flatMap(cs => [...(cs.js || []), ...(cs.css || [])]),
+            manifest.background?.service_worker
+          ].filter(Boolean);
+          let missing = 0;
+          for (const file of filesToCheck) {
+            const fullPath = path.join('extension', file);
+            if (!fs.existsSync(fullPath)) {
+              console.error('Missing referenced asset:', fullPath);
+              missing++;
+            }
+          }
+          if (missing > 0) {
+            console.error(missing + ' referenced file(s) not found in extension/');
+            process.exit(1);
+          }
+          console.log('Manifest and all referenced files verified successfully.');
+          "
+
+      - name: Check JavaScript syntax
+        run: |
+          find extension -type f -name "*.js" -exec node --check {} +
+
+      - name: Package extension artifact
+        run: |
+          zip -r producheck-extension.zip extension/
+
+      - name: Upload extension package
+        uses: actions/upload-artifact@v4
+        with:
+          name: producheck-extension
+          path: producheck-extension.zip
+          retention-days: 14
+
