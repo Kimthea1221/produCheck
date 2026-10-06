@@ -14,47 +14,63 @@ verifyBtn.style.border = "1px solid #256428";
 verifyBtn.style.fontWeight = "bold";
 verifyBtn.style.borderRadius = "15px";
 verifyBtn.style.cursor = "pointer";
+verifyBtn.style.top = "24px";
+verifyBtn.style.right = "24px";
 document.body.appendChild(verifyBtn);
 
-let debounceTimer;
-let pendingSelection = '';
-
 let verifyButtonEnabled = true; // default
+let lastStoreName = '';
+
+// checking if its in the product page
+function isProductPage() {
+
+    const currentUrl = location.href;
+
+    if ((currentUrl.includes("shopee.ph") && currentUrl.includes("-i.")) || currentUrl.includes("shopee.ph/product")) {
+        console.log("Product page of shopee");
+        return true;
+    }    
+
+    if (currentUrl.includes("lazada.com.ph/products/") && currentUrl.includes(".html")){
+        console.log("Product page of lazada");
+        return true;
+    } 
+
+    if (currentUrl.includes("facebook.com/marketplace/item/")) {
+        console.log("Product page of facebook");
+        return true;  
+    } 
+
+    if (currentUrl.includes("shop.tiktok.com/ph/pdp")) {
+        console.log("Product page of tiktok");
+        return true;
+    }   
+
+    return false;
+}
+
+function updateButton() {
+  verifyBtn.style.display = (verifyButtonEnabled && isProductPage()) ? "block" : "none";
+}
+
+let lastUrl = location.href;
+setInterval(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    updateButton();
+  }
+}, 500);
 
 chrome.storage.local.get(['verifyButtonEnabled'], (result) => {
   verifyButtonEnabled = result.verifyButtonEnabled !== false;
+  updateButton();   // new
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.verifyButtonEnabled) {
     verifyButtonEnabled = changes.verifyButtonEnabled.newValue;
-    if (!verifyButtonEnabled) verifyBtn.style.display = "none";
+    updateButton();   // replaces the old display = "none" line
   }
-});
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "closeEverifyModal" && modal) {
-    modal.style.display = "none";
-  }
-});
-
-document.addEventListener("mouseup", () => {
-    clearTimeout(debounceTimer);
- 
-    debounceTimer = setTimeout(() => {
-        const selectedText = window.getSelection().toString();
- 
-        if (selectedText.length > 0 && verifyButtonEnabled) {
-            pendingSelection = selectedText;
-            const range = window.getSelection().getRangeAt(0).getBoundingClientRect();
- 
-            verifyBtn.style.left = range.left + "px";
-            verifyBtn.style.top = (range.bottom + 8) + "px";
-            verifyBtn.style.display = "block";
-        } else {
-            verifyBtn.style.display = "none";
-        }
-    }, 100);
 });
 
 function platform(url) {
@@ -488,7 +504,7 @@ function createModal() {
         if (productName) productName.value = lastProductTitle;
         if (url) url.value = sanitizeUrl(lastProductUrl);
        
-        modal.querySelector('#rf-store-name').value = '';
+        modal.querySelector('#rf-store-name').value = lastStoreName;
         modal.querySelector('#rf-description').value = '';
 
         RF_FIELDS.forEach((f) => {
@@ -629,28 +645,43 @@ function populateMatches(stateId, results) {
   });
 }
 
-verifyBtn.addEventListener("click", () => {
-  lastProductTitle = pendingSelection.trim().slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+verifyBtn.addEventListener("click", async () => {
   lastProductUrl = location.href;
+
+  // hide our own UI so it doesn't appear in the screenshot
   verifyBtn.style.display = "none";
- 
-  createModal();
-  showState('state-loading');
- 
-  chrome.runtime.sendMessage({
-    action: "extractedTitle",
-    title: lastProductTitle,
-    platform: platform(location.href),
-    url: location.href
+  if (modal) modal.style.display = "none";
+
+  document.getElementById("debug-shot")?.remove();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  chrome.runtime.sendMessage({ 
+    action: "captureScreenshot",
+    url: location.href,
+    platform: platform(location.href)
   }, (response) => {
-    console.log("Response from background:", response);
- 
-    const verdict = response?.data?.verdict || 'no_match';
-    const status = verdict === 'no_match' ? 'suspicious' : verdict;
-    lastVerificationStatus = status;
-    const results = response?.data?.top5_registered || [];
-    
-    renderResult(status, lastProductTitle, results);
+    updateButton();
+    createModal();
+    showState('state-loading');
+
+    if (!response?.success) {
+      console.error("Capture failed:", response?.error);
+      return;
+    }
+
+    lastProductTitle = (response.title || '').slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+    lastStoreName = response.store || '';
+
+    chrome.runtime.sendMessage({
+      action: "extractedTitle",
+      title: lastProductTitle,
+      platform: platform(location.href),
+      url: location.href
+    }, (res) => {
+      const verdict = res?.data?.verdict || 'no_match';
+      const status = verdict === 'no_match' ? 'suspicious' : verdict;
+      lastVerificationStatus = status;
+      renderResult(status, lastProductTitle, res?.data?.top5_registered || []);
+    });
   });
 });
-
