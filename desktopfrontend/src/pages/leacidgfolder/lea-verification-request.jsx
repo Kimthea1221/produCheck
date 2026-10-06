@@ -27,6 +27,9 @@ import {
 } from 'lucide-react';
 
 import { apiFetch } from '../../utils/apiFetch';
+// ADDED — processing overlay
+import { useProcessing } from '../../utils/useProcessing';
+import ProcessingOverlay from '../component/processing-overlay';
 
 // Helper: reads a FastAPI error response body and returns a single readable string.
 // Handles both { "detail": "string" } and { "detail": [{ "msg": "...", ... }, ...] }
@@ -132,7 +135,114 @@ function QueuePagination({ currentPage, totalPages, onPageChange }) {
   );
 }
 
+// ADDED — pure display fallback helper: null, undefined, empty, or whitespace-only returns '—'
+function formatComplainantDisplayValue(val) {
+  if (val == null) return '—';
+  const str = String(val).trim();
+  return str.length > 0 ? str : '—';
+}
+
+// ADDED — child component for display-only complainant intake details with local fetch and stale-response guard
+function LeaComplainantDetails({ complaintId, complainantName }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    if (!complaintId) {
+      setLoading(false);
+      setError(false);
+      setData(null);
+      return;
+    }
+
+    let isCancelled = false;
+    setLoading(true);
+    setError(false);
+    setData(null);
+
+    // 🔌 BACKEND: walkin-detail currently has no LEA role check. Backend must restrict it to LEA roles.
+    apiFetch(`/complaints/${complaintId}/walkin-detail`)
+      .then(async (res) => {
+        if (isCancelled) return;
+        if (res.status === 404) {
+          // 404 or empty record: show '—' for all fields without an error message
+          setData(null);
+          setError(false);
+          return;
+        }
+        if (!res.ok) {
+          setError(true);
+          setData(null);
+          return;
+        }
+        const json = await res.json();
+        if (isCancelled) return;
+        setData(json);
+        setError(false);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setError(true);
+          setData(null);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [complaintId]);
+
+  return (
+    <div className="LeaComplainantDetailsSection">
+      <h6 className="LeaComplainantDetailsTitle">Complainant Details (LEA only, not sent to FDA)</h6>
+      {error && !loading && (
+        <p className="LeaComplainantError">Could not load</p>
+      )}
+      <div className="LeaComplainantGrid">
+        {/* ADDED — Full Name row spanning both columns */}
+        <div className="LeaComplainantField LeaComplainantFieldFullWidth">
+          <label className="LeaComplainantLabel">FULL NAME</label>
+          <div className="LeaComplainantValueBox">
+            {formatComplainantDisplayValue(complainantName)}
+          </div>
+        </div>
+        <div className="LeaComplainantField">
+          <label className="LeaComplainantLabel">CONTACT NUMBER</label>
+          <div className="LeaComplainantValueBox">
+            {loading ? 'Loading…' : formatComplainantDisplayValue(data?.contact_number)}
+          </div>
+        </div>
+        <div className="LeaComplainantField">
+          <label className="LeaComplainantLabel">EMAIL</label>
+          <div className="LeaComplainantValueBox">
+            {loading ? 'Loading…' : formatComplainantDisplayValue(data?.email)}
+          </div>
+        </div>
+        <div className="LeaComplainantField">
+          <label className="LeaComplainantLabel">ADDRESS</label>
+          <div className="LeaComplainantValueBox">
+            {loading ? 'Loading…' : formatComplainantDisplayValue(data?.address)}
+          </div>
+        </div>
+        <div className="LeaComplainantField">
+          <label className="LeaComplainantLabel">ID PRESENTED</label>
+          <div className="LeaComplainantValueBox">
+            {loading ? 'Loading…' : formatComplainantDisplayValue(data?.id_type)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LeaVerificationRequest() {
+  const proc = useProcessing(); // ADDED — processing overlay state
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -656,6 +766,7 @@ function LeaVerificationRequest() {
 
   // ADDED — POST/PUT /drafts/verification/
   // ─── Save Draft handler 
+  // CHANGED — wrapped with useProcessing run()
   const handleSaveDraft = async () => {
     if (!selectedComplaint) {
       showError('Please select a complaint first.');
@@ -668,37 +779,57 @@ function LeaVerificationRequest() {
       notes_to_fda: complaintStatement,
     });
 
-    try {
-      let res;
-      if (!currentDraftId) {
-        res = await apiFetch('/drafts/verification/', {
-          method: 'POST',
-          body,
-        });
-      } else {
-        res = await apiFetch(`/drafts/verification/${currentDraftId}`, {
-          method: 'PUT',
-          body,
-        });
-      }
+    let savedDraftId = null;
 
-      if (!res.ok) {
-        const msg = await parseBackendError(res);
-        showError(msg);
-        return;
-      }
+    const ok = await proc.run(
+      {
+        title: 'SAVING DRAFT...',
+        message: 'Saving verification request draft...',
+        successTitle: 'DRAFT SAVED',
+        successMessage: 'Draft saved. Redirecting to Saved Drafts...',
+        withSuccess: true,
+      },
+      async () => {
+        try {
+          let res;
+          if (!currentDraftId) {
+            res = await apiFetch('/drafts/verification/', {
+              method: 'POST',
+              body,
+            });
+          } else {
+            res = await apiFetch(`/drafts/verification/${currentDraftId}`, {
+              method: 'PUT',
+              body,
+            });
+          }
 
-      const data = await res.json();
-      if (data.draft_id) setCurrentDraftId(data.draft_id);
-      showSuccess('Draft saved successfully.');
+          if (!res.ok) {
+            const msg = await parseBackendError(res);
+            showError(msg);
+            return false;
+          }
+
+          const data = await res.json();
+          if (data.draft_id) savedDraftId = data.draft_id;
+          showSuccess('Draft saved successfully.');
+          return true;
+        } catch {
+          showError('Failed to save draft. Please try again.');
+          return false;
+        }
+      }
+    );
+
+    if (ok) {
+      if (savedDraftId) setCurrentDraftId(savedDraftId);
       navigate('/leacidgfolder/lea-saved-draft');
-    } catch {
-      showError('Failed to save draft. Please try again.');
     }
   };
 
   // ADDED — POST /verification-requests/ or /drafts/verification/{id}/submit
   // ─── Send Request to FDA handler ─────────────────────────────────────────
+  // CHANGED — wrapped with useProcessing run()
   const handleSendRequest = async () => {
     if (!selectedComplaint) {
       showError('Please select a complaint first.');
@@ -715,49 +846,65 @@ function LeaVerificationRequest() {
       return;
     }
 
-    try {
-      let res;
-      if (currentDraftId) {
-        const updateRes = await apiFetch(`/drafts/verification/${currentDraftId}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            complaint_id: selectedComplaint.complaint_id,
-            product_code: productCode || null,
-            priority,
-            notes_to_fda: complaintStatement,
-          }),
-        });
+    const ok = await proc.run(
+      {
+        title: 'SENDING REQUEST...',
+        message: 'Submitting verification request to FDA...',
+        successTitle: 'REQUEST SENT',
+        successMessage: 'Verification request sent to FDA.',
+        withSuccess: true,
+      },
+      async () => {
+        try {
+          let res;
+          if (currentDraftId) {
+            const updateRes = await apiFetch(`/drafts/verification/${currentDraftId}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                complaint_id: selectedComplaint.complaint_id,
+                product_code: productCode || null,
+                priority,
+                notes_to_fda: complaintStatement,
+              }),
+            });
 
-        if (!updateRes.ok) {
-          const msg = await parseBackendError(updateRes);
-          showError(msg);
-          return;
+            if (!updateRes.ok) {
+              const msg = await parseBackendError(updateRes);
+              showError(msg);
+              return false;
+            }
+
+            res = await apiFetch(`/drafts/verification/${currentDraftId}/submit`, {
+              method: 'POST',
+            });
+          } else {
+            res = await apiFetch('/verification-requests/', {
+              method: 'POST',
+              body: JSON.stringify({
+                complaint_id: selectedComplaint.complaint_id,
+                product_code: productCode || null,
+                priority,
+                notes_to_fda: complaintStatement,
+              }),
+            });
+          }
+
+          if (!res.ok) {
+            const msg = await parseBackendError(res);
+            showError(msg);
+            return false;
+          }
+
+          await Promise.all([fetchReadyList(), fetchLeaCounts()]);
+          return true;
+        } catch {
+          showError('Failed to send request. Please try again.');
+          return false;
         }
-
-        res = await apiFetch(`/drafts/verification/${currentDraftId}/submit`, {
-          method: 'POST',
-        });
-      } else {
-        res = await apiFetch('/verification-requests/', {
-          method: 'POST',
-          body: JSON.stringify({
-            complaint_id: selectedComplaint.complaint_id,
-            product_code: productCode || null,
-            priority,
-            notes_to_fda: complaintStatement,
-          }),
-        });
       }
+    );
 
-      if (!res.ok) {
-        const msg = await parseBackendError(res);
-        showError(msg);
-        return;
-      }
-
-      await fetchReadyList();
-      await fetchLeaCounts();
-
+    if (ok) {
       showSuccess('Verification request sent to FDA.');
       // Reset compose form state
       setCurrentDraftId(null);
@@ -771,12 +918,11 @@ function LeaVerificationRequest() {
       } else {
         setActiveTab('Awaiting FDA');
       }
-    } catch {
-      showError('Failed to send request. Please try again.');
     }
   };
 
   // ADDED — Delete Draft / Verification Request handler for Ready to Send tab
+  // CHANGED — wrapped with useProcessing run()
   const handleDeleteRequest = () => {
     if (!selectedComplaint) {
       showError('Please select a complaint first.');
@@ -789,46 +935,58 @@ function LeaVerificationRequest() {
       confirmText: 'Delete',
       confirmBg: '#ef4444',
       onConfirm: async () => {
+        // CHANGED — close modal before proc.run()
         setModalConfig(null);
 
-        if (currentDraftId) {
-          try {
-            const draftRes = await apiFetch(`/drafts/verification/${currentDraftId}`, {
-              method: 'DELETE',
-            });
-            if (!draftRes.ok) {
-              const msg = await parseBackendError(draftRes);
-              showError(msg);
-              return;
+        const ok = await proc.run(
+          {
+            title: 'DELETING COMPLAINT...',
+            message: 'Deleting complaint and associated draft...',
+            withSuccess: false,
+          },
+          async () => {
+            if (currentDraftId) {
+              try {
+                const draftRes = await apiFetch(`/drafts/verification/${currentDraftId}`, {
+                  method: 'DELETE',
+                });
+                if (!draftRes.ok) {
+                  const msg = await parseBackendError(draftRes);
+                  showError(msg);
+                  return false;
+                }
+              } catch {
+                showError('Failed to delete draft. Please try again.');
+                return false;
+              }
             }
-          } catch {
-            showError('Failed to delete draft. Please try again.');
-            return;
-          }
-        }
 
-        try {
-          const res = await apiFetch(`/complaints/walkin/${selectedComplaint.complaint_id}`, {
-            method: 'DELETE',
-          });
-          if (!res.ok) {
-            const msg = await parseBackendError(res);
-            showError(msg);
-            return;
+            try {
+              const res = await apiFetch(`/complaints/walkin/${selectedComplaint.complaint_id}`, {
+                method: 'DELETE',
+              });
+              if (!res.ok) {
+                const msg = await parseBackendError(res);
+                showError(msg);
+                return false;
+              }
+              showSuccess('Complaint deleted successfully.');
+              await Promise.all([fetchReadyList(), fetchLeaCounts()]);
+              return true;
+            } catch {
+              showError('Failed to delete complaint. Please try again.');
+              return false;
+            }
           }
-          showSuccess('Complaint deleted successfully.');
-        } catch {
-          showError('Failed to delete complaint. Please try again.');
-          return;
-        }
+        );
 
-        setCurrentDraftId(null);
-        setSelectedComplaint(null);
-        setProductCode('');
-        setComplaintStatement('');
-        setPriority('standard');
-        await fetchReadyList();
-        await fetchLeaCounts();
+        if (ok) {
+          setCurrentDraftId(null);
+          setSelectedComplaint(null);
+          setProductCode('');
+          setComplaintStatement('');
+          setPriority('standard');
+        }
       },
       onCancel: () => {
         setModalConfig(null);
@@ -944,124 +1102,170 @@ function LeaVerificationRequest() {
       confirmText,
       confirmBg,
       onConfirm: async () => {
+        // CHANGED — close modal before proc.run()
+        setModalConfig(null);
+
         if (actionType === 'Send Reminder' || actionType === 'Recall Request') {
           const endpoint = actionType === 'Send Reminder' ? 'resend-reminder' : 'recall';
+          const isRecall = actionType === 'Recall Request';
 
-          try {
-            const res = await apiFetch(`/verification-requests/${id}/${endpoint}`, {
-              method: 'POST',
-            });
+          const ok = await proc.run(
+            {
+              title: isRecall ? 'RECALLING REQUEST...' : 'SENDING REMINDER...',
+              message: isRecall
+                ? 'Canceling verification request and returning case...'
+                : 'Sending reminder notification to FDA verifier...',
+              withSuccess: false,
+            },
+            async () => {
+              try {
+                const res = await apiFetch(`/verification-requests/${id}/${endpoint}`, {
+                  method: 'POST',
+                });
 
-            if (!res.ok) {
-              const msg = await parseBackendError(res);
-              showError(msg);
-              setModalConfig(null);
-              return;
+                if (!res.ok) {
+                  const msg = await parseBackendError(res);
+                  showError(msg);
+                  return false;
+                }
+
+                await res.json();
+
+                if (isRecall) {
+                  await Promise.all([fetchReadyList(), fetchLeaCounts()]);
+                }
+                return true;
+              } catch {
+                showError('Something went wrong. Please try again.');
+                return false;
+              }
             }
+          );
 
-            await res.json();
-
-            if (actionType === 'Recall Request') {
-              setAwaitingList(awaitingList.filter((r) => r.request_id !== id));
+          if (ok) {
+            if (isRecall) {
+              setAwaitingList((prev) => prev.filter((r) => r.request_id !== id));
               setSelectedAwaitingFda(null);
-              await fetchReadyList();
-              await fetchLeaCounts();
             }
-
             setSuccessMessage(successText);
-            setModalConfig(null);
             setTimeout(() => setSuccessMessage(''), 3000);
-          } catch {
-            showError('Something went wrong. Please try again.');
-            setModalConfig(null);
           }
           return;
         }
 
         if (actionType === 'Acknowledge' || actionType === 'Dismiss Case') {
-          try {
-            const res = await apiFetch(`/verification-requests/${id}/acknowledge`, {
-              method: 'POST',
-            });
-            if (!res.ok) {
-              const msg = await parseBackendError(res);
-              showError(msg);
-              setModalConfig(null);
-              return;
+          const isDismiss = actionType === 'Dismiss Case';
+          const ok = await proc.run(
+            {
+              title: isDismiss ? 'DISMISSING CASE...' : 'ACKNOWLEDGING REJECTION...',
+              message: isDismiss
+                ? 'Closing case and moving to Closed Cases...'
+                : 'Acknowledging FDA rejection...',
+              withSuccess: false,
+            },
+            async () => {
+              try {
+                const res = await apiFetch(`/verification-requests/${id}/acknowledge`, {
+                  method: 'POST',
+                });
+                if (!res.ok) {
+                  const msg = await parseBackendError(res);
+                  showError(msg);
+                  return false;
+                }
+                await Promise.all([fetchFdaResponseList(), fetchClosedList(), fetchLeaCounts()]);
+                return true;
+              } catch {
+                showError('Something went wrong. Please try again.');
+                return false;
+              }
             }
+          );
+
+          if (ok) {
             setSuccessMessage(successText);
-            setModalConfig(null);
             setTimeout(() => setSuccessMessage(''), 3000);
-            await fetchFdaResponseList();
-            await fetchClosedList();
-            await fetchLeaCounts();
-          } catch {
-            showError('Something went wrong. Please try again.');
-            setModalConfig(null);
           }
           return;
         }
 
         if (actionType === 'Initiate Takedown') {
-          try {
-            const res = await apiFetch(`/verification-requests/${id}/initiate-takedown`, {
-              method: 'POST',
-              body: JSON.stringify({
-                field_operation_notes: fdaTakedownNotes.trim() ? fdaTakedownNotes.trim() : null,
-              }),
-            });
-            if (!res.ok) {
-              const msg = await parseBackendError(res);
-              showError(msg);
-              setModalConfig(null);
-              return;
+          const ok = await proc.run(
+            {
+              title: 'INITIATING TAKEDOWN...',
+              message: 'Marking case for takedown enforcement...',
+              withSuccess: false,
+            },
+            async () => {
+              try {
+                const res = await apiFetch(`/verification-requests/${id}/initiate-takedown`, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    field_operation_notes: fdaTakedownNotes.trim() ? fdaTakedownNotes.trim() : null,
+                  }),
+                });
+                if (!res.ok) {
+                  const msg = await parseBackendError(res);
+                  showError(msg);
+                  return false;
+                }
+                await Promise.all([fetchFdaResponseList(), fetchInitiatedList(), fetchLeaCounts()]);
+                return true;
+              } catch {
+                showError('Something went wrong. Please try again.');
+                return false;
+              }
             }
-            setSuccessMessage(successText);
-            setModalConfig(null);
+          );
+
+          if (ok) {
             setFdaTakedownNotes('');
+            setSuccessMessage(successText);
             setTimeout(() => setSuccessMessage(''), 3000);
-            await fetchFdaResponseList();
-            await fetchInitiatedList();
-            await fetchLeaCounts();
-          } catch {
-            showError('Something went wrong. Please try again.');
-            setModalConfig(null);
           }
           return;
         }
 
         if (actionType === 'Close Case') {
-          try {
-            const res = await apiFetch(`/complaints/${id}/close-case`, {
-              method: 'POST',
-              body: JSON.stringify({
-                field_operation_notes: initiatedFieldNotes.trim() ? initiatedFieldNotes.trim() : null,
-              }),
-            });
-            if (!res.ok) {
-              const msg = await parseBackendError(res);
-              showError(msg);
-              setModalConfig(null);
-              return;
+          const ok = await proc.run(
+            {
+              title: 'CLOSING CASE...',
+              message: 'Marking takedown operation complete and closing case...',
+              withSuccess: false,
+            },
+            async () => {
+              try {
+                const res = await apiFetch(`/complaints/${id}/close-case`, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    field_operation_notes: initiatedFieldNotes.trim() ? initiatedFieldNotes.trim() : null,
+                  }),
+                });
+                if (!res.ok) {
+                  const msg = await parseBackendError(res);
+                  showError(msg);
+                  return false;
+                }
+                await Promise.all([fetchInitiatedList(), fetchClosedList(), fetchLeaCounts()]);
+                return true;
+              } catch {
+                showError('Something went wrong. Please try again.');
+                return false;
+              }
             }
-            setSuccessMessage(successText);
-            setModalConfig(null);
+          );
+
+          if (ok) {
             // CHANGED (Part 0) — reset initiatedFieldNotes, not the old shared fieldOperationNotes
             setInitiatedFieldNotes('');
+            setSuccessMessage(successText);
             setTimeout(() => setSuccessMessage(''), 3000);
-            await fetchInitiatedList();
-            await fetchClosedList();
-            await fetchLeaCounts();
-          } catch {
-            showError('Something went wrong. Please try again.');
-            setModalConfig(null);
           }
           return;
         }
 
         // Fallback for any future action types not yet wired.
         setSuccessMessage(successText);
-        setModalConfig(null);
         setTimeout(() => {
           setSuccessMessage('');
         }, 3000);
@@ -1262,16 +1466,12 @@ function LeaVerificationRequest() {
                           <p style={{ color: '#7a8796', fontSize: '13px' }}>Loading details...</p>
                         ) : selectedComplaint ? (
                           <>
-                            <small>CASE ID: {selectedComplaint.case_reference}</small>
+                            {/* CHANGED — removed Manufacturer line from title block; Case ID retained */}
+                            <small><span className='LeaHeaderFieldLabel'>CASE ID:</span> {selectedComplaint.case_reference}</small>
                             <h2>{selectedComplaint.product_title}</h2>
-                            <p>MANUFACTURER: {selectedComplaint.manufacturer || '—'}</p>
 
+                            {/* CHANGED — Complainant moved to Complainant Details; Manufacturer placed last in grid */}
                             <div className="CaseInfoGrid">
-                              <div>
-                                <label>COMPLAINANT</label>
-                                <p>{selectedComplaint.complainant_name || '—'}</p>
-                              </div>
-
                               <div>
                                 <label>CATEGORY</label>
                                 <p>{selectedComplaint.product_category || '—'}</p>
@@ -1286,7 +1486,18 @@ function LeaVerificationRequest() {
                                 <label>SOURCE</label>
                                 <p>{GetSourceLabel(selectedComplaint.source)}</p>
                               </div>
+
+                              <div>
+                                <label>MANUFACTURER</label>
+                                <p>{selectedComplaint.manufacturer || '—'}</p>
+                              </div>
                             </div>
+
+                            {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
+                            <LeaComplainantDetails
+                              complaintId={selectedComplaint.complaint_id}
+                              complainantName={selectedComplaint.complainant_name}
+                            />
                           </>
                         ) : (
                           <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case from the list to view details.</p>
@@ -1304,7 +1515,7 @@ function LeaVerificationRequest() {
 
                         <div className="VerificationRow">
                           <div>
-                            <label>Product code (if known)</label>
+                            <label>PRODUCT CODE (if known)</label>
                             {/* BACKEND: maps to product_code in verification_requests */}
                             <input
                               type="text"
@@ -1316,7 +1527,7 @@ function LeaVerificationRequest() {
                           </div>
 
                           <div>
-                            <label>Priority</label>
+                            <label>PRIORITY</label>
                             {/* BACKEND: priority maps to priority column in verification_requests table */}
                             <select value={priority} onChange={(e) => setPriority(e.target.value)}>
                               <option value="standard">Standard</option>
@@ -1328,7 +1539,7 @@ function LeaVerificationRequest() {
                         </div>
 
                         <div className="VerificationNotes">
-                          <label>Notes to FDA verifier</label>
+                          <label>NOTES TO FDA VERIFIER</label>
                           {/*     BACKEND: maps to notes_to_fda in verification_requests */}
                           <textarea
                             rows="5"
@@ -1518,20 +1729,16 @@ function LeaVerificationRequest() {
                       <div>
                         {selectedAwaitingFda ? (
                           <>
-                            <small>CASE ID: {selectedAwaitingFda.case_reference}</small>
+                            {/* CHANGED — removed Manufacturer line from title block; Case ID retained */}
+                            <small><span className='LeaHeaderFieldLabel'>CASE ID:</span> {selectedAwaitingFda.case_reference}</small>
                             <h2>{selectedAwaitingFda.product_name}</h2>
-                            <p>MANUFACTURER: {selectedAwaitingFda.manufacturer || '—'}</p>
 
                             {/* BACKEND: complainant, category, source, and region are NOT stored
                                                         directly in verification_requests. They are fetched via complaint_id
                                                         joining to the complaints and walkin_complainants tables through the
                                                         verification_requests_full view */}
+                            {/* CHANGED — Complainant moved to Complainant Details; Manufacturer placed last in grid */}
                             <div className="CaseInfoGrid">
-                              <div>
-                                <label>COMPLAINANT</label>
-                                <p>{selectedAwaitingFda.complainant_name || '—'}</p>
-                              </div>
-
                               <div>
                                 <label>CATEGORY</label>
                                 <p>{selectedAwaitingFda.product_category || '—'}</p>
@@ -1548,10 +1755,16 @@ function LeaVerificationRequest() {
                               </div>
 
                               <div>
-                                <label>SOURCE</label>
-                                <p>{GetSourceLabel(selectedAwaitingFda.source)}</p>
+                                <label>MANUFACTURER</label>
+                                <p>{selectedAwaitingFda.manufacturer || '—'}</p>
                               </div>
                             </div>
+
+                            {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
+                            <LeaComplainantDetails
+                              complaintId={selectedAwaitingFda.complaint_id}
+                              complainantName={selectedAwaitingFda.complainant_name}
+                            />
                           </>
                         ) : (
                           <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case from the list to view details.</p>
@@ -1737,16 +1950,12 @@ function LeaVerificationRequest() {
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Loading details...</p>
                           ) : selectedResponse ? (
                             <>
-                              <small>CASE ID: {selectedResponse.case_reference}</small>
+                              {/* CHANGED — removed Manufacturer line from title block; Case ID retained */}
+                              <small><span className='LeaHeaderFieldLabel'>CASE ID:</span> {selectedResponse.case_reference}</small>
                               <h2>{selectedResponse.product_title}</h2>
-                              <p>MANUFACTURER: {selectedResponse.manufacturer || '—'}</p>
 
+                              {/* CHANGED — Complainant moved to Complainant Details; Manufacturer placed last in grid */}
                               <div className="CaseInfoGrid">
-                                <div>
-                                  <label>COMPLAINANT</label>
-                                  <p>{selectedResponse.complainant_name || '—'}</p>
-                                </div>
-
                                 <div>
                                   <label>CATEGORY</label>
                                   <p>{selectedResponse.product_category || '—'}</p>
@@ -1761,7 +1970,18 @@ function LeaVerificationRequest() {
                                   <label>SOURCE</label>
                                   <p>{GetSourceLabel(selectedResponse.source)}</p>
                                 </div>
+
+                                <div>
+                                  <label>MANUFACTURER</label>
+                                  <p>{selectedResponse.manufacturer || '—'}</p>
+                                </div>
                               </div>
+
+                              {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
+                              <LeaComplainantDetails
+                                complaintId={selectedResponse.complaint_id}
+                                complainantName={selectedResponse.complainant_name}
+                              />
                             </>
                           ) : (
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case to view details.</p>
@@ -1776,7 +1996,8 @@ function LeaVerificationRequest() {
                                   <div className='LeaVerifResponseStatusHeader LeaVerifRejectedHeader'>
                                     <XCircle style={{ color: '#EF4444' }} />
                                     <div className='StatementReturn'>
-                                      <h3>CONFIRMED REJECTED PRODUCT</h3>
+                                      {/* CHANGED — rejection is of the request, not a product verdict (Fix 4) */}
+                                      <h3>VERIFICATION REQUEST REJECTED</h3>
                                     </div>
                                   </div>
 
@@ -2037,16 +2258,12 @@ function LeaVerificationRequest() {
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Loading details...</p>
                           ) : selectedInitiatedCase ? (
                             <>
-                              <small>CASE ID: {selectedInitiatedCase.case_reference}</small>
+                              {/* CHANGED — removed Manufacturer line from title block; Case ID retained */}
+                              <small><span className='LeaHeaderFieldLabel'>CASE ID:</span> {selectedInitiatedCase.case_reference}</small>
                               <h2>{selectedInitiatedCase.product_title}</h2>
-                              <p>MANUFACTURER: {selectedInitiatedCase.manufacturer || '—'}</p>
 
+                              {/* CHANGED — Complainant moved to Complainant Details; Manufacturer placed last in grid */}
                               <div className="CaseInfoGrid">
-                                <div>
-                                  <label>COMPLAINANT</label>
-                                  <p>{selectedInitiatedCase.complainant_name || '—'}</p>
-                                </div>
-
                                 <div>
                                   <label>CATEGORY</label>
                                   <p>{selectedInitiatedCase.product_category || '—'}</p>
@@ -2061,7 +2278,18 @@ function LeaVerificationRequest() {
                                   <label>SOURCE</label>
                                   <p>{GetSourceLabel(selectedInitiatedCase.source)}</p>
                                 </div>
+
+                                <div>
+                                  <label>MANUFACTURER</label>
+                                  <p>{selectedInitiatedCase.manufacturer || '—'}</p>
+                                </div>
                               </div>
+
+                              {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
+                              <LeaComplainantDetails
+                                complaintId={selectedInitiatedCase.complaint_id}
+                                complainantName={selectedInitiatedCase.complainant_name}
+                              />
                             </>
                           ) : (
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case to view details.</p>
@@ -2536,6 +2764,14 @@ function LeaVerificationRequest() {
           </button>
         </div>
       )}
+
+      {/* ADDED — Centered processing overlay */}
+      <ProcessingOverlay
+        isVisible={proc.isVisible}
+        title={proc.title}
+        message={proc.message}
+        status={proc.status}
+      />
     </div>
   );
 }

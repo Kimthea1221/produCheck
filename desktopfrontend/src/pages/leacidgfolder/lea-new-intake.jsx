@@ -10,10 +10,14 @@ import { useLocation, useNavigate } from 'react-router-dom' // ADDED: read nav d
 
 // ADDED — backend URL in one place, so it's easy to update later
 import { apiFetch } from '../../utils/apiFetch';
+// ADDED — processing overlay
+import { useProcessing } from '../../utils/useProcessing';
+import ProcessingOverlay from '../component/processing-overlay';
 
 function LeaNewIntake() {
   const location = useLocation()  // ADDED
   const navigate = useNavigate()  // ADDED
+  const proc = useProcessing()  // ADDED — processing overlay state
 
   // ADDED — draftId passed in from Saved Drafts "Edit Draft" click.
   // null = brand new intake, no draft involved.
@@ -117,6 +121,8 @@ function LeaNewIntake() {
   const [attachmentIdsToRemove, setAttachmentIdsToRemove] = useState([])
 
   const [loading, setLoading] = useState(false)  // ADDED — disables buttons mid-request
+  // CHANGED — tracks which action is in-flight ('draft' | 'submit' | null) so busy labels don't collide
+  const [pendingAction, setPendingAction] = useState(null)
 
   // ADDED — replaces errorMessage. { message, type: 'error' | 'success' }
   const [toast, setToast] = useState(null)
@@ -548,6 +554,7 @@ function LeaNewIntake() {
     }
   }
 
+  // CHANGED — wrapped with useProcessing run()
   const handleSaveAsDraft = async () => {
     if (editingComplaintId) {
       showToast('This complaint is already submitted and cannot be saved as a draft.')
@@ -560,35 +567,57 @@ function LeaNewIntake() {
     }
 
     setLoading(true)
-    const formData = buildFormData()
+    // CHANGED — set pendingAction to 'draft' while saving draft
+    setPendingAction('draft')
 
-    if (editingDraftId) {
-      attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
-    }
+    const ok = await proc.run(
+      {
+        title: 'SAVING DRAFT...',
+        message: 'Saving your complaint draft...',
+        successTitle: 'DRAFT SAVED',
+        successMessage: 'Draft saved. Redirecting to Saved Drafts...',
+        withSuccess: true,
+      },
+      async () => {
+        const formData = buildFormData()
 
-    const url = editingDraftId
-      ? `/drafts/walkin/${editingDraftId}`
-      : `/drafts/walkin/`
-    const method = editingDraftId ? 'PUT' : 'POST'
+        if (editingDraftId) {
+          attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+        }
 
-    try {
-      const res = await apiFetch(url, {
-        method,
-        body: formData,
-      })
-      if (!res.ok) {
-        showToast(await parseBackendError(res))
-        return
+        const url = editingDraftId
+          ? `/drafts/walkin/${editingDraftId}`
+          : `/drafts/walkin/`
+        const method = editingDraftId ? 'PUT' : 'POST'
+
+        try {
+          const res = await apiFetch(url, {
+            method,
+            body: formData,
+          })
+          if (!res.ok) {
+            showToast(await parseBackendError(res))
+            return false
+          }
+          showToast('Draft saved successfully.', 'success')
+          return true
+        } catch (err) {
+          showToast(err.message)
+          return false
+        } finally {
+          setLoading(false)
+          // CHANGED — reset pendingAction when draft save finishes
+          setPendingAction(null)
+        }
       }
-      showToast('Draft saved successfully.', 'success')
+    )
+
+    if (ok) {
       navigate('/leacidgfolder/lea-saved-draft')
-    } catch (err) {
-      showToast(err.message)
-    } finally {
-      setLoading(false)
     }
   }
 
+  // CHANGED — wrapped with useProcessing run()
   const handleLogComplaint = async (e) => {
     e.preventDefault()
 
@@ -598,55 +627,73 @@ function LeaNewIntake() {
     }
 
     setLoading(true)
+    // CHANGED — set pendingAction to 'submit' while logging/submitting complaint
+    setPendingAction('submit')
 
-    try {
-      let res
-      if (editingComplaintId) {
-        const formData = buildFormData()
-        attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+    const ok = await proc.run(
+      {
+        title: 'LOGGING COMPLAINT...',
+        message: 'Submitting walk-in complaint details...',
+        successTitle: 'COMPLAINT LOGGED',
+        successMessage: 'Complaint logged successfully. Redirecting...',
+        withSuccess: true,
+      },
+      async () => {
+        try {
+          let res
+          if (editingComplaintId) {
+            const formData = buildFormData()
+            attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
 
-        res = await apiFetch(`/complaints/walkin/${editingComplaintId}`, {
-          method: 'PUT',
-          body: formData,
-        })
-      } else if (editingDraftId) {
-        const formData = buildFormData()
-        attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+            res = await apiFetch(`/complaints/walkin/${editingComplaintId}`, {
+              method: 'PUT',
+              body: formData,
+            })
+          } else if (editingDraftId) {
+            const formData = buildFormData()
+            attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
 
-        const updateRes = await apiFetch(`/drafts/walkin/${editingDraftId}`, {
-          method: 'PUT',
-          body: formData,
-        })
+            const updateRes = await apiFetch(`/drafts/walkin/${editingDraftId}`, {
+              method: 'PUT',
+              body: formData,
+            })
 
-        if (!updateRes.ok) {
-          showToast(await parseBackendError(updateRes))
+            if (!updateRes.ok) {
+              showToast(await parseBackendError(updateRes))
+              return false
+            }
+
+            res = await apiFetch(`/drafts/walkin/${editingDraftId}/submit`, {
+              method: 'POST',
+            })
+          } else {
+            const formData = buildFormData()
+            res = await apiFetch('/complaints/walkin/', {
+              method: 'POST',
+              body: formData,
+            })
+          }
+
+          if (!res.ok) {
+            showToast(await parseBackendError(res))
+            return false
+          }
+          showToast('Complaint logged successfully.', 'success')
+          return true
+        } catch (err) {
+          showToast(err.message)
+          return false
+        } finally {
           setLoading(false)
-          return
+          // CHANGED — reset pendingAction when submission finishes
+          setPendingAction(null)
         }
-
-        res = await apiFetch(`/drafts/walkin/${editingDraftId}/submit`, {
-          method: 'POST',
-        })
-      } else {
-        const formData = buildFormData()
-        res = await apiFetch('/complaints/walkin/', {
-          method: 'POST',
-          body: formData,
-        })
       }
+    )
 
-      if (!res.ok) {
-        showToast(await parseBackendError(res))
-        return
-      }
-      showToast('Complaint logged successfully.', 'success')
+    if (ok) {
       navigate('/leacidgfolder/lea-walkin-complaints')
-    } catch (err) {
-      showToast(err.message)
-    } finally {
-      setLoading(false)
     }
-
   }
 
   return (
@@ -1007,11 +1054,13 @@ function LeaNewIntake() {
                 <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
                 {!editingComplaintId && (
                   <button type="button" className='DraftButton' disabled={loading} onClick={handleSaveAsDraft}>
-                    {loading ? 'Saving...' : 'Save as Draft'}
+                    {/* CHANGED — only show Saving... when pendingAction is 'draft' */}
+                    {pendingAction === 'draft' ? 'Saving...' : 'Save as Draft'}
                   </button>
                 )}
                 <button type="submit" className='LogButton' disabled={loading}>
-                  {loading ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
+                  {/* CHANGED — only show Submitting... when pendingAction is 'submit' */}
+                  {pendingAction === 'submit' ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
                 </button>
               </div>
             </form>
@@ -1128,6 +1177,14 @@ function LeaNewIntake() {
           </button>
         </div>
       )}
+
+      {/* ADDED — Centered processing overlay */}
+      <ProcessingOverlay
+        isVisible={proc.isVisible}
+        title={proc.title}
+        message={proc.message}
+        status={proc.status}
+      />
     </div>
   )
 }
