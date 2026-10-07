@@ -31,6 +31,7 @@
   },
 
   "host_permissions": [
+    "<all_urls>",
     "https://*.shopee.ph/*",
     "https://*.lazada.com.ph/*",
     "https://*.tiktok.com/*",
