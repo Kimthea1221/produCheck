@@ -600,80 +600,97 @@ function LeaWalkinComplaints() {
             })()}
             {viewModal && selectedComplaint && (
               <div className='ModalOverlay'>
-                <div className='ModalViewButton'>
-                  <h4>{selectedComplaint.product}</h4>
-                  <div className='ModalSummary'>
+                {/* CHANGED — Added WcDetailModalFdaSize modifier class to match FDA case details modal sizing */}
+                <div className='ModalViewButton WcDetailModal WcDetailModalFdaSize' onClick={(e) => e.stopPropagation()}>
+                  {/* ADDED — Fixed header matching FDA case details modal */}
+                  <div className='WcDetailModalHeader'>
                     <div>
-                      <p><strong>Case ID:</strong> <br></br>{selectedComplaint.id}</p>
-                      <p><strong>Manufacturer:</strong><br></br> {selectedComplaint.manufacturer || '—'}</p>
-                      <p><strong>Category:</strong><br></br> {selectedComplaint.category || '—'}</p>
-                      <p><strong>Place of Purchase:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.place_of_purchase || '—')}</p>
-                      <p><strong>Date of Purchase:</strong><br></br> {detailLoading ? 'Loading…' : formatPurchaseDate(selectedComplaint.date_of_purchase)}</p>
-                      <p><strong>Amount Paid:</strong><br></br> {detailLoading ? 'Loading…' : formatAmountPaid(selectedComplaint.amount_paid)}</p>
-                    </div>
-                    <div>
-                      <p><strong>Complainant:</strong><br></br> {selectedComplaint.complainant || '—'}</p>
-                      <p><strong>Contact Number:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.contact_number || '—')}</p>
-                      <p><strong>Email:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.email || '—')}</p>
-                      <p><strong>Address:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.address || '—')}</p>
-                      <p><strong>ID Presented:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.id_type || '—')}</p>
-                      <p><strong>Logged:</strong><br></br> {selectedComplaint.logged}</p>
-                      <p><strong>Status:</strong> <br></br>
-                        <span className={`WcStatusBadge ${WcGetStatusClass(selectedComplaint.status)}`}>
-                          {WcGetStatusLabel(selectedComplaint.status)}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <h6 className='Statementcomp'>COMPLAINANT STATEMENT</h6>
-                  <div className='StatementBox'>
-                    <p>{detailLoading ? 'Loading…' : (selectedComplaint.statement || selectedComplaint.complainant_statement || selectedComplaint.description || 'Example statement....')}</p>
-                  </div>
-
-                  {/* Auto-Attached Evidence & Request Documents */}
-                  <div className="LeaVerifSectionCard" style={{ marginTop: '16px', marginBottom: '16px' }}>
-                    <div className="LeaVerifSectionHeader">
-                      <Paperclip size={16} className="LeaVerifBlueIcon" />
-                      <h3>Auto-Attached Evidence &amp; Request Documents</h3>
-                    </div>
-                    <div className="LeaVerifDocsGrid">
-                      {(() => {
-                        const attachedFiles = selectedComplaint?.attached_files || selectedComplaint?.attachedFiles || selectedComplaint?.evidence || selectedComplaint?.files || selectedComplaint?.attachments || [];
-                        if (attachedFiles.length > 0) {
-                          return attachedFiles.map((f, idx) => (
-                            <div key={f.file_id || f.id || idx} className="LeaVerifDocCard">
-                              <div className="LeaVerifDocIcon">
-                                {(f.mime_type?.startsWith('image/') || f.type?.startsWith('image/')) ? (
-                                  <ImageIcon size={18} />
-                                ) : (
-                                  <FileText size={18} />
-                                )}
-                              </div>
-                              <div className="LeaVerifDocInfo">
-                                <p className="LeaVerifDocName">{f.file_name || f.name}</p>
-                                <span className="LeaVerifDocMeta">{f.file_size_display || f.size}</span>
-                              </div>
-                              <div className="LeaVerifDocActions">
-                                <button
-                                  type="button"
-                                  className="LeaVerifDocActionBtn"
-                                  title="Inspect Attachment"
-                                  onClick={() => setDocPreviewModal(f)}
-                                >
-                                  <Eye size={13} />
-                                </button>
-                              </div>
-                            </div>
-                          ));
-                        }
-                        return (
-                          <p className="LeaVerifNoDocsText">No evidence documents attached to this complaint.</p>
-                        );
-                      })()}
+                      {/* ADDED — Muted eyebrow label above product title matching FDA case details modal */}
+                      <small className='WcDetailEyebrow'>Complaint Details · {selectedComplaint.id}</small>
+                      <h4>{selectedComplaint.product}</h4>
                     </div>
                   </div>
 
-                  <div className='ModalActions'>
+                  {/* ADDED — Scrollable body container matching FDA case details modal */}
+                  <div className='WcDetailModalBody'>
+                    <div className='ModalSummary'>
+                      <div>
+                        {/* CHANGED — Wrapped fetched values in WcFieldValueBox for bordered read-only box styling */}
+                        <p><strong>Case ID:</strong> <br></br><span className='WcFieldValueBox'>{selectedComplaint.id}</span></p>
+                        <p><strong>Manufacturer:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.manufacturer || '—'}</span></p>
+                        <p><strong>Category:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.category || '—'}</span></p>
+                        <p><strong>Place of Purchase:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.place_of_purchase || '—')}</span></p>
+                        <p><strong>Date of Purchase:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : formatPurchaseDate(selectedComplaint.date_of_purchase)}</span></p>
+                        <p><strong>Amount Paid:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : formatAmountPaid(selectedComplaint.amount_paid)}</span></p>
+                      </div>
+                      <div>
+                        {/* CHANGED — Wrapped fetched values in WcFieldValueBox for bordered read-only box styling */}
+                        <p><strong>Complainant:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.complainant || '—'}</span></p>
+                        <p><strong>Contact Number:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.contact_number || '—')}</span></p>
+                        <p><strong>Email:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.email || '—')}</span></p>
+                        <p><strong>Address:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.address || '—')}</span></p>
+                        <p><strong>ID Presented:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.id_type || '—')}</span></p>
+                        <p><strong>Logged:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.logged}</span></p>
+                        <p><strong>Status:</strong> <br></br>
+                          <span className='WcFieldValueBox'>
+                            <span className={`WcStatusBadge ${WcGetStatusClass(selectedComplaint.status)}`}>
+                              {WcGetStatusLabel(selectedComplaint.status)}
+                            </span>
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <h6 className='Statementcomp'>COMPLAINANT STATEMENT</h6>
+                    <div className='StatementBox'>
+                      <p>{detailLoading ? 'Loading…' : (selectedComplaint.statement || selectedComplaint.complainant_statement || selectedComplaint.description || 'Example statement....')}</p>
+                    </div>
+
+                    {/* Auto-Attached Evidence & Request Documents */}
+                    <div className="LeaVerifSectionCard" style={{ marginTop: '16px', marginBottom: '16px' }}>
+                      <div className="LeaVerifSectionHeader">
+                        <Paperclip size={16} className="LeaVerifBlueIcon" />
+                        <h3>Auto-Attached Evidence &amp; Request Documents</h3>
+                      </div>
+                      <div className="LeaVerifDocsGrid">
+                        {(() => {
+                          const attachedFiles = selectedComplaint?.attached_files || selectedComplaint?.attachedFiles || selectedComplaint?.evidence || selectedComplaint?.files || selectedComplaint?.attachments || [];
+                          if (attachedFiles.length > 0) {
+                            return attachedFiles.map((f, idx) => (
+                              <div key={f.file_id || f.id || idx} className="LeaVerifDocCard">
+                                <div className="LeaVerifDocIcon">
+                                  {(f.mime_type?.startsWith('image/') || f.type?.startsWith('image/')) ? (
+                                    <ImageIcon size={18} />
+                                  ) : (
+                                    <FileText size={18} />
+                                  )}
+                                </div>
+                                <div className="LeaVerifDocInfo">
+                                  <p className="LeaVerifDocName">{f.file_name || f.name}</p>
+                                  <span className="LeaVerifDocMeta">{f.file_size_display || f.size}</span>
+                                </div>
+                                <div className="LeaVerifDocActions">
+                                  <button
+                                    type="button"
+                                    className="LeaVerifDocActionBtn"
+                                    title="Inspect Attachment"
+                                    onClick={() => setDocPreviewModal(f)}
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ));
+                          }
+                          return (
+                            <p className="LeaVerifNoDocsText">No evidence documents attached to this complaint.</p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CHANGED — Fixed footer matching FDA case details modal */}
+                  <div className='ModalActions WcDetailModalFooter'>
                     <button className='BtnCancelModal' onClick={handleCloseViewbutton}>Close</button>
                   </div>
                 </div>

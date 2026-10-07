@@ -642,108 +642,121 @@ useEffect(() => {
 
           {/* DETAIL MODAL OVERLAY */}
           {selectedReport && (
-            <div className="FdaModalOverlay" onClick={() => setSelectedReportId(null)}>
-              <div className="FdaModalContent" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="FdaDetailClose"
-                  onClick={() => setSelectedReportId(null)}
-                  title="Close details"
-                >
-                  <X size={16} />
-                </button>
-                
+            <div className="FdaModalOverlay">
+              <div className="FdaModalContent FdaReportsDetailModal" onClick={(e) => e.stopPropagation()}>
+                {/* 1. FIXED HEADER */}
                 <div className="FdaDetailHeader">
-                  <small>Case Details · {selectedReport.case_reference}</small>
-                  <h2>{selectedReport.product_title}</h2>
-                  <p>{selectedReport.manufacturer || '—'}</p>
-                </div>
-
-                <div className="FdaDetailGrid">
-                  <div className="FdaDetailItem">
-                    <label>Category</label>
-                    <span>{getCategoryLabel(selectedReport.product_category) || '—'}</span>
-                  </div>
-                  {/* REMOVED — Region detail item */}
-                  <div className="FdaDetailItem">
-                    <label>Source Type</label>
-                    <span className="FdaSourceBadge" style={{ width: 'fit-content' }}>
-                      {selectedReport.source === "extension" ? (
-                        <Globe size={11} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                      ) : (
-                        <Footprints size={11} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                      )}
-                      {getSourceLabel(selectedReport.source)}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Current Status</label>
-                    <span className="FdaBadge" style={{ ...getStatusStyle(selectedReport.status), width: 'fit-content' }}>
-                      {getWorkflowStatus(selectedReport.status, selectedReport.source)}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
-                    <label>Submitted At</label>
-                    <span>{formatDateTime(selectedReport.created_at)}</span>
+                  <div>
+                    <small>Case Details · {selectedReport.case_reference}</small>
+                    <h2>{selectedReport.product_title}</h2>
+                    <p>{selectedReport.manufacturer || '—'}</p>
                   </div>
                 </div>
 
-                {/* CHANGED — description now comes from the real DETAIL
-                    fetch (selectedReportDetail), not the list item. Shows
-                    a loading/error state while that request is in flight,
-                    since it's a separate round trip from the list. */}
-                {detailLoading ? (
-                  <div className="FdaDetailDesc">
-                    <p>Loading case details…</p>
+                {/* 2. SCROLLABLE BODY */}
+                <div className="FdaDetailBody">
+                  <div className="FdaDetailGrid">
+                    {/* CHANGED — Wrapped fetched values in FdaFieldValueBox for bordered read-only box styling */}
+                    <div className="FdaDetailItem">
+                      <label>Category</label>
+                      <span className="FdaFieldValueBox">{getCategoryLabel(selectedReport.product_category) || '—'}</span>
+                    </div>
+                    {/* REMOVED — Region detail item */}
+                    <div className="FdaDetailItem">
+                      <label>Source Type</label>
+                      <div className="FdaFieldValueBox">
+                        <span className="FdaSourceBadge" style={{ width: 'fit-content' }}>
+                          {selectedReport.source === "extension" ? (
+                            <Globe size={11} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                          ) : (
+                            <Footprints size={11} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                          )}
+                          {getSourceLabel(selectedReport.source)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Current Status</label>
+                      <div className="FdaFieldValueBox">
+                        <span className="FdaBadge" style={{ ...getStatusStyle(selectedReport.status), width: 'fit-content' }}>
+                          {getWorkflowStatus(selectedReport.status, selectedReport.source)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
+                      <label>Submitted At</label>
+                      <span className="FdaFieldValueBox">{formatDateTime(selectedReport.created_at)}</span>
+                    </div>
                   </div>
-                ) : detailError ? (
-                  <div className="FdaDetailDesc">
-                    <p>{detailError}</p>
-                  </div>
-                ) : (
-                  <>
+
+                  {/* CHANGED — description now comes from the real DETAIL
+                      fetch (selectedReportDetail), not the list item. Shows
+                      a loading/error state while that request is in flight,
+                      since it's a separate round trip from the list. */}
+                  {detailLoading ? (
                     <div className="FdaDetailDesc">
-                      <label>Complaint Description</label>
-                      <p>{selectedReportDetail?.description || 'No description provided.'}</p>
+                      <p>Loading case details…</p>
                     </div>
+                  ) : detailError ? (
+                    <div className="FdaDetailDesc">
+                      <p>{detailError}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="FdaDetailDesc">
+                        <label>Complaint Description</label>
+                        <p>{selectedReportDetail?.description || 'No description provided.'}</p>
+                      </div>
 
-                    <div className="FdaDetailAttachments">
-                      <label>Attached Files / Evidence</label>
-                      {selectedReportDetail?.attached_files && selectedReportDetail.attached_files.length > 0 ? (
-                        <div className="FdaVerifDocsGrid">
-                          {selectedReportDetail.attached_files.map(doc => {
-                            // CHANGED — real field names from SharedFileResponse:
-                            // file_id / file_name / mime_type / file_size_display
-                            // (not id / name / type / size / url like the mock data).
-                            const isImage = doc.mime_type?.startsWith('image/') ||
-                              /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_name || '');
-                            return (
-                              <div className="FdaVerifDocCard" key={doc.file_id}>
-                                <div className="FdaVerifDocIcon">
-                                  {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                      <div className="FdaDetailAttachments">
+                        <label>Attached Files / Evidence</label>
+                        {selectedReportDetail?.attached_files && selectedReportDetail.attached_files.length > 0 ? (
+                          <div className="FdaVerifDocsGrid">
+                            {selectedReportDetail.attached_files.map(doc => {
+                              // CHANGED — real field names from SharedFileResponse:
+                              // file_id / file_name / mime_type / file_size_display
+                              // (not id / name / type / size / url like the mock data).
+                              const isImage = doc.mime_type?.startsWith('image/') ||
+                                /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_name || '');
+                              return (
+                                <div className="FdaVerifDocCard" key={doc.file_id}>
+                                  <div className="FdaVerifDocIcon">
+                                    {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                  </div>
+                                  <div className="FdaVerifDocInfo">
+                                    <p className="FdaVerifDocName" title={doc.file_name}>{doc.file_name}</p>
+                                    <span className="FdaVerifDocMeta">{doc.file_size_display}</span>
+                                  </div>
+                                  <div className="FdaVerifDocActions">
+                                    <button
+                                      className="FdaVerifDocActionBtn"
+                                      title="Inspect Attachment"
+                                      onClick={() => handleViewAttachment(doc)}
+                                    >
+                                      <Eye size={13} />
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="FdaVerifDocInfo">
-                                  <p className="FdaVerifDocName" title={doc.file_name}>{doc.file_name}</p>
-                                  <span className="FdaVerifDocMeta">{doc.file_size_display}</span>
-                                </div>
-                                <div className="FdaVerifDocActions">
-                                  <button
-                                    className="FdaVerifDocActionBtn"
-                                    title="Inspect Attachment"
-                                    onClick={() => handleViewAttachment(doc)}
-                                  >
-                                    <Eye size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="FdaVerifNoDocsText">No files or evidence were attached to this complaint.</p>
-                      )}
-                    </div>
-                  </>
-                )}
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="FdaVerifNoDocsText">No files or evidence were attached to this complaint.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* 3. FIXED FOOTER */}
+                <div className="FdaDetailFooter">
+                  <button
+                    className="FdaVerifBtnModalCancel"
+                    onClick={() => setSelectedReportId(null)}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           )}
