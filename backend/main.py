@@ -75,7 +75,7 @@ from app.desktop.routers.drafts.fda_verification_drafts import router as fda_ver
 from app.desktop.routers.verification.verification_response import fda_response_router
 
 # Title Extaction Retrieved from the Chrome Extension to NLP
-from app.extension.routers.retrieval import router as retrieval_router
+#from app.extension.routers.retrieval import router as retrieval_router
 
 #for verification history in extension
 from app.extension.routers import verification
@@ -168,7 +168,7 @@ app.include_router(password_reset_request_router)
 #         "User": consumer
 #     }
 
-app.include_router(retrieval_router)
+# app.include_router(retrieval_router)
 
 app.include_router(verification.router)
 app.include_router(marketplace_detection_router)
