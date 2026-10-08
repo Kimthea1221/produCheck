@@ -6,9 +6,178 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import mammoth from 'mammoth'
-import { Eye, MoreVertical, Pencil, Trash2, X, Paperclip, FileText, Image as ImageIcon, Download } from 'lucide-react'
+import {
+  Eye,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  X,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  Clock3,
+  BellRing,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Info,
+  Calendar,
+  User,
+  ShieldCheck,
+  CheckCircle2,
+} from 'lucide-react'
 
 import { apiFetch } from '../../utils/apiFetch';
+
+// ⚠️ REMOVE THIS: Mock toggle and control for walk-in verification progress
+const USE_WALKIN_PROCESS_MOCK = true;
+// ⚠️ REMOVE THIS: Change to 'takedown_initiated' or 'completed' to preview later stages
+const MOCK_UNREGISTERED_COMPLAINT_STATUS = 'takedown_requested';
+
+// 🔌 BACKEND: GET /complaints/{id}/walkin-detail should return a `verification` object (or null). Expected keys:
+// request_id, request_status ('pending'|'confirmed_registered'|'confirmed_unregistered'|'rejected'|'recalled'),
+// priority, product_code, notes_to_fda, requested_at, requested_by_name, reminder_sent_at,
+// verification_result ('registered'|'unregistered'|'rejected'|null), cpr_number, cpr_expiry,
+// unregistered_reason, rejection_reason, response_notes, verified_by_name, responded_at,
+// acknowledged_at, acknowledged_by_name, complaint_status ('open'|'under_review'|
+// 'takedown_requested'|'takedown_initiated'|'completed'|'dismissed'), takedown_initiated_at,
+// takedown_initiated_by_name, field_operation_notes, closed_at, closed_by_name,
+// reason_closed ('completed'|'registered'|'rejected'), reason_detail
+
+// ⚠️ REMOVE THIS: Mock provider generating realistic Philippine cosmetic data for walk-in verification progress preview
+function getMockWalkinVerification(status, complaint) {
+  if (status === 'queued') {
+    return null;
+  }
+
+  if (status === 'pending') {
+    return {
+      request_id: 'vr-mock-001',
+      request_status: 'pending',
+      priority: 'standard',
+      product_code: 'BC-893012-PH',
+      notes_to_fda: 'Citizen reported severe dermatitis and rash within 48 hours of using this facial cream purchased at Divisoria market. Suspected counterfeit or unregistered cosmetic formulation with heavy metal contamination.',
+      requested_at: '2026-10-04T09:30:00Z',
+      requested_by_name: 'Agent Danilo Reyes, CIDG',
+      reminder_sent_at: '2026-10-06T14:15:00Z',
+      verification_result: null,
+      cpr_number: null,
+      cpr_expiry: null,
+      unregistered_reason: null,
+      rejection_reason: null,
+      response_notes: null,
+      verified_by_name: null,
+      responded_at: null,
+      acknowledged_at: null,
+      acknowledged_by_name: null,
+      complaint_status: 'open',
+      takedown_initiated_at: null,
+      takedown_initiated_by_name: null,
+      field_operation_notes: null,
+      closed_at: null,
+      closed_by_name: null,
+      reason_closed: null,
+      reason_detail: null,
+    };
+  }
+
+  if (status === 'confirmed_registered') {
+    return {
+      request_id: 'vr-mock-002',
+      request_status: 'confirmed_registered',
+      priority: 'high',
+      product_code: 'NN-100000941235',
+      notes_to_fda: 'Walk-in complainant reported skin peeling and chemical burns after applying whitening serum bought from an online distributor stall in Quiapo.',
+      requested_at: '2026-09-28T10:15:00Z',
+      requested_by_name: 'Agent Maria Santos, CIDG',
+      reminder_sent_at: null,
+      verification_result: 'registered',
+      cpr_number: 'NN-100000941235',
+      cpr_expiry: '2027-11-30',
+      unregistered_reason: null,
+      rejection_reason: null,
+      response_notes: 'Product holds an active Cosmetic Product Notification with the FDA Center for Cosmetics Regulation and Research (CCRR). Batch number matches authentic manufacturer distribution records. Citizen reaction may indicate individual hypersensitivity or improper storage handling.',
+      verified_by_name: 'Ma. Cristina Rodriguez, RPh (FDA CCRR)',
+      responded_at: '2026-09-30T11:45:00Z',
+      acknowledged_at: '2026-10-01T08:20:00Z',
+      acknowledged_by_name: 'Agent Maria Santos, CIDG',
+      complaint_status: 'dismissed',
+      takedown_initiated_at: null,
+      takedown_initiated_by_name: null,
+      field_operation_notes: null,
+      closed_at: '2026-10-01T08:20:00Z',
+      closed_by_name: 'Agent Maria Santos, CIDG',
+      reason_closed: 'registered',
+      reason_detail: 'Verified authentic FDA-notified cosmetic product. Case closed and referred to consumer advisory unit.',
+    };
+  }
+
+  if (status === 'confirmed_unregistered') {
+    const cStatus = MOCK_UNREGISTERED_COMPLAINT_STATUS;
+    return {
+      request_id: 'vr-mock-003',
+      request_status: 'confirmed_unregistered',
+      priority: 'urgent',
+      product_code: 'GBC-EXP-4402',
+      notes_to_fda: 'Complainant submitted samples of whitening toner sold with unverified foreign labels in Baclaran shopping center. Chemical odor reported.',
+      requested_at: '2026-09-22T08:45:00Z',
+      requested_by_name: 'Agent Rafael Cruz, CIDG',
+      reminder_sent_at: null,
+      verification_result: 'unregistered',
+      cpr_number: null,
+      cpr_expiry: null,
+      unregistered_reason: 'No record of Cosmetic Notification or Certificate of Product Registration in FDA Philippines Database. Product contains undeclared Hydroquinone and Mercury levels exceeding permissible safety limits under ASEAN Cosmetic Directive.',
+      rejection_reason: null,
+      response_notes: 'Immediate enforcement action recommended pursuant to RA 9711 (FDA Act of 2009). Issue seizure order and confiscate inventory from retailer and regional warehouse distributors.',
+      verified_by_name: 'Eduardo M. Bautista, Chemist III (FDA Enforcement Task Force)',
+      responded_at: '2026-09-24T14:30:00Z',
+      acknowledged_at: '2026-09-25T09:00:00Z',
+      acknowledged_by_name: 'Agent Rafael Cruz, CIDG',
+      complaint_status: cStatus,
+      takedown_initiated_at: (cStatus === 'takedown_initiated' || cStatus === 'completed') ? '2026-09-26T10:00:00Z' : null,
+      takedown_initiated_by_name: (cStatus === 'takedown_initiated' || cStatus === 'completed') ? 'Lt. Col. Arthur Valenzuela, CIDG Region IV-A' : null,
+      field_operation_notes: (cStatus === 'takedown_initiated' || cStatus === 'completed') ? 'Joint raid conducted with FDA Regional Field Office. 4 retail stalls inspected; 320 bottles seized and secured under chain of custody. Notice of Violation served to shop manager.' : null,
+      closed_at: cStatus === 'completed' ? '2026-10-02T16:30:00Z' : null,
+      closed_by_name: cStatus === 'completed' ? 'Agent Rafael Cruz, CIDG' : null,
+      reason_closed: cStatus === 'completed' ? 'completed' : null,
+      reason_detail: cStatus === 'completed' ? 'Enforcement operation successfully concluded. All illicit stocks impounded and forwarded to FDA laboratory for judicial evidentiary proceedings.' : null,
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      request_id: 'vr-mock-004',
+      request_status: 'rejected',
+      priority: 'low',
+      product_code: 'UNKNOWN-SOAP-01',
+      notes_to_fda: 'Citizen presented handwritten receipt for an unlabeled herbal bath soap purchased at a provincial weekend flea market.',
+      requested_at: '2026-09-18T13:10:00Z',
+      requested_by_name: 'Agent Leo Magbanua, CIDG',
+      reminder_sent_at: null,
+      verification_result: 'rejected',
+      cpr_number: null,
+      cpr_expiry: null,
+      unregistered_reason: null,
+      rejection_reason: 'Insufficient product identification data. Labeling images provided do not show brand name, manufacturer details, lot/batch number, or primary packaging for FDA database cross-reference.',
+      response_notes: 'Please obtain higher-resolution packaging photographs or an official manufacturer invoice before resubmitting verification request.',
+      verified_by_name: 'Carmina S. Mendoza (FDA Regulatory Officer)',
+      responded_at: '2026-09-20T10:00:00Z',
+      acknowledged_at: '2026-09-21T11:15:00Z',
+      acknowledged_by_name: 'Agent Leo Magbanua, CIDG',
+      complaint_status: 'dismissed',
+      takedown_initiated_at: null,
+      takedown_initiated_by_name: null,
+      field_operation_notes: null,
+      closed_at: '2026-09-21T11:15:00Z',
+      closed_by_name: 'Agent Leo Magbanua, CIDG',
+      reason_closed: 'rejected',
+      reason_detail: 'Verification request rejected due to illegible evidence. Citizen contacted to provide clearer packaging samples.',
+    };
+  }
+
+  return null;
+}
 
 // BACKEND: Status values must match the backend complaint workflow states exactly.
 function WcGetStatusClass(status) {
@@ -27,6 +196,12 @@ function WcGetStatusClass(status) {
 
     case 'rejected':
       return 'WcStatus-rejected';
+
+    case 'takedown_initiated':
+      return 'WcStatus-takedown-initiated';
+
+    case 'completed':
+      return 'WcStatus-completed';
 
     default:
       return '';
@@ -49,6 +224,12 @@ function WcGetStatusLabel(status) {
 
     case 'rejected':
       return 'Verification Rejected';
+
+    case 'takedown_initiated':
+      return 'Takedown Initiated';
+
+    case 'completed':
+      return 'Takedown Completed';
 
     default:
       return status;
@@ -78,6 +259,24 @@ function formatAmountPaid(amount) {
   const num = Number(amount);
   if (isNaN(num)) return String(amount);
   return `₱${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDateTime(dateStr) {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+    }) + ' ' + d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 function LeaWalkinComplaints() {
@@ -249,6 +448,9 @@ function LeaWalkinComplaints() {
         return res.json()
       })
       .then((data) => {
+        // ⚠️ REMOVE THIS: Attach mock verification if backend data.verification is missing and mock is active
+        const mockVerif = USE_WALKIN_PROCESS_MOCK ? getMockWalkinVerification(complaint.status, complaint) : null;
+
         setSelectedComplaint((prev) => (prev && prev.id === complaint.id ? {
           ...prev,
           statement: data.nature_of_complaint,
@@ -261,6 +463,7 @@ function LeaWalkinComplaints() {
           place_of_purchase: data.place_of_purchase,
           date_of_purchase: data.date_of_purchase,
           amount_paid: data.amount_paid,
+          verification: data.verification || mockVerif, // 🔌 BACKEND: GET /complaints/{id}/walkin-detail should return a `verification` object (or null)
         } : prev))
       })
       .catch((err) => console.error('Failed to load complaint detail:', err))
@@ -356,7 +559,7 @@ function LeaWalkinComplaints() {
     ])
     const escapeCell = (val, isDate = false) => {
         const escaped = String(val ?? '').replace(/"/g, '""')
-        // CHANGED — dates get the ="..." treatment so Excel can't
+        // CHANGED — dates get the =""..."" treatment so Excel can't
         // auto-convert/reformat them and truncate the column (##### bug)
         return isDate ? `"=""${escaped}"""` : `"${escaped}"`
     }
@@ -418,6 +621,9 @@ function LeaWalkinComplaints() {
                   <option value="confirmed_registered">Confirmed Registered</option>
                   <option value="confirmed_unregistered">Confirmed Unregistered</option>
                   <option value="rejected">Verification Rejected</option>
+                  {/* 🔌 BACKEND: the list/detail status never returns these values yet (derived from the verification request status). They will work once the backend returns the complaint status. */}
+                  <option value="takedown_initiated">Takedown Initiated</option>
+                  <option value="completed">Takedown Completed</option>
                 </select>
 
                 <select
@@ -600,80 +806,486 @@ function LeaWalkinComplaints() {
             })()}
             {viewModal && selectedComplaint && (
               <div className='ModalOverlay'>
-                <div className='ModalViewButton'>
-                  <h4>{selectedComplaint.product}</h4>
-                  <div className='ModalSummary'>
+                {/* CHANGED — Added WcDetailModalFdaSize modifier class to match FDA case details modal sizing */}
+                <div className='ModalViewButton WcDetailModal WcDetailModalFdaSize' onClick={(e) => e.stopPropagation()}>
+                  {/* ADDED — Fixed header matching FDA case details modal */}
+                  <div className='WcDetailModalHeader'>
                     <div>
-                      <p><strong>Case ID:</strong> <br></br>{selectedComplaint.id}</p>
-                      <p><strong>Manufacturer:</strong><br></br> {selectedComplaint.manufacturer || '—'}</p>
-                      <p><strong>Category:</strong><br></br> {selectedComplaint.category || '—'}</p>
-                      <p><strong>Place of Purchase:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.place_of_purchase || '—')}</p>
-                      <p><strong>Date of Purchase:</strong><br></br> {detailLoading ? 'Loading…' : formatPurchaseDate(selectedComplaint.date_of_purchase)}</p>
-                      <p><strong>Amount Paid:</strong><br></br> {detailLoading ? 'Loading…' : formatAmountPaid(selectedComplaint.amount_paid)}</p>
+                      {/* ADDED — Muted eyebrow label above product title matching FDA case details modal */}
+                      <small className='WcDetailEyebrow'>Complaint Details · {selectedComplaint.id}</small>
+                      <h4>{selectedComplaint.product}</h4>
                     </div>
-                    <div>
-                      <p><strong>Complainant:</strong><br></br> {selectedComplaint.complainant || '—'}</p>
-                      <p><strong>Contact Number:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.contact_number || '—')}</p>
-                      <p><strong>Email:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.email || '—')}</p>
-                      <p><strong>Address:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.address || '—')}</p>
-                      <p><strong>ID Presented:</strong><br></br> {detailLoading ? 'Loading…' : (selectedComplaint.id_type || '—')}</p>
-                      <p><strong>Logged:</strong><br></br> {selectedComplaint.logged}</p>
-                      <p><strong>Status:</strong> <br></br>
-                        <span className={`WcStatusBadge ${WcGetStatusClass(selectedComplaint.status)}`}>
-                          {WcGetStatusLabel(selectedComplaint.status)}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  <h6 className='Statementcomp'>COMPLAINANT STATEMENT</h6>
-                  <div className='StatementBox'>
-                    <p>{detailLoading ? 'Loading…' : (selectedComplaint.statement || selectedComplaint.complainant_statement || selectedComplaint.description || 'Example statement....')}</p>
                   </div>
 
-                  {/* Auto-Attached Evidence & Request Documents */}
-                  <div className="LeaVerifSectionCard" style={{ marginTop: '16px', marginBottom: '16px' }}>
-                    <div className="LeaVerifSectionHeader">
-                      <Paperclip size={16} className="LeaVerifBlueIcon" />
-                      <h3>Auto-Attached Evidence &amp; Request Documents</h3>
+                  {/* ADDED — Scrollable body container matching FDA case details modal */}
+                  <div className='WcDetailModalBody'>
+                    <div className='ModalSummary'>
+                      <div>
+                        {/* CHANGED — Wrapped fetched values in WcFieldValueBox for bordered read-only box styling */}
+                        <p><strong>Case ID:</strong> <br></br><span className='WcFieldValueBox'>{selectedComplaint.id}</span></p>
+                        <p><strong>Manufacturer:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.manufacturer || '—'}</span></p>
+                        <p><strong>Category:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.category || '—'}</span></p>
+                        <p><strong>Place of Purchase:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.place_of_purchase || '—')}</span></p>
+                        <p><strong>Date of Purchase:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : formatPurchaseDate(selectedComplaint.date_of_purchase)}</span></p>
+                        <p><strong>Amount Paid:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : formatAmountPaid(selectedComplaint.amount_paid)}</span></p>
+                      </div>
+                      <div>
+                        {/* CHANGED — Wrapped fetched values in WcFieldValueBox for bordered read-only box styling */}
+                        <p><strong>Complainant:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.complainant || '—'}</span></p>
+                        <p><strong>Contact Number:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.contact_number || '—')}</span></p>
+                        <p><strong>Email:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.email || '—')}</span></p>
+                        <p><strong>Address:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.address || '—')}</span></p>
+                        <p><strong>ID Presented:</strong><br></br><span className='WcFieldValueBox'>{detailLoading ? 'Loading…' : (selectedComplaint.id_type || '—')}</span></p>
+                        <p><strong>Logged:</strong><br></br><span className='WcFieldValueBox'>{selectedComplaint.logged}</span></p>
+                        <p><strong>Status:</strong> <br></br>
+                          <span className='WcFieldValueBox'>
+                            <span className={`WcStatusBadge ${WcGetStatusClass(selectedComplaint.status)}`}>
+                              {WcGetStatusLabel(selectedComplaint.status)}
+                            </span>
+                          </span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="LeaVerifDocsGrid">
-                      {(() => {
-                        const attachedFiles = selectedComplaint?.attached_files || selectedComplaint?.attachedFiles || selectedComplaint?.evidence || selectedComplaint?.files || selectedComplaint?.attachments || [];
-                        if (attachedFiles.length > 0) {
-                          return attachedFiles.map((f, idx) => (
-                            <div key={f.file_id || f.id || idx} className="LeaVerifDocCard">
-                              <div className="LeaVerifDocIcon">
-                                {(f.mime_type?.startsWith('image/') || f.type?.startsWith('image/')) ? (
-                                  <ImageIcon size={18} />
-                                ) : (
-                                  <FileText size={18} />
+                    <h6 className='Statementcomp'>COMPLAINANT STATEMENT</h6>
+                    <div className='StatementBox'>
+                      <p>{detailLoading ? 'Loading…' : (selectedComplaint.statement || selectedComplaint.complainant_statement || selectedComplaint.description || 'Example statement....')}</p>
+                    </div>
+
+                    {/* Auto-Attached Evidence & Request Documents */}
+                    <div className="LeaVerifSectionCard" style={{ marginTop: '16px', marginBottom: '16px' }}>
+                      <div className="LeaVerifSectionHeader">
+                        <Paperclip size={16} className="LeaVerifBlueIcon" />
+                        <h3>Auto-Attached Evidence &amp; Request Documents</h3>
+                      </div>
+                      <div className="LeaVerifDocsGrid">
+                        {(() => {
+                          const attachedFiles = selectedComplaint?.attached_files || selectedComplaint?.attachedFiles || selectedComplaint?.evidence || selectedComplaint?.files || selectedComplaint?.attachments || [];
+                          if (attachedFiles.length > 0) {
+                            return attachedFiles.map((f, idx) => (
+                              <div key={f.file_id || f.id || idx} className="LeaVerifDocCard">
+                                <div className="LeaVerifDocIcon">
+                                  {(f.mime_type?.startsWith('image/') || f.type?.startsWith('image/')) ? (
+                                    <ImageIcon size={18} />
+                                  ) : (
+                                    <FileText size={18} />
+                                  )}
+                                </div>
+                                <div className="LeaVerifDocInfo">
+                                  <p className="LeaVerifDocName">{f.file_name || f.name}</p>
+                                  <span className="LeaVerifDocMeta">{f.file_size_display || f.size}</span>
+                                </div>
+                                <div className="LeaVerifDocActions">
+                                  <button
+                                    type="button"
+                                    className="LeaVerifDocActionBtn"
+                                    title="Inspect Attachment"
+                                    onClick={() => setDocPreviewModal(f)}
+                                  >
+                                    <Eye size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ));
+                          }
+                          return (
+                            <p className="LeaVerifNoDocsText">No evidence documents attached to this complaint.</p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Verification & Enforcement Progress Section */}
+                    {(selectedComplaint.status === 'queued' || selectedComplaint?.verification) && (
+                      <div className="WcVerifSectionCard">
+                        <div className="WcVerifSectionHeader">
+                          <ShieldCheck size={16} className="WcVerifBlueIcon" />
+                          <h3>Verification &amp; Enforcement Progress</h3>
+                        </div>
+
+                        {/* A) Status 'queued' (works without backend): muted info box */}
+                        {selectedComplaint.status === 'queued' && (
+                          <div className="WcVerifInfoBox">
+                            <Info size={16} className="WcVerifInfoIcon" />
+                            <p>Complaint logged and ready to send. Open Verification Requests &gt; Ready to Send to compose the request to FDA.</p>
+                          </div>
+                        )}
+
+                        {/* Renders when verification object exists and is not 'recalled' */}
+                        {selectedComplaint?.verification && (
+                          <>
+                            {/* B) Verification Request Subsection (when request_status is not 'recalled') */}
+                            {selectedComplaint.verification.request_status !== 'recalled' && (
+                              <div className="WcVerifSubSection">
+                                <div className="WcVerifSubHeader">
+                                  <FileText size={15} className="WcVerifBlueIcon" />
+                                  <h4>Verification Request Details</h4>
+                                </div>
+                                <div className="WcVerifRequestGrid">
+                                  {selectedComplaint.verification.product_code && (
+                                    <div className="WcVerifGridItem">
+                                      <label className="WcVerifFieldLabel">Product Code</label>
+                                      <p className="WcVerifFieldValue">{selectedComplaint.verification.product_code}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.priority && (
+                                    <div className="WcVerifGridItem">
+                                      <label className="WcVerifFieldLabel">Priority</label>
+                                      <p className="WcVerifFieldValue">
+                                        {selectedComplaint.verification.priority.charAt(0).toUpperCase() + selectedComplaint.verification.priority.slice(1)}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.requested_by_name && (
+                                    <div className="WcVerifGridItem">
+                                      <label className="WcVerifFieldLabel">Requested By</label>
+                                      <p className="WcVerifFieldValue">{selectedComplaint.verification.requested_by_name}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.requested_at && (
+                                    <div className="WcVerifGridItem">
+                                      <label className="WcVerifFieldLabel">Date Requested</label>
+                                      <p className="WcVerifFieldValue">{formatDateTime(selectedComplaint.verification.requested_at)}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.notes_to_fda && (
+                                    <div className="WcVerifGridItem WcVerifFullWidth">
+                                      <label className="WcVerifFieldLabel">Notes to FDA Verifier</label>
+                                      <div className="WcVerifNotesBox">
+                                        <p className="WcVerifNotesText">{selectedComplaint.verification.notes_to_fda}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* C) Awaiting FDA (verification_result null): banner with send date and optional reminder */}
+                            {!selectedComplaint.verification.verification_result && (
+                              <div className="WcVerifAwaitingBanner">
+                                <div className="WcVerifAwaitingHeader">
+                                  <div className="WcVerifWaitingIconBox"><Clock3 size={16} /></div>
+                                  <h4>Awaiting FDA Response</h4>
+                                </div>
+                                <p className="WcVerifAwaitingText">
+                                  Request sent {formatDateTime(selectedComplaint.verification.requested_at)}. FDA verifier will respond with a digital confirmation of registration status.
+                                </p>
+                                {selectedComplaint.verification.reminder_sent_at && (
+                                  <p className="WcVerifReminderNotice">
+                                    <BellRing size={13} />
+                                    Reminder sent {formatDateTime(selectedComplaint.verification.reminder_sent_at)}
+                                  </p>
                                 )}
                               </div>
-                              <div className="LeaVerifDocInfo">
-                                <p className="LeaVerifDocName">{f.file_name || f.name}</p>
-                                <span className="LeaVerifDocMeta">{f.file_size_display || f.size}</span>
+                            )}
+
+                            {/* D) Registered: CONFIRMED REGISTERED PRODUCT banner */}
+                            {selectedComplaint.verification.verification_result === 'registered' && (
+                              <div className="ResponseBox ResponseRegistered" style={{ marginBottom: '16px' }}>
+                                <div className="LeaVerifResponseStatusHeader LeaVerifRegisteredHeader">
+                                  <CheckCircle style={{ color: '#10B981', backgroundColor: '#D1FAE5' }} />
+                                  <div className="StatementReturn">
+                                    <h3>CONFIRMED REGISTERED PRODUCT</h3>
+                                  </div>
+                                </div>
+
+                                <div className="LeaVerifResultFieldsGrid">
+                                  {selectedComplaint.verification.verified_by_name && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Verified By</label>
+                                      <p className="LeaVerifFieldValue">{selectedComplaint.verification.verified_by_name}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.responded_at && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Date Returned / Responded</label>
+                                      <p className="LeaVerifFieldValue">{formatDateTime(selectedComplaint.verification.responded_at)}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.cpr_number && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">FDA CPR Registration Number</label>
+                                      <p className="LeaVerifFieldValue">{selectedComplaint.verification.cpr_number}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.cpr_expiry && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">CPR Validity / Expiry Date</label>
+                                      <p className="LeaVerifFieldValue">{selectedComplaint.verification.cpr_expiry}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.response_notes && (
+                                    <div className="LeaVerifResultField LeaVerifFullWidthField">
+                                      <label className="LeaVerifFieldLabel">Official FDA Verification Remarks</label>
+                                      <p className="LeaVerifFieldValue" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                                        {selectedComplaint.verification.response_notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="LeaVerifDocActions">
-                                <button
-                                  type="button"
-                                  className="LeaVerifDocActionBtn"
-                                  title="Inspect Attachment"
-                                  onClick={() => setDocPreviewModal(f)}
-                                >
-                                  <Eye size={13} />
-                                </button>
+                            )}
+
+                            {/* E) Unregistered: CONFIRMED UNREGISTERED PRODUCT banner */}
+                            {selectedComplaint.verification.verification_result === 'unregistered' && (
+                              <div className="ResponseBox ResponseUnregistered" style={{ marginBottom: '16px' }}>
+                                <div className="LeaVerifResponseStatusHeader LeaVerifUnregisteredHeader">
+                                  <AlertTriangle style={{ color: '#EF4444', backgroundColor: '#FEE2E2' }} />
+                                  <div className="StatementReturn">
+                                    <h3>CONFIRMED UNREGISTERED PRODUCT</h3>
+                                  </div>
+                                </div>
+
+                                <div className="LeaVerifResultFieldsGrid">
+                                  {selectedComplaint.verification.verified_by_name && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Verified By</label>
+                                      <p className="LeaVerifFieldValue">{selectedComplaint.verification.verified_by_name}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.responded_at && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Date Returned / Responded</label>
+                                      <p className="LeaVerifFieldValue">{formatDateTime(selectedComplaint.verification.responded_at)}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.unregistered_reason && (
+                                    <div className="LeaVerifResultField LeaVerifFullWidthField">
+                                      <label className="LeaVerifFieldLabel">Reason Product is Not Registered</label>
+                                      <p className="LeaVerifFieldValue" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                                        {selectedComplaint.verification.unregistered_reason}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.response_notes && (
+                                    <div className="LeaVerifResultField LeaVerifFullWidthField">
+                                      <label className="LeaVerifFieldLabel">Advisory &amp; Enforcement Recommendations for LEA</label>
+                                      <p className="LeaVerifFieldValue" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                                        {selectedComplaint.verification.response_notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ));
-                        }
-                        return (
-                          <p className="LeaVerifNoDocsText">No evidence documents attached to this complaint.</p>
-                        );
-                      })()}
-                    </div>
+                            )}
+
+                            {/* F) Rejected: VERIFICATION REQUEST REJECTED banner */}
+                            {selectedComplaint.verification.verification_result === 'rejected' && (
+                              <div className="ResponseBox ResponseRejected" style={{ marginBottom: '16px' }}>
+                                <div className="LeaVerifResponseStatusHeader LeaVerifRejectedHeader">
+                                  <XCircle style={{ color: '#EF4444', backgroundColor: '#FEE2E2' }} />
+                                  <div className="StatementReturn">
+                                    <h3>VERIFICATION REQUEST REJECTED</h3>
+                                  </div>
+                                </div>
+
+                                <div className="LeaVerifRejectionFieldsGrid">
+                                  {(selectedComplaint.verification.verified_by_name || selectedComplaint.verification.verifier_name) && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Rejected By</label>
+                                      <p className="LeaVerifFieldValue">{selectedComplaint.verification.verified_by_name || selectedComplaint.verification.verifier_name}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.responded_at && (
+                                    <div className="LeaVerifResultField">
+                                      <label className="LeaVerifFieldLabel">Date Returned / Responded</label>
+                                      <p className="LeaVerifFieldValue">{formatDateTime(selectedComplaint.verification.responded_at)}</p>
+                                    </div>
+                                  )}
+                                  {selectedComplaint.verification.rejection_reason && (
+                                    <div className="LeaVerifResultField LeaVerifFullWidthField">
+                                      <label className="LeaVerifFieldLabel">Reason for Rejection</label>
+                                      <p className="LeaVerifFieldValue" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                                        {selectedComplaint.verification.rejection_reason}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* G) LEA Follow-up Stepper under D, E and F */}
+                            {selectedComplaint.verification.verification_result && (() => {
+                              const vResult = selectedComplaint.verification.verification_result;
+                              const isRegOrRej = vResult === 'registered' || vResult === 'rejected';
+
+                              if (isRegOrRej) {
+                                const isAck = Boolean(selectedComplaint.verification.acknowledged_at);
+                                const steps = [
+                                  {
+                                    key: 'awaiting_lea',
+                                    title: 'Awaiting LEA Action',
+                                    isCompleted: isAck,
+                                    isCurrent: !isAck,
+                                    date: selectedComplaint.verification.responded_at,
+                                    dateLabel: 'Date FDA Responded:',
+                                  },
+                                  {
+                                    key: 'acknowledged',
+                                    title: 'Acknowledged - Case Closed',
+                                    isCompleted: isAck,
+                                    isCurrent: false,
+                                    isFuture: !isAck,
+                                    date: selectedComplaint.verification.acknowledged_at,
+                                    dateLabel: 'Acknowledged At:',
+                                    actor: selectedComplaint.verification.acknowledged_by_name,
+                                    actorLabel: 'Acknowledged By:',
+                                  },
+                                ];
+
+                                return (
+                                  <div className="WcVerifStepperWrap">
+                                    <span className="WcVerifStepperHeaderLabel">LEA FOLLOW-UP PROGRESSION</span>
+                                    <div className="WcVerifStepper">
+                                      {steps.map((st, idx) => {
+                                        let stepClass = 'WcVerifStep';
+                                        if (st.isCompleted) stepClass += ' is-completed';
+                                        if (st.isCurrent) stepClass += ' is-current';
+                                        if (st.isFuture) stepClass += ' is-future';
+
+                                        return (
+                                          <div key={st.key} className={stepClass}>
+                                            <div className="WcVerifStepIcon">
+                                              {st.isCompleted ? <CheckCircle2 size={16} /> : idx + 1}
+                                            </div>
+                                            <div className="WcVerifStepContent">
+                                              <div className="WcVerifStepHeader">
+                                                <span className="WcVerifStepTitle">
+                                                  {st.title}
+                                                  {st.isCurrent && <span className="WcVerifStepCurrentTag">Current Stage</span>}
+                                                </span>
+                                              </div>
+                                              {(st.date || st.actor) && (
+                                                <div className="WcVerifStepMeta">
+                                                  {st.date && (
+                                                    <span>
+                                                      <Calendar size={12} />
+                                                      <strong>{st.dateLabel}</strong> {formatDateTime(st.date)}
+                                                    </span>
+                                                  )}
+                                                  {st.actor && (
+                                                    <span>
+                                                      <User size={12} />
+                                                      <strong>{st.actorLabel}</strong> {st.actor}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // Unregistered: 3 steps driven by complaint_status
+                              const cStatus = selectedComplaint.verification.complaint_status || 'takedown_requested';
+                              const isTakedownInitiated = cStatus === 'takedown_initiated';
+                              const isCompleted = cStatus === 'completed';
+
+                              const unregSteps = [
+                                {
+                                  key: 'awaiting_lea',
+                                  title: 'Awaiting LEA Action',
+                                  isCompleted: isTakedownInitiated || isCompleted,
+                                  isCurrent: !isTakedownInitiated && !isCompleted,
+                                  isFuture: false,
+                                  date: selectedComplaint.verification.responded_at,
+                                  dateLabel: 'Date FDA Responded:',
+                                },
+                                {
+                                  key: 'takedown_initiated',
+                                  title: 'Takedown Initiated',
+                                  isCompleted: isCompleted,
+                                  isCurrent: isTakedownInitiated,
+                                  isFuture: !isTakedownInitiated && !isCompleted,
+                                  date: selectedComplaint.verification.takedown_initiated_at,
+                                  dateLabel: 'Initiated At:',
+                                  actor: selectedComplaint.verification.takedown_initiated_by_name,
+                                  actorLabel: 'Initiated By:',
+                                  notes: selectedComplaint.verification.field_operation_notes,
+                                },
+                                {
+                                  key: 'closed',
+                                  title: 'Case Closed',
+                                  isCompleted: isCompleted,
+                                  isCurrent: false,
+                                  isFuture: !isCompleted,
+                                  date: selectedComplaint.verification.closed_at,
+                                  dateLabel: 'Closed At:',
+                                  actor: selectedComplaint.verification.closed_by_name,
+                                  actorLabel: 'Closed By:',
+                                  reasonClosed: selectedComplaint.verification.reason_detail || selectedComplaint.verification.reason_closed,
+                                },
+                              ];
+
+                              return (
+                                <div className="WcVerifStepperWrap">
+                                  <span className="WcVerifStepperHeaderLabel">LEA FOLLOW-UP PROGRESSION</span>
+                                  <div className="WcVerifStepper">
+                                    {unregSteps.map((st, idx) => {
+                                      let stepClass = 'WcVerifStep';
+                                      if (st.isCompleted) stepClass += ' is-completed';
+                                      if (st.isCurrent) stepClass += ' is-current';
+                                      if (st.isFuture) stepClass += ' is-future';
+
+                                      return (
+                                        <div key={st.key} className={stepClass}>
+                                          <div className="WcVerifStepIcon">
+                                            {st.isCompleted ? <CheckCircle2 size={16} /> : idx + 1}
+                                          </div>
+                                          <div className="WcVerifStepContent">
+                                            <div className="WcVerifStepHeader">
+                                              <span className="WcVerifStepTitle">
+                                                {st.title}
+                                                {st.isCurrent && <span className="WcVerifStepCurrentTag">Current Stage</span>}
+                                              </span>
+                                            </div>
+                                            {(st.date || st.actor) && (
+                                              <div className="WcVerifStepMeta">
+                                                {st.date && (
+                                                  <span>
+                                                    <Calendar size={12} />
+                                                    <strong>{st.dateLabel}</strong> {formatDateTime(st.date)}
+                                                  </span>
+                                                )}
+                                                {st.actor && (
+                                                  <span>
+                                                    <User size={12} />
+                                                    <strong>{st.actorLabel}</strong> {st.actor}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            )}
+                                            {st.notes && (
+                                              <div className="WcVerifStepNotes">
+                                                <strong>Field operation status update</strong>
+                                                <p className="WcVerifNotesText">{st.notes}</p>
+                                              </div>
+                                            )}
+                                            {st.reasonClosed && (
+                                              <div className="WcVerifStepNotes WcVerifStepNotesReason">
+                                                <strong>Reason Closed</strong>
+                                                <p className="WcVerifNotesText">{st.reasonClosed}</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className='ModalActions'>
+                  {/* CHANGED — Fixed footer matching FDA case details modal */}
+                  <div className='ModalActions WcDetailModalFooter'>
                     <button className='BtnCancelModal' onClick={handleCloseViewbutton}>Close</button>
                   </div>
                 </div>

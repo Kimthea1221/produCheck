@@ -18,15 +18,672 @@ import {
   AlertTriangle,
   X,
   Clock,
+  FileText, // ADDED — for draft view modal attachments
+  Image as ImageIcon, // ADDED — for draft view modal attachments
+  Paperclip, // ADDED — for draft view modal attachments & queue header parity
+  ShieldCheck, // ADDED — for draft view modal verification result section
+  CheckCircle, // ADDED — for draft view modal confirmed registered panel
+  Download, // ADDED — for draft view modal attachment preview download
 } from "lucide-react";
 import { apiFetch } from "../../utils/apiFetch";
+import mammoth from "mammoth"; // ADDED — for docx attachment preview in draft view modal
+
 
 
 // CHANGED — was a client-side page size of 5; now 10 to match the server's
 // default page_size sent in every GET /drafts/fda-verification/ request.
 const ITEMS_PER_PAGE = 25;
 
+// 🔌 BACKEND: draft attachments are not stored yet. Set false and read attached_files from the draft response once the backend supports it.
+const USE_DRAFT_ATTACHMENT_MOCK = true;
+
+// ⚠️ REMOVE THIS — Mock dataset for draft attachments until backend stores draft files
+const MOCK_DRAFT_ATTACHMENTS = [
+  {
+    // ⚠️ REMOVE THIS
+    file_id: "mock-draft-file-01",
+    file_name: "cpr_certificate_photo.jpg",
+    mime_type: "image/jpeg",
+    file_size_display: "2.4 MB",
+  },
+  {
+    // ⚠️ REMOVE THIS
+    file_id: "mock-draft-file-02",
+    file_name: "fda_database_screenshot.png",
+    mime_type: "image/png",
+    file_size_display: "1.1 MB",
+  },
+  {
+    // ⚠️ REMOVE THIS
+    file_id: "mock-draft-file-03",
+    file_name: "product_label_inspection.pdf",
+    mime_type: "application/pdf",
+    file_size_display: "450.8 KB",
+  },
+];
+
+// ADDED — maps priority string to corresponding badge CSS class (matches fda-verification.jsx)
+const getPriorityBadgeClass = (priority) => {
+  switch (priority) {
+    case "urgent":
+      return "FdaVerifBadgeUrgent";
+    case "high":
+      return "FdaVerifBadgeHigh";
+    case "critical":
+      return "FdaVerifBadgeUrgent";
+    case "standard":
+    default:
+      return "FdaVerifBadgeStandard";
+  }
+};
+
+// ADDED — Child modal component displaying full Verification Queue panels for saved draft
+function FdaDraftViewModal({ draft, onClose, onContinueEditing, formatDate }) {
+  // Detail fetches
+  const [requestDetail, setRequestDetail] = useState(null);
+  const [requestLoading, setRequestLoading] = useState(true);
+  const [requestError, setRequestError] = useState(false);
+
+  const [draftDetail, setDraftDetail] = useState(null);
+  const [draftLoading, setDraftLoading] = useState(true);
+  const [draftError, setDraftError] = useState(false);
+
+  // Attached file preview modal state (queue parity)
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [docxHtml, setDocxHtml] = useState("");
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxError, setDocxError] = useState(false);
+
+  // Fetch parent request details and draft determination
+  useEffect(() => {
+    let cancelled = false;
+    setRequestLoading(true);
+    setRequestError(false);
+    setDraftLoading(true);
+    setDraftError(false);
+
+    // 1. GET /verification-requests/{request_id}
+    apiFetch(`/verification-requests/${draft.verification_request_id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setRequestDetail(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRequestError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRequestLoading(false);
+        }
+      });
+
+    // 2. GET /drafts/fda-verification/{draft_id}
+    apiFetch(`/drafts/fda-verification/${draft.draft_id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setDraftDetail(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDraftError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDraftLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.draft_id, draft.verification_request_id]);
+
+  // Preview file effect (copies queue preview behavior)
+  useEffect(() => {
+    if (!previewFile) {
+      setPreviewUrl(null);
+      setPreviewError(false);
+      setDocxHtml("");
+      setDocxLoading(false);
+      setDocxError(false);
+      return;
+    }
+
+    const mime = previewFile.mime_type || "";
+    const name = previewFile.file_name || "";
+    const isImage = mime.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+    const isPdf = mime === "application/pdf" || /\.pdf$/i.test(name);
+    const isDocx = mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.docx$/i.test(name);
+
+    if (!isImage && !isPdf && !isDocx) return;
+
+    setDocxHtml("");
+    setDocxLoading(false);
+    setDocxError(false);
+
+    if (isDocx) {
+      let cancelled = false;
+      setDocxLoading(true);
+      setDocxError(false);
+      apiFetch(`/shared-files/${previewFile.file_id}/preview`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
+        .then((result) => {
+          if (!cancelled) setDocxHtml(result.value);
+        })
+        .catch((err) => {
+          console.error("Docx conversion error:", err);
+          if (!cancelled) setDocxError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setDocxLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    let objectUrl = null;
+    setPreviewLoading(true);
+    setPreviewError(false);
+
+    apiFetch(`/shared-files/${previewFile.file_id}/preview`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => setPreviewError(true))
+      .finally(() => setPreviewLoading(false));
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewFile]);
+
+  const rawStatus = draftDetail?.draft_verification_status?.toLowerCase();
+  const isRegistered = rawStatus === "registered";
+  const isUnregistered = rawStatus === "unregistered";
+  const hasDetermination = isRegistered || isUnregistered;
+
+  return (
+    <div className="FdaVerifModalOverlay">
+      <div className="FdaRecordModalContainer FdaVerifDraftModalSize">
+        {/* Header */}
+        <div className="FdaRecordModalHeader">
+          <div className="FdaRecordModalTitleGroup">
+            <Eye size={20} className="FdaVerifGreenIcon" />
+            <div>
+              <h3>Draft Summary</h3>
+              <p className="FdaRecordModalSubtitle">
+                {draft.case_reference} &bull; Last modified {formatDate(draft.updated_at)}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="FdaVerifIconButton"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="FdaRecordModalBody">
+          {/* SECTION 1: CASE INFORMATION */}
+          <div className="FdaVerifMergedSection">
+            <div className="FdaVerifSectionHeader">
+              <FileText size={16} className="FdaVerifGreenIcon" />
+              <h3>Case Information</h3>
+            </div>
+
+            {requestError && (
+              <p className="FdaVerifDraftMutedLine FdaVerifDraftAlertLine">
+                Could not load request details (the request may have been recalled or is no longer awaiting FDA). LEA files are unavailable.
+              </p>
+            )}
+
+            <div className="FdaVerifGrid2">
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Case ID (LEA Reference):</span>
+                <span className="FdaVerifInfoValueHighlight">
+                  {requestDetail?.case_reference || draft.case_reference || "—"}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Product Name:</span>
+                <span className="FdaVerifInfoValue">
+                  {requestDetail?.product_name || draft.product_name || "—"}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Manufacturer:</span>
+                <span className="FdaVerifInfoValue">
+                  {requestDetail?.manufacturer || draft.manufacturer || "—"}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Requesting LEA Officer / Unit:</span>
+                <span className="FdaVerifInfoValue">
+                  {requestDetail?.requested_by_name ?? (requestLoading ? "Loading…" : "N/A")}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Product Category:</span>
+                <span className="FdaVerifInfoValue">
+                  {requestDetail?.product_category || draft.product_category || "—"}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Date Received:</span>
+                <span className="FdaVerifInfoValue">
+                  {requestDetail?.requested_at
+                    ? new Date(requestDetail.requested_at).toLocaleString("en-US", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : (requestLoading ? "Loading…" : "—")}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup FdaVerifGridFull">
+                <span className="FdaVerifInfoLabel">Verification Request Source:</span>
+                <span className="FdaVerifInfoValue">LEA Verification Request</span>
+              </div>
+            </div>
+          </div>
+
+          <hr className="FdaVerifSectionDivider" />
+
+          {/* SECTION 2: VERIFICATION REQUEST INFORMATION (LEA-CIDG) */}
+          <div className="FdaVerifMergedSection">
+            <div className="FdaVerifSectionHeader">
+              <FileText size={16} className="FdaVerifGreenIcon" />
+              <h3>Verification Request Information (LEA-CIDG)</h3>
+            </div>
+
+            <div className="FdaVerifGrid2">
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Product Code / Barcode:</span>
+                <span className="FdaVerifCodeBadge">
+                  {requestDetail?.product_code || (requestLoading ? "…" : "N/A")}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup">
+                <span className="FdaVerifInfoLabel">Priority Level:</span>
+                <span className={`FdaVerifPriorityBadge ${getPriorityBadgeClass(requestDetail?.priority)}`}>
+                  {requestDetail?.priority
+                    ? requestDetail.priority.charAt(0).toUpperCase() + requestDetail.priority.slice(1)
+                    : (requestLoading ? "…" : "—")}
+                </span>
+              </div>
+
+              <div className="FdaVerifInfoGroup FdaVerifGridFull">
+                <span className="FdaVerifInfoLabel">Notes &amp; Statement from LEA Officers:</span>
+                <div className="FdaVerifNotesBox">
+                  <p>{requestDetail?.complaint_statement?.trim() || (requestLoading ? "Loading statement…" : "No statement provided.")}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr className="FdaVerifSectionDivider" />
+
+          {/* SECTION 3: AUTO-ATTACHED EVIDENCE & REQUEST DOCUMENTS */}
+          <div className="FdaVerifMergedSection">
+            <div className="FdaVerifSectionHeader">
+              <Paperclip size={16} className="FdaVerifGreenIcon" />
+              <h3>Auto-Attached Evidence &amp; Request Documents</h3>
+            </div>
+
+            <div className="FdaVerifDocsGrid">
+              {requestDetail?.attached_files && requestDetail.attached_files.length > 0 ? (
+                requestDetail.attached_files.map((file) => (
+                  <div key={file.file_id} className="FdaVerifDocCard">
+                    <div className="FdaVerifDocIcon">
+                      <FileText size={18} />
+                    </div>
+                    <div className="FdaVerifDocInfo">
+                      <p className="FdaVerifDocName">{file.file_name}</p>
+                      <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+                    </div>
+                    <div className="FdaVerifDocActions">
+                      <button
+                        type="button"
+                        className="FdaVerifDocActionBtn"
+                        title="Inspect Attachment"
+                        onClick={() => setPreviewFile(file)}
+                      >
+                        <Eye size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="FdaVerifNoDocsText">
+                  {requestLoading ? "Loading attached documents…" : "No evidence documents attached to this request."}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <hr className="FdaVerifSectionDivider" />
+
+          {/* SECTION 4: FDA VERIFICATION RESULT SECTION (SAVED DRAFT) */}
+          <div className="FdaVerifMergedSection">
+            <div className="FdaVerifSectionHeader">
+              <ShieldCheck size={18} className="FdaVerifGreenIcon" />
+              <div>
+                <h3>FDA Verification Result Section</h3>
+                <p className="FdaVerifDraftSub">Saved verification determination and official FDA database findings.</p>
+              </div>
+            </div>
+
+            {draftError && (
+              <p className="FdaVerifDraftMutedLine FdaVerifDraftAlertLine">
+                Could not load saved draft determination.
+              </p>
+            )}
+
+            {!hasDetermination ? (
+              <div className="FdaVerifGrid2">
+                <div className="FdaVerifInfoGroup">
+                  <span className="FdaVerifInfoLabel">Verification Status:</span>
+                  <span className="FdaVerifInfoValue">—</span>
+                  <p className="FdaVerifDraftMutedLine">No determination saved yet</p>
+                </div>
+              </div>
+            ) : isRegistered ? (
+              <div className="FdaVerifRegisteredPanel FdaVerifDraftPanel">
+                <div className="FdaVerifPanelHeaderGreen">
+                  <CheckCircle size={18} />
+                  <div>
+                    <h4>CONFIRMED REGISTERED PRODUCT</h4>
+                    <p>Saved CPR details and official regulatory remarks.</p>
+                  </div>
+                </div>
+
+                <div className="FdaVerifGrid2 FdaVerifDraftGridGap">
+                  <div className="FdaVerifInfoGroup">
+                    <span className="FdaVerifInfoLabel">FDA CPR Registration Number:</span>
+                    <span className="FdaVerifInfoValue">{draftDetail?.draft_cpr_number || "—"}</span>
+                  </div>
+
+                  <div className="FdaVerifInfoGroup">
+                    <span className="FdaVerifInfoLabel">CPR Validity / Expiry Date:</span>
+                    <span className="FdaVerifInfoValue">{draftDetail?.draft_cpr_expiry || "—"}</span>
+                  </div>
+                </div>
+
+                <div className="FdaVerifInfoGroup">
+                  <span className="FdaVerifInfoLabel">Official FDA Verification Remarks:</span>
+                  <div className="FdaVerifNotesBox FdaVerifDraftRemarksBox">
+                    <p>{draftDetail?.draft_response_notes?.trim() || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="FdaVerifUnregisteredPanel FdaVerifDraftPanel">
+                <div className="FdaVerifPanelHeaderOrange">
+                  <AlertTriangle size={18} className="FdaVerifRedIcon" />
+                  <div>
+                    <h4>UNREGISTERED PRODUCT WARNING</h4>
+                    <p>Saved rationale and regulatory advisories for LEA.</p>
+                  </div>
+                </div>
+
+                <div className="FdaVerifInfoGroup FdaVerifDraftGroupGap">
+                  <span className="FdaVerifInfoLabel">Reason Product is Not Registered:</span>
+                  <div className="FdaVerifNotesBox FdaVerifDraftRemarksBox">
+                    <p>{draftDetail?.draft_unregistered_reason?.trim() || "—"}</p>
+                  </div>
+                </div>
+
+                <div className="FdaVerifInfoGroup">
+                  <span className="FdaVerifInfoLabel">Advisory &amp; Enforcement Recommendations for LEA:</span>
+                  <div className="FdaVerifNotesBox FdaVerifDraftRemarksBox">
+                    <p>{draftDetail?.draft_response_notes?.trim() || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 5: ATTACH FILES / EVIDENCE (MOCK) — Shown only when status is Registered or Unregistered */}
+          {hasDetermination && USE_DRAFT_ATTACHMENT_MOCK && (
+            <>
+              <hr className="FdaVerifSectionDivider" />
+              <div className="FdaVerifMergedSection FdaVerifMockAttach">
+                <div className="FdaVerifAttachHeaderRow">
+                  <span className="FdaVerifInfoLabel">ATTACHED FILES / EVIDENCE</span>
+                  <span className="FdaVerifMockBadge">Mock preview</span>
+                </div>
+
+                <div className="FdaVerifDocsGrid">
+                  {MOCK_DRAFT_ATTACHMENTS.map((file) => {
+                    const isImage =
+                      file.mime_type?.startsWith("image/") ||
+                      /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || "");
+                    return (
+                      <div key={file.file_id} className="FdaVerifDocCard">
+                        <div className="FdaVerifDocIcon">
+                          {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                        </div>
+                        <div className="FdaVerifDocInfo">
+                          <p className="FdaVerifDocName" title={file.file_name}>
+                            {file.file_name}
+                          </p>
+                          <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+                        </div>
+                        <div className="FdaVerifDocActions">
+                          <button
+                            type="button"
+                            className="FdaVerifDocActionBtn"
+                            title="Mock file, no preview"
+                            disabled
+                          >
+                            <Eye size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="FdaRecordModalFooter">
+          <button
+            type="button"
+            className="FdaVerifBtnOutline"
+            onClick={onClose}
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            className="FdaBtnCloseModal"
+            onClick={() => {
+              onClose();
+              onContinueEditing(draft);
+            }}
+          >
+            Continue Editing
+          </button>
+        </div>
+      </div>
+
+      {/* Attachment Preview Modal (Queue parity, renders above draft modal) */}
+      {previewFile && (
+        <div className="FdaVerifModalOverlay FdaVerifDraftPreviewOverlay" role="dialog" aria-modal="true">
+          <div className="FdaVerifDocModalContainer">
+            <div className="FdaVerifDocModalHeader">
+              <div className="FdaVerifDocModalTitleGroup">
+                <Paperclip size={18} className="FdaVerifGreenIcon" />
+                <div>
+                  <h3>{previewFile.file_name}</h3>
+                  <p className="FdaVerifDocModalMeta">
+                    {previewFile.mime_type} &bull; {previewFile.file_size_display}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="FdaVerifIconButton"
+                onClick={() => setPreviewFile(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="FdaVerifDocModalBody">
+              {(() => {
+                const _mime = previewFile.mime_type || "";
+                const _name = previewFile.file_name || "";
+                const isImage = _mime.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(_name);
+                const isPdf = _mime === "application/pdf" || /\.pdf$/i.test(_name);
+                const isDocx = _mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.docx$/i.test(_name);
+
+                if (isImage || isPdf) {
+                  return previewLoading ? (
+                    <div className="FdaVerifDocPlaceholderPreview">
+                      <p className="FdaVerifPreviewText">Loading preview&hellip;</p>
+                    </div>
+                  ) : previewError ? (
+                    <div className="FdaVerifDocPlaceholderPreview">
+                      <FileText size={48} className="FdaVerifDocPreviewIcon" />
+                      <p className="FdaVerifPreviewTitle">Preview unavailable</p>
+                      <p className="FdaVerifPreviewText">Try downloading the file instead.</p>
+                    </div>
+                  ) : isImage ? (
+                    <img
+                      src={previewUrl}
+                      alt={previewFile.file_name}
+                      className="FdaVerifDocImagePreview"
+                    />
+                  ) : (
+                    <iframe
+                      src={previewUrl}
+                      title={previewFile.file_name}
+                      className="FdaVerifDocPdfPreview"
+                    />
+                  );
+                }
+
+                if (isDocx) {
+                  return docxLoading ? (
+                    <div className="FdaVerifDocPlaceholderPreview">
+                      <p className="FdaVerifPreviewText">Converting Word document for preview&hellip;</p>
+                    </div>
+                  ) : docxError ? (
+                    <div className="FdaVerifDocPlaceholderPreview">
+                      <FileText size={48} className="FdaVerifDocPreviewIcon" />
+                      <p className="FdaVerifPreviewTitle">Could not render Word preview</p>
+                      <p className="FdaVerifPreviewText">Try downloading the document to view its full contents.</p>
+                    </div>
+                  ) : (
+                    <div className="FdaVerifDocDocxPreview">
+                      <div
+                        className="FdaVerifDocxContent"
+                        dangerouslySetInnerHTML={{ __html: docxHtml }}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="FdaVerifDocPlaceholderPreview">
+                    <FileText size={48} className="FdaVerifDocPreviewIcon" />
+                    <p className="FdaVerifPreviewTitle">Preview not supported</p>
+                    <p className="FdaVerifPreviewText">
+                      <strong>{previewFile.file_name}</strong> can't be previewed inline &mdash; use download instead.
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="FdaVerifModalFooter">
+              <button
+                type="button"
+                className="FdaVerifBtnOutline"
+                onClick={() => setPreviewFile(null)}
+              >
+                Close Preview
+              </button>
+              <button
+                type="button"
+                className="FdaVerifBtnDownloadAttachment"
+                onClick={() => {
+                  apiFetch(`/shared-files/${previewFile.file_id}/download`)
+                    .then((res) => {
+                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                      return res.blob();
+                    })
+                    .then((blob) => {
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = previewFile.file_name;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      setPreviewFile(null);
+                    })
+                    .catch(() => {
+                      // catch download failure
+                    });
+                }}
+              >
+                <Download size={14} />
+                <span>Download Attachment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FDASavedDraft() {
+
 
   const navigate = useNavigate();
 
@@ -721,102 +1378,17 @@ function FDASavedDraft() {
       )}
 
       {/* View Draft Summary Modal
-                CHANGED — no longer requires a separate detail fetch. The list response
-                already contains all fields the modal displays (case_reference, product_name,
-                manufacturer, product_category, draft_status), so setViewModalData(draft)
-                is called directly with the row object. Field names updated throughout:
-                viewModalData.caseId       → viewModalData.case_reference
-                viewModalData.product      → viewModalData.product_name
-                viewModalData.category     → viewModalData.product_category
-                viewModalData.lastModified → formatDate(viewModalData.updated_at)
-                SOURCE row removed entirely — no source field in real draft data.
-                DRAFT STATUS badge reads the real draft_status value (not hardcoded "Draft"). */}
+          CHANGED — delegates to FdaDraftViewModal child component, fetching full
+          verification request details and saved determination with full queue panel parity */}
       {viewModalData && (
-        <div className="FdaVerifModalOverlay">
-          <div className="FdaRecordModalContainer" style={{ width: "700px", maxWidth: "96vw" }}>
-            <div className="FdaRecordModalHeader">
-              <div className="FdaRecordModalTitleGroup">
-                <Eye size={20} className="FdaVerifGreenIcon" />
-                <div>
-                  <h3>Draft Summary</h3>
-                  {/* CHANGED — was viewModalData.caseId • viewModalData.lastModified;
-                                        now uses real field names and formats updated_at via formatDate(). */}
-                  <p className="FdaRecordModalSubtitle">
-                    {viewModalData.case_reference} &bull; Last modified{" "}
-                    {formatDate(viewModalData.updated_at)}
-                  </p>
-                </div>
-              </div>
-              <button
-                className="FdaVerifIconButton"
-                onClick={() => setViewModalData(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="FdaRecordModalBody">
-              <div className="FdaRecordInfoGrid">
-                <div className="FdaRecordInfoItem">
-                  <span className="FdaVerifInfoLabel">CASE ID</span>
-                  {/* CHANGED — was viewModalData.caseId */}
-                  <span className="FdaVerifInfoValueHighlight">
-                    {viewModalData.case_reference}
-                  </span>
-                </div>
-                <div className="FdaRecordInfoItem">
-                  <span className="FdaVerifInfoLabel">PRODUCT NAME</span>
-                  {/* CHANGED — was viewModalData.product */}
-                  <span className="FdaVerifInfoValue">{viewModalData.product_name}</span>
-                </div>
-                <div className="FdaRecordInfoItem">
-                  <span className="FdaVerifInfoLabel">MANUFACTURER</span>
-                  {/* Unchanged field name — manufacturer is the same in both shapes. */}
-                  <span className="FdaVerifInfoValue">{viewModalData.manufacturer}</span>
-                </div>
-                <div className="FdaRecordInfoItem">
-                  <span className="FdaVerifInfoLabel">CATEGORY</span>
-                  {/* CHANGED — was viewModalData.category */}
-                  <span className="FdaVerifInfoValue">{viewModalData.product_category}</span>
-                </div>
-                {/* REMOVED — SOURCE row deleted. The real backend draft response
-                                    has no source field, so this row no longer exists in either
-                                    the table or the modal. */}
-                <div className="FdaRecordInfoItem">
-                  <span className="FdaVerifInfoLabel">DRAFT STATUS</span>
-                  {/* CHANGED — was hardcoded <span>Draft</span>; now reads the
-                                        real draft_status value from the backend and capitalizes it
-                                        via capitalizeStatus() so "draft" → "Draft", "incomplete"
-                                        → "Incomplete", etc. */}
-                  <span className="FdaSavedDraftStatusBadge">
-                    {capitalizeStatus(viewModalData.draft_status)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="FdaRecordModalFooter">
-              <button
-                className="FdaVerifBtnOutline"
-                onClick={() => setViewModalData(null)}
-              >
-                Close
-              </button>
-              <button
-                className="FdaBtnCloseModal"
-                onClick={() => {
-                  setViewModalData(null);
-                  // CHANGED — handleContinueEditing now uses the real
-                  // verification_request_id for navigation (see handler above).
-                  handleContinueEditing(viewModalData);
-                }}
-              >
-                Continue Editing
-              </button>
-            </div>
-          </div>
-        </div>
+        <FdaDraftViewModal
+          draft={viewModalData}
+          onClose={() => setViewModalData(null)}
+          onContinueEditing={handleContinueEditing}
+          formatDate={formatDate}
+        />
       )}
+
 
       {/* Toast Notification — unchanged. */}
       {toastMessage && (
