@@ -1,4 +1,5 @@
-# backend/app/desktop/services/Product_database/registered_product_service.py
+from datetime import date, datetime, timezone
+import sys
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func
 from fastapi import HTTPException, status, Request, BackgroundTasks
@@ -15,6 +16,35 @@ from app.desktop.schemas.Product_database.registered_products import (
     RegisteredProductUpdate
 )
 from app.desktop.services.Product_database.csv_sync import sync_registered_products_to_csv, sync_unregistered_advisories_to_csv
+
+
+def auto_cleanup_expired_registered_products(db: Session):
+    """
+    Automatically soft-deletes registered products whose expiry_date <= today.
+    Also ensures the CSV stays in sync.
+    """
+    try:
+        today = date.today()
+        expired_products = db.query(RegisteredProduct).filter(
+            RegisteredProduct.deleted_at.is_(None),
+            RegisteredProduct.expiry_date.isnot(None),
+            RegisteredProduct.expiry_date <= today
+        ).all()
+
+        if expired_products:
+            now = datetime.now(timezone.utc)
+            fallback_user = db.query(User.user_id).first()
+            fallback_user_id = fallback_user[0] if fallback_user else None
+
+            for p in expired_products:
+                p.deleted_at = now
+                p.deleted_by = p.updated_by or p.added_by or fallback_user_id
+            
+            db.commit()
+            sync_registered_products_to_csv(db)
+    except Exception as e:
+        db.rollback()
+        print(f"Warning: Error in auto_cleanup_expired_registered_products: {e}", file=sys.stderr)
 
 
 def increment_marketplace_detection_count(db: Session, product_id) -> bool:
@@ -63,6 +93,8 @@ def format_product_response(product: RegisteredProduct, db: Session):
 
 
 def get_all_registered_products(db: Session, current_user: User):
+    auto_cleanup_expired_registered_products(db)
+
     AddedUser = aliased(User)
     UpdatedUser = aliased(User)
 

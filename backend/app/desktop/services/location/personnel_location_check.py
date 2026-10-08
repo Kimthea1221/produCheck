@@ -135,20 +135,7 @@ def check_and_log_personnel_login_location(
             related_user_id=user.user_id,
         )
 
-        # 2. In-App Notification to the Personnel
-        personnel_notif = Notification(
-            recipient_type="personnel",
-            user_id=user.user_id,
-            title="Location Outside Geofence Detected",
-            message=(
-                f"Your login on {now_str} was detected outside the {workspace_name} geofence radius "
-                f"({formatted_dist} away). Your regional administrator has been notified."
-            ),
-        )
-        db.add(personnel_notif)
-        db.commit()
-
-        # 3. Send Email Alert to all active Regional Admins
+        # 2. Send Email Alert to all active Regional Admins (Personnel are not notified)
         admins = (
             db.query(User)
             .filter(
