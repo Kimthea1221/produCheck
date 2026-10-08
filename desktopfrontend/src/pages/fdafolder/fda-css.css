@@ -6206,4 +6206,553 @@ h6 {
   color: #1F2937;
   opacity: 0.6;
 }
+
+/* ==========================================================================
+   ADDED — FDA DRAFT VIEW MODAL MOCK ATTACHMENT STYLES
+   ========================================================================== */
+.FdaVerifAttachHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.FdaVerifMockBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #B45309;
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.FdaVerifMockAttach .FdaVerifDocActionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ============================================================================ */
+/* ADDED — FDA VIEW REPORTS: WALK-IN CASE VERIFICATION & LEA EXCHANGE TIMELINE   */
+/* Scoped strictly to .FdaReportsDetailModal                                    */
+/* ============================================================================ */
+
+.FdaReportsDetailModal .FdaViewReportExchangeWrap {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.FdaReportsDetailModal .FdaViewReportSectionTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.FdaReportsDetailModal .FdaViewReportSectionTopTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1B4332;
+}
+
+.FdaReportsDetailModal .FdaViewReportMockControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.FdaReportsDetailModal .FdaViewReportMockLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400E;
+  margin: 0;
+}
+
+.FdaReportsDetailModal .FdaViewReportMockSelect {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #1F2937;
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.FdaReportsDetailModal .FdaViewReportMockSelect:focus {
+  border-color: #1B4332;
+}
+
+.FdaReportsDetailModal .FdaViewReportResultSectionSpacing {
+  margin-top: 4px;
+}
+
+.FdaReportsDetailModal .FdaViewReportInfoGridWhite {
+  background: #FDFDFD;
+  border: 1px solid #EDEDED;
+}
+
+.FdaReportsDetailModal .FdaViewReportStepperLabel {
+  margin-bottom: 8px;
+  display: block;
+}
+
+.FdaReportsDetailModal .FdaViewReportNoVerifBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: #F9FAFB;
+  border: 1px dashed #D1D5DB;
+  border-radius: 8px;
+  color: #6B7280;
+  font-size: 13px;
+  font-style: italic;
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.FdaReportsDetailModal .FdaViewReportNoVerifIcon {
+  color: #9CA3AF;
+  flex-shrink: 0;
+}
+
+/* Neutralize overflow and max-height for reused blocks inside View Reports Detail Modal */
+.FdaReportsDetailModal .FdaRecordInfoGrid,
+.FdaReportsDetailModal .FdaRecordResultSection,
+.FdaReportsDetailModal .FdaVerif-lea-stepper-wrap,
+.FdaReportsDetailModal .FdaVerif-lea-stepper,
+.FdaReportsDetailModal .FdaRecordRemarksText,
+.FdaReportsDetailModal .FdaRecordRejectionReasonBox {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.FdaReportsDetailModal .FdaVerif-lea-step,
+.FdaReportsDetailModal .FdaVerif-lea-step-content {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.FdaReportsDetailModal .FdaRecordRemarksText,
+.FdaReportsDetailModal .FdaRecordRejectionReasonBox p,
+.FdaReportsDetailModal .FdaVerif-lea-notes-text {
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  min-width: 0 !important;
+}
+
+/* ============================================================================ */
+/* ADDED — PROPOSED: FDA STATUS PRODUCT LINK DISPLAY FOR EXTENSION COMPLAINTS   */
+/* Scoped strictly to .FdaStatusProductLinkWrap and children                    */
+/* ============================================================================ */
+
+.FdaStatusProductLinkWrap {
+  margin-top: 14px;
+  margin-bottom: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.FdaStatusProductLinkCard {
+  background: #FDFDFD;
+  border: 1.5px solid #EDEDED;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+}
+
+.FdaStatusProductLinkHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.FdaStatusProductLinkTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.FdaStatusProductLinkTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #13213C;
+  margin: 0;
+}
+
+.FdaStatusProductLinkDomain {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1F2937;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+
+.FdaStatusProductLinkBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.FdaStatusProductLinkUrlBox {
+  padding: 10px 12px;
+  background: #F9FAFB;
+  border: 1.5px solid #EDEDED;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.FdaStatusProductLinkText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  color: #1F2937;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.45;
+  display: block;
+}
+
+.FdaStatusProductLinkActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.FdaStatusProductLinkBtn {
+  background: #FDFDFD;
+  border: 1px solid #EDEDED;
+  color: #13213C;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.FdaStatusProductLinkBtn:hover {
+  background: #1B4332;
+  color: #FDFDFD;
+  border-color: #1B4332;
+}
+
+.FdaStatusProductLinkCopiedIcon {
+  color: #166534;
+}
+
+.FdaStatusProductLinkCopiedText {
+  color: #166534;
+  font-weight: 600;
+}
+
+/* ============================================================================ */
+/* ADDED — PROPOSED: FDA STATUS INERT SAMPLE CASE DISPLAY CLASSES               */
+/* Scoped to sample case indicator and disabled update controls                 */
+/* ============================================================================ */
+
+.FdaStatusSampleBadge {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.FdaStatusSampleNotice {
+  font-size: 12px;
+  color: #6B7280;
+  font-style: italic;
+  padding: 8px 12px;
+  background: #F9FAFB;
+  border: 1px dashed #D1D5DB;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.FdaDetailPanel .BtnPushUpdate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #9CA3AF;
+}
+
+/* ============================================================================ */
+/* ADDED — FDA SAVED DRAFT VIEW MODAL SIZING & SECTION STYLING                  */
+/* Matches dimensions of .FdaVerifDocModalContainer & .WcDetailModalFdaSize:    */
+/* width: 92vw; max-width: 1100px; height: 90vh; max-height: 94vh;             */
+/* ============================================================================ */
+
+.FdaRecordModalContainer.FdaVerifDraftModalSize {
+  width: 92vw !important;
+  max-width: 1100px !important;
+  height: 90vh !important;
+  max-height: 94vh !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25) !important;
+}
+
+.FdaRecordModalContainer.FdaVerifDraftModalSize .FdaRecordModalHeader {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding: 0 0 12px 0;
+  background: transparent;
+}
+
+.FdaRecordModalContainer.FdaVerifDraftModalSize .FdaRecordModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.FdaRecordModalContainer.FdaVerifDraftModalSize .FdaRecordModalFooter {
+  flex-shrink: 0;
+  margin-top: 14px;
+  border-top: 1px solid #EDEDED;
+  padding: 14px 0 0 0;
+  background: transparent;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.FdaVerifDraftPreviewOverlay {
+  z-index: 1200 !important;
+}
+
+.FdaVerifDraftMutedLine {
+  font-size: 12px;
+  color: #6B7280;
+  font-style: italic;
+  margin: 4px 0 0 0;
+}
+
+.FdaVerifDraftAlertLine {
+  color: #B91C1C;
+  padding: 8px 12px;
+  background: rgba(185, 28, 28, 0.06);
+  border-left: 3px solid #B91C1C;
+  border-radius: 4px;
+  font-style: normal;
+  margin: 6px 0;
+}
+
+.FdaVerifDraftSub {
+  font-size: 12px;
+  color: #6B7280;
+  margin: 2px 0 0 0;
+}
+
+.FdaVerifDraftPanel {
+  margin-top: 10px;
+}
+
+.FdaVerifDraftGridGap {
+  margin-bottom: 12px;
+}
+
+.FdaVerifDraftGroupGap {
+  margin-bottom: 12px;
+}
+
+.FdaVerifDraftRemarksBox {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ============================================================================ */
+/* ADDED — REJECTED RECORD MODAL SIZING & LAYOUT ALIGNMENT                      */
+/* Matches dimensions of .FdaVerifDocModalContainer & .FdaVerif-completed-modal-container: */
+/* width: 92vw; max-width: 1100px; height: 90vh; max-height: 94vh;             */
+/* border-radius: 12px; padding: 20px; flex column; fixed header/footer; scroll body */
+/* ============================================================================ */
+
+.FdaVerif-rejected-modal-container {
+  width: 92vw !important;
+  max-width: 1100px !important;
+  height: 90vh !important;
+  max-height: 94vh !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25) !important;
+}
+
+.FdaVerif-rejected-modal-container .FdaRecordModalHeader {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding: 0 0 12px 0;
+}
+
+.FdaVerif-rejected-modal-container .FdaRecordModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 4px 0;
+}
+
+.FdaVerif-rejected-modal-container .FdaRecordModalFooter {
+  flex-shrink: 0;
+  margin-top: 14px;
+  border-top: 1px solid #EDEDED;
+  padding: 14px 0 0 0;
+  background: transparent;
+}
+
+@media (max-width: 640px) {
+  .FdaVerif-rejected-modal-container {
+    width: 94vw !important;
+    padding: 16px !important;
+  }
+}
+
+/* ============================================================================ */
+/* FDA PRODUCT DATABASE — ADD MODALS BUTTON ALIGNMENT (REGISTERED & ADVISORY)   */
+/* Spans both columns of the form grid so footer buttons align bottom-right.    */
+/* Leaves all edit, convert, and confirmation modals unchanged.                 */
+/* ============================================================================ */
+
+.FdaModalFooter.FdaAddModalFooter {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-top: 28px !important;
+  padding-top: 16px !important;
+  border-top: 1px solid #EDEDED !important;
+}
+
+/* ============================================================================ */
+/* FDA PRODUCT DATABASE — VIEW PRODUCT & VIEW ADVISORY MODAL SIZING & SCROLL    */
+/* Matches dimensions of .FdaVerifDocModalContainer:                             */
+/* width: 92vw; max-width: 1100px; height: 90vh; max-height: 94vh;               */
+/* border-radius: 12px; padding: 20px; overflow: hidden                          */
+/* ============================================================================ */
+
+.FdaProductViewModal {
+  width: 92vw !important;
+  max-width: 1100px !important;
+  height: 90vh !important;
+  max-height: 94vh !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25) !important;
+  position: relative !important;
+  overflow-wrap: anywhere;
+}
+
+.FdaProductViewModal .FdaDetailClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+}
+
+.FdaProductViewModal .FdaDetailHeader {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding-bottom: 12px;
+  padding-right: 40px;
+}
+
+.FdaProductViewModal .FdaDetailHeader h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.FdaProductViewModal .FdaProductViewBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.FdaProductViewModal .FdaDetailGrid {
+  margin: 12px 0;
+  padding: 16px 0;
+}
+
+.FdaProductViewModal .FdaSourceLink {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.FdaProductViewModal .FdaModalFooter {
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #EDEDED;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .FdaProductViewModal {
+    width: 94vw !important;
+    padding: 16px !important;
+  }
+}
+
 

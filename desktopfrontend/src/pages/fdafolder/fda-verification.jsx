@@ -1882,40 +1882,40 @@ function FDAVerification() {
           {/* BACKEND: Tab switching triggers state filter & loads corresponding API dataset */}
           <div className="FdaFilterRow FdaVerifTabsRow">
             <div className="FdaPillContainer">
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'queue' ? 'active' : ''}`}
                 onClick={() => handleTabChange('queue')}
                 id="fda-tab-verification-queue"
               >
                 Verification Queue
-                <span className="FdaPillCount">{queueCounts !== null ? queueCounts.verification_queue_count : '-'}</span>
               </button>
 
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'completed' ? 'active' : ''}`}
                 onClick={() => handleTabChange('completed')}
                 id="fda-tab-completed"
               >
                 Completed
-                <span className="FdaPillCount">{queueCounts !== null ? queueCounts.completed_count : '-'}</span>
               </button>
 
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'rejected' ? 'active' : ''}`}
                 onClick={() => handleTabChange('rejected')}
                 id="fda-tab-rejected"
               >
                 Rejected Requests
-                <span className="FdaPillCount">{queueCounts !== null ? queueCounts.rejected_count : '-'}</span>
               </button>
 
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'lea_response' ? 'active' : ''}`}
                 onClick={() => handleTabChange('lea_response')}
                 id="fda-tab-lea-response"
               >
                 LEA Response
-                <span className="FdaPillCount">{leaResponseTotal}</span>
               </button>
             </div>
           </div>
@@ -3409,7 +3409,8 @@ function FDAVerification() {
               still renders without changes. */}
           {fdaRecordModalData && (
             <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true">
-              <div className={`FdaRecordModalContainer${fdaRecordModalData._type === 'completed' ? ' FdaVerif-completed-modal-container' : fdaRecordModalData._type === 'lea_response' ? ' FdaVerif-lea-modal-container' : ''}`}>
+              {/* CHANGED — added FdaVerif-rejected-modal-container modifier for rejected records to match preview modal size */}
+              <div className={`FdaRecordModalContainer${fdaRecordModalData._type === 'completed' ? ' FdaVerif-completed-modal-container' : fdaRecordModalData._type === 'lea_response' ? ' FdaVerif-lea-modal-container' : fdaRecordModalData._type === 'rejected' ? ' FdaVerif-rejected-modal-container' : ''}`}>
 
                 {/* Modal Header */}
                 <div className="FdaRecordModalHeader">

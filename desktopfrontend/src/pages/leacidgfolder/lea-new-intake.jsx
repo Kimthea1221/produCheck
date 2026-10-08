@@ -145,6 +145,26 @@ function LeaNewIntake() {
   // ADDED — Frontend field validation state
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
+  const [submitError, setSubmitError] = useState('')
+
+  // Helper to check if at least one field or file has a value
+  const hasAtLeastOneField = () => {
+    if (fullName && fullName.trim()) return true
+    if (contactNumber && contactNumber.trim()) return true
+    if (email && email.trim()) return true
+    if (idType && idType.trim()) return true
+    if (address && address.trim()) return true
+    if (productName && productName.trim()) return true
+    if (manufacturer && manufacturer.trim()) return true
+    if (productCategory && productCategory.trim()) return true
+    if (placeOfPurchase && placeOfPurchase.trim()) return true
+    if (dateOfPurchase && dateOfPurchase.trim()) return true
+    if (amountPaid !== '' && amountPaid !== null && amountPaid !== undefined && String(amountPaid).trim() !== '') return true
+    if (natureOfComplaint && natureOfComplaint.trim()) return true
+    if (files && files.length > 0) return true
+    if (existingAttachments && existingAttachments.length > 0) return true
+    return false
+  }
 
   // Helper to get current value for a given field name
   const getFieldValue = (field) => {
@@ -164,14 +184,8 @@ function LeaNewIntake() {
     }
   }
 
-  // lea-new-intake.jsx — validateSingleField
-  // CHANGED — added a second parameter so callers can distinguish
-  // "live typing feedback" (skip required/min-length) from
-  // "full submit validation" (enforce everything). Previously handleBlur
-  // and validateForm called this identically, so leaving a field early
-  // while typing showed the same "required"/"too short" errors that
-  // should only appear on a real submit attempt.
-  const validateSingleField = (field, value, { requireField = true } = {}) => {
+  // Format validation — runs ONLY when field has a value; empty never counts as invalid
+  const validateSingleField = (field, value) => {
     if (field === 'fullName') {
       if (value && value.trim()) {
         const nameRegex = /^[a-zA-Z\s.'\-]+$/
@@ -207,11 +221,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'productName') {
-      // CHANGED — required/min-length only enforced when requireField is true
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Product Name is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Product Name must be at least 2 characters.'
         }
@@ -220,10 +230,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'manufacturer') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Manufacturer/Seller is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Manufacturer/Seller must be at least 2 characters.'
         }
@@ -232,19 +239,11 @@ function LeaNewIntake() {
     }
 
     if (field === 'productCategory') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Category is required.'
-        }
-      }
       return ''
     }
 
     if (field === 'placeOfPurchase') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Place of Purchase is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Place of Purchase must be at least 2 characters.'
         }
@@ -253,13 +252,6 @@ function LeaNewIntake() {
     }
 
     if (field === 'dateOfPurchase') {
-      // Future-date check stays unconditional — that's a format problem,
-      // not a "not filled in yet" problem, so it's still useful mid-draft
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Date of Purchase is required.'
-        }
-      }
       if (value && value.trim()) {
         const selectedDate = new Date(value)
         const today = new Date()
@@ -272,8 +264,6 @@ function LeaNewIntake() {
     }
 
     if (field === 'amountPaid') {
-      // Unchanged — already correctly format-only (never required),
-      // no requireField gating needed here
       if (value !== '' && value !== null && value !== undefined) {
         if (Number(value) < 0) {
           return 'Amount Paid cannot be negative.'
@@ -289,10 +279,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'natureOfComplaint') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Nature of Complaint is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 10) {
           return 'Nature of Complaint must be at least 10 characters.'
         }
@@ -301,48 +288,28 @@ function LeaNewIntake() {
     }
 
     if (field === 'attachments') {
-      if (requireField) {
-        const { files: fList, existingAttachments: eList } = value || {}
-        const isEditingWithExisting = (editingDraftId || editingComplaintId)
-        if ((!fList || fList.length === 0) && (!isEditingWithExisting || !eList || eList.length === 0)) {
-          return 'Please attach at least one supporting document or photo.'
-        }
-      }
       return ''
     }
 
     return ''
   }
 
-  // Optional fields list for real-time format validation
-  const optionalFields = ['fullName', 'contactNumber', 'email', 'amountPaid']
+  const minLengthFields = ['productName', 'manufacturer', 'placeOfPurchase', 'natureOfComplaint']
 
-  // lea-new-intake.jsx — handleBlur
-  // CHANGED — pass requireField: false so leaving a field early only
-  // surfaces real format problems (bad email, negative amount, future
-  // date), never "required"/"too short" — those belong to a real submit
-  // attempt only, not to normal mid-draft typing
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }))
-    const fieldError = validateSingleField(field, getFieldValue(field), { requireField: false })
+    const fieldError = validateSingleField(field, getFieldValue(field))
     setErrors((prev) => ({ ...prev, [field]: fieldError }))
   }
 
-  // lea-new-intake.jsx — handleChangeField
-  // CHANGED — pass requireField: false, matching the same fix applied to
-  // handleBlur. Real-time typing feedback should only catch actual format
-  // problems (e.g. a future date, invalid characters) — not "required" or
-  // "too short," which should only block a real submit attempt.
   const handleChangeField = (field, setter, val) => {
     setter(val)
-    const err = validateSingleField(field, val, { requireField: false })
+    if (submitError) setSubmitError('')
+    const err = validateSingleField(field, val)
 
-    if (optionalFields.includes(field)) {
-      setErrors((prev) => ({ ...prev, [field]: err }))
-      return
-    }
-
-    if (touched[field] || (err && err.includes('future'))) {
+    if (minLengthFields.includes(field) && !touched[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }))
+    } else {
       setErrors((prev) => ({ ...prev, [field]: err }))
     }
   }
@@ -457,6 +424,7 @@ function LeaNewIntake() {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
+      if (submitError) setSubmitError('')
       const updated = [...files, ...Array.from(e.target.files)]
       setFiles(updated)
       if (touched.attachments) {
@@ -498,6 +466,7 @@ function LeaNewIntake() {
     setIsDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      if (submitError) setSubmitError('')
       const updated = [...files, ...Array.from(e.dataTransfer.files)]
       setFiles(updated)
       if (touched.attachments) {
@@ -520,6 +489,7 @@ function LeaNewIntake() {
     setIsDragActive(false)
   }
 
+  // 🔌 BACKEND: the create/update endpoint must accept missing values for these fields
   const buildFormData = () => {
     const formData = new FormData()
     formData.append('full_name', fullName)
@@ -621,6 +591,12 @@ function LeaNewIntake() {
   const handleLogComplaint = async (e) => {
     e.preventDefault()
 
+    if (!hasAtLeastOneField()) {
+      setSubmitError('Fill in at least one field or attach a file before logging this complaint.')
+      return
+    }
+    setSubmitError('')
+
     if (!validateForm()) {
       showToast('Please fix the validation errors before submitting.')
       return
@@ -711,6 +687,9 @@ function LeaNewIntake() {
 
           <div className='FormForWalkin'>
             <form onSubmit={handleLogComplaint} noValidate>
+              <p style={{ margin: '0 0 -8px 0', fontSize: '13px', color: '#6b7280' }}>
+                All fields are optional, but at least one field or file is needed to log a complaint.
+              </p>
               <div className='FormSection'>
                 <h3>COMPLAINANT DETAILS</h3>
                 <div className='col'>
@@ -776,7 +755,10 @@ function LeaNewIntake() {
                     <select
                       id="idType"
                       value={idType}
-                      onChange={(e) => setIdType(e.target.value)}
+                      onChange={(e) => {
+                        setIdType(e.target.value)
+                        if (submitError) setSubmitError('')
+                      }}
                     >
                       <option value="">Select ID Type</option>
                       <option value="philsys">PhilSys</option>
@@ -793,7 +775,10 @@ function LeaNewIntake() {
                   type="text"
                   placeholder='Ex. Florida'
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value)
+                    if (submitError) setSubmitError('')
+                  }}
                   maxLength={300}
                 />
               </div>
@@ -802,7 +787,7 @@ function LeaNewIntake() {
                 <h3>REPORTED PRODUCT</h3>
                 <div className='col'>
                   <div>
-                    <label htmlFor="productName">Product Name</label>
+                    <label htmlFor="productName">Product Name (OPTIONAL)</label>
                     <input
                       id="productName"
                       type="text"
@@ -821,7 +806,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="manufacturer">Manufacturer/Seller</label>
+                    <label htmlFor="manufacturer">Manufacturer/Seller (OPTIONAL)</label>
                     <input
                       id="manufacturer"
                       type="text"
@@ -843,7 +828,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="productCategory">Category</label>
+                    <label htmlFor="productCategory">Category (OPTIONAL)</label>
                     <select
                       id="productCategory"
                       value={productCategory}
@@ -864,7 +849,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="placeOfPurchase">Place of Purchase</label>
+                    <label htmlFor="placeOfPurchase">Place of Purchase (OPTIONAL)</label>
                     <input
                       id="placeOfPurchase"
                       type="text"
@@ -886,7 +871,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="dateOfPurchase">Date of Purchase</label>
+                    <label htmlFor="dateOfPurchase">Date of Purchase (OPTIONAL)</label>
                     <input
                       id="dateOfPurchase"
                       type="date"
@@ -930,7 +915,7 @@ function LeaNewIntake() {
 
               <div className='FormSection'>
                 <h3>Complainant Statement</h3>
-                <label htmlFor="natureOfComplaint">Nature Of Complaint</label>
+                <label htmlFor="natureOfComplaint">Nature Of Complaint (OPTIONAL)</label>
                 <textarea
                   id="natureOfComplaint"
                   rows='5'
@@ -1050,18 +1035,25 @@ function LeaNewIntake() {
                 </div>
               </div>
 
-              <div>
-                <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
-                {!editingComplaintId && (
-                  <button type="button" className='DraftButton' disabled={loading} onClick={handleSaveAsDraft}>
-                    {/* CHANGED — only show Saving... when pendingAction is 'draft' */}
-                    {pendingAction === 'draft' ? 'Saving...' : 'Save as Draft'}
-                  </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                {submitError && (
+                  <span className="LoginErrorMsg" style={{ fontSize: '13px' }}>
+                    <AlertCircle size={14} /> {submitError}
+                  </span>
                 )}
-                <button type="submit" className='LogButton' disabled={loading}>
-                  {/* CHANGED — only show Submitting... when pendingAction is 'submit' */}
-                  {pendingAction === 'submit' ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
+                  {!editingComplaintId && (
+                    <button type="button" className='DraftButton' disabled={loading} onClick={handleSaveAsDraft}>
+                      {/* CHANGED — only show Saving... when pendingAction is 'draft' */}
+                      {pendingAction === 'draft' ? 'Saving...' : 'Save as Draft'}
+                    </button>
+                  )}
+                  <button type="submit" className='LogButton' disabled={loading}>
+                    {/* CHANGED — only show Submitting... when pendingAction is 'submit' */}
+                    {pendingAction === 'submit' ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

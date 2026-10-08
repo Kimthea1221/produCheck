@@ -1785,7 +1785,7 @@ function FDAProductDB() {
                     {formErrors.expiryDate && <span className="form-error-msg">{formErrors.expiryDate}</span>}
                   </div>
 
-                  <div className="FdaModalFooter span-two">
+                  <div className="FdaModalFooter FdaAddModalFooter span-two">
                     <button type="button" className="BtnModalCancel" onClick={() => setShowAddProductModal(false)}>Cancel</button>
                     <button type="submit" className="BtnModalSave">Save Product</button>
                   </div>
@@ -1797,7 +1797,7 @@ function FDAProductDB() {
           {/* Modal 2: View Registered Product Detail */}
           {showViewProductModal && selectedProduct && (
             <div className="FdaModalOverlay">
-              <div className="FdaModalContent" onClick={(e) => e.stopPropagation()}>
+              <div className="FdaModalContent FdaProductViewModal" onClick={(e) => e.stopPropagation()}>
                 <button className="FdaDetailClose" onClick={() => setShowViewProductModal(false)}>
                   <X size={16} />
                 </button>
@@ -1815,40 +1815,42 @@ function FDAProductDB() {
                   </div>
                 </div>
 
-                <div className="FdaDetailGrid">
-                  <div className="FdaDetailItem">
-                    <label>Category</label>
-                    <span>{selectedProduct.category}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Current Status</label>
-                    <span className="FdaBadge badge-registered" style={{ width: 'fit-content' }}>Registered</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Date Registered</label>
-                    <span>{formatDate(selectedProduct.dateRegistered)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Expiry Date</label>
-                    <span className={`FdaBadge ${getExpiryInfo(selectedProduct.expiryDate).className}`} style={{ width: 'fit-content' }}>
-                      {formatDate(selectedProduct.expiryDate)}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Added By</label>
-                    <span>{selectedProduct.addedBy}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Created On</label>
-                    <span>{formatDate(selectedProduct.createdAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated</label>
-                    <span>{formatDate(selectedProduct.updatedAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated By</label>
-                    <span>{selectedProduct.updatedBy}</span>
+                <div className="FdaProductViewBody">
+                  <div className="FdaDetailGrid">
+                    <div className="FdaDetailItem">
+                      <label>Category</label>
+                      <span>{selectedProduct.category}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Current Status</label>
+                      <span className="FdaBadge badge-registered" style={{ width: 'fit-content' }}>Registered</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Date Registered</label>
+                      <span>{formatDate(selectedProduct.dateRegistered)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Expiry Date</label>
+                      <span className={`FdaBadge ${getExpiryInfo(selectedProduct.expiryDate).className}`} style={{ width: 'fit-content' }}>
+                        {formatDate(selectedProduct.expiryDate)}
+                      </span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Added By</label>
+                      <span>{selectedProduct.addedBy}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Created On</label>
+                      <span>{formatDate(selectedProduct.createdAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated</label>
+                      <span>{formatDate(selectedProduct.updatedAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated By</label>
+                      <span>{selectedProduct.updatedBy}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2065,7 +2067,7 @@ function FDAProductDB() {
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
                   </div>
 
-                  <div className="FdaModalFooter span-two">
+                  <div className="FdaModalFooter FdaAddModalFooter span-two">
                     <button type="button" className="BtnModalCancel" onClick={() => setShowAddAdvisoryModal(false)}>Cancel</button>
                     {/* 🔌 BACKEND: POST /api/advisories */}
                     <button type="submit" className="BtnModalDelete">Save Advisory</button>
@@ -2078,7 +2080,7 @@ function FDAProductDB() {
           {/* Modal 6: View Advisory Detail */}
           {showViewAdvisoryModal && selectedAdvisory && (
             <div className="FdaModalOverlay">
-              <div className="FdaModalContent" onClick={(e) => e.stopPropagation()}>
+              <div className="FdaModalContent FdaProductViewModal" onClick={(e) => e.stopPropagation()}>
                 <button className="FdaDetailClose" onClick={() => setShowViewAdvisoryModal(false)}>
                   <X size={16} />
                 </button>
@@ -2095,47 +2097,49 @@ function FDAProductDB() {
                   </div>
                 </div>
 
-                <div className="FdaDetailGrid">
-                  <div className="FdaDetailItem">
-                    <label>Status</label>
-                    <span className="FdaBadge badge-unregistered" style={{ width: 'fit-content' }}>Unregistered</span>
+                <div className="FdaProductViewBody">
+                  <div className="FdaDetailGrid">
+                    <div className="FdaDetailItem">
+                      <label>Status</label>
+                      <span className="FdaBadge badge-unregistered" style={{ width: 'fit-content' }}>Unregistered</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Advisory Date</label>
+                      <span>{formatDate(selectedAdvisory.advisoryDate)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Source URL</label>
+                      <span>
+                        {selectedAdvisory.sourceUrl ? (
+                          <a href={selectedAdvisory.sourceUrl} target="_blank" rel="noopener noreferrer" className="FdaSourceLink">
+                            {selectedAdvisory.sourceUrl}
+                            <ExternalLink size={12} />
+                          </a>
+                        ) : '—'}
+                      </span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Added By</label>
+                      <span>{selectedAdvisory.addedBy}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Created On</label>
+                      <span>{formatDate(selectedAdvisory.createdAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated</label>
+                      <span>{formatDate(selectedAdvisory.updatedAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
+                      <label>Last Updated By</label>
+                      <span>{selectedAdvisory.updatedBy}</span>
+                    </div>
                   </div>
-                  <div className="FdaDetailItem">
-                    <label>Advisory Date</label>
-                    <span>{formatDate(selectedAdvisory.advisoryDate)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Source URL</label>
-                    <span>
-                      {selectedAdvisory.sourceUrl ? (
-                        <a href={selectedAdvisory.sourceUrl} target="_blank" rel="noopener noreferrer" className="FdaSourceLink">
-                          {selectedAdvisory.sourceUrl}
-                          <ExternalLink size={12} />
-                        </a>
-                      ) : '—'}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Added By</label>
-                    <span>{selectedAdvisory.addedBy}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Created On</label>
-                    <span>{formatDate(selectedAdvisory.createdAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated</label>
-                    <span>{formatDate(selectedAdvisory.updatedAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
-                    <label>Last Updated By</label>
-                    <span>{selectedAdvisory.updatedBy}</span>
-                  </div>
-                </div>
 
-                <div className="FdaDetailDesc">
-                  <label>Advisory details</label>
-                  <p>{selectedAdvisory.advisoryDetails || "No details provided."}</p>
+                  <div className="FdaDetailDesc">
+                    <label>Advisory details</label>
+                    <p>{selectedAdvisory.advisoryDetails || "No details provided."}</p>
+                  </div>
                 </div>
 
                 <div className="FdaModalFooter">

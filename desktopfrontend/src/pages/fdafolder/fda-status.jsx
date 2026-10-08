@@ -1,5 +1,5 @@
 // desktopfrontend/src/pages/fdafolder/fda-status.jsx   
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "../component/sidebar";
 import TopBar from "../component/top-bar";
 import './fda-css.css';
@@ -18,6 +18,10 @@ import {
   Download,
   Eye,
   Image as ImageIcon,
+  Globe,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { apiFetch } from "../../utils/apiFetch";
 
@@ -86,6 +90,47 @@ const thumbnailStyle = {
   cursor: "pointer",
 };
 
+// 🔌 BACKEND: Flip to false once GET /complaints-status-update serializes the PROPOSED key 'product_url'
+const USE_PRODUCT_LINK_MOCK = true;
+
+// 🔌 BACKEND: no real extension complaints needed once the flag is false
+const USE_STATUS_SAMPLE_CASE_MOCK = true;
+
+// ⚠️ REMOVE THIS: Sample mock complaint for UI preview when database has 0 extension complaints
+const STATUS_SAMPLE_CASE_MOCK = {
+  complaintId: "mock-sample-case",
+  caseReference: "SAMPLE-0001",
+  productTitle: "Sample Whitening Cream 50g (mockup)",
+  manufacturer: "Sample Manufacturer",
+  region: "Region III",
+  status: "open",
+  reporterUsername: "sample.consumer",
+  reporterEmail: "sample.consumer@example.com",
+  hasAttachment: false,
+  attachmentName: null,
+};
+
+// ADDED — Resolves product link at display time without mutating records or API payloads
+function getMockProductLink(complaint, allComplaints) {
+  if (!complaint) return null;
+  if (USE_PRODUCT_LINK_MOCK) {
+    const rawIndex = (allComplaints || []).findIndex((c) => c.complaintId === complaint.complaintId);
+    const index = rawIndex >= 0 ? rawIndex : 0;
+    // ⚠️ REMOVE THIS: Sample valid https link (Open + Copy + domain)
+    if (index % 3 === 0) {
+      return "https://www.lazada.com.ph/products/unregistered-skin-whitening-cream-i123456789.html";
+    }
+    // ⚠️ REMOVE THIS: Sample non-http javascript: test value (plain text, no Open button)
+    if (index % 3 === 1) {
+      return "javascript:alert('malicious_xss_test')";
+    }
+    // ⚠️ REMOVE THIS: Sample very long https URL with a long query string to test wrapping
+    return "https://shopee.ph/product-listing-unregistered-fda-cosmetic-special-formula-intensive-skin-revitalizing-serum-v2?sp_atk=89a7b6c5-4d3e-2f1a-0b9c-8d7e6f5a4b3c&xptdk=e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b&source_tracker=organic_search_desktop_consumer_feed_campaign_philippines_2026_investigation";
+  }
+  // When flag is false, read the PROPOSED key product_url
+  return complaint.product_url || null;
+}
+
 function FdaStatus() {
   const [complaints, setComplaints] = useState([]);
   const [statusHistory, setStatusHistory] = useState([]);
@@ -98,6 +143,18 @@ function FdaStatus() {
   const [casePage, setCasePage] = useState(1);
 
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
+
+  // Search + status filter combined
+  const isSearchOrFilterActive = searchQuery.trim() !== "" || filterStatus !== "All";
+  // ADDED — Show sample case at display time ONLY when fetched complaints is empty and no search/filter is active
+  const shouldShowSampleCase = USE_STATUS_SAMPLE_CASE_MOCK && complaints.length === 0 && !isSearchOrFilterActive;
+  const displayComplaints = shouldShowSampleCase ? [STATUS_SAMPLE_CASE_MOCK] : complaints;
+
+  // ADDED — Resolve active selection: selects the sample case if shouldShowSampleCase and no explicit selection
+  const activeSelectedId = selectedComplaintId || (shouldShowSampleCase ? STATUS_SAMPLE_CASE_MOCK.complaintId : null);
+  const selectedComplaint =
+    displayComplaints.find((c) => c.complaintId === activeSelectedId) || null;
+  const isSampleCase = selectedComplaint?.complaintId === "mock-sample-case";
 
   // Draft form state (right panel)
   const [newStatus, setNewStatus] = useState("");
@@ -119,6 +176,44 @@ function FdaStatus() {
   const [toastError, setToastError] = useState(null);
   const [toastVariant, setToastVariant] = useState("danger");
 
+  // ADDED — Copy link feedback state & cleanup ref
+  const [copiedProductLink, setCopiedProductLink] = useState(false);
+  const copyTimerRef = useRef(null);
+
+  // ADDED — Reset copied state & clear timer when selected complaint changes
+  useEffect(() => {
+    setCopiedProductLink(false);
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+  }, [selectedComplaintId]);
+
+  // ADDED — Clean up copy timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ADDED — Safe copy handler with try/catch and 2s timeout
+  const handleCopyProductLink = async (url) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedProductLink(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedProductLink(false);
+        copyTimerRef.current = null;
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy link:", err);
+    }
+  };
+
   useEffect(() => {
     if (!toastError) return;
     const duration = toastVariant === "warning" ? 8000 : toastVariant === "success" ? 5000 : 4000;
@@ -138,9 +233,6 @@ function FdaStatus() {
     const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
     return STATUS_OPTIONS.filter((opt) => allowed.includes(opt.value));
   }
-
-  const selectedComplaint =
-    complaints.find((c) => c.complaintId === selectedComplaintId) || null;
 
   // Fetch complaints from the backend 
   const fetchComplaints = useCallback(async (preserveSelection = true) => {
@@ -178,11 +270,12 @@ function FdaStatus() {
   }, [selectedComplaintId, selectedComplaint?.status]);
 
   useEffect(() => {
-  if (!selectedComplaint?.hasAttachment) {
-    setAttachmentUrl(null);
-    setAttachmentFailed(false);
-    return;
-  }
+    // ADDED — Guard: never fetch attachment for mock sample case
+    if (!selectedComplaint?.hasAttachment || isSampleCase) {
+      setAttachmentUrl(null);
+      setAttachmentFailed(false);
+      return;
+    }
 
     let objectUrl = null;
     let cancelled = false;
@@ -214,8 +307,8 @@ function FdaStatus() {
     };
   }, [selectedComplaintId]);
 
-  // Search + status filter combined
-  const filteredComplaints = complaints.filter((c) => {
+  // Search + status filter combined over displayComplaints
+  const filteredComplaints = displayComplaints.filter((c) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
       (c.caseReference || "").toLowerCase().includes(query) ||
@@ -236,6 +329,21 @@ function FdaStatus() {
     if (newStatus === "dismissed") return dismissNote || dismissPreset;
     return null;
   };
+
+  // ADDED — Display-time product link resolution
+  const resolvedProductLink = getMockProductLink(selectedComplaint, displayComplaints);
+  const hasProductLink = Boolean(resolvedProductLink && resolvedProductLink.trim());
+  const isHttpUrl = Boolean(resolvedProductLink && /^https?:\/\//i.test(resolvedProductLink.trim()));
+
+  let urlDomain = "";
+  if (isHttpUrl) {
+    try {
+      const parsed = new URL(resolvedProductLink.trim());
+      urlDomain = parsed.hostname;
+    } catch {
+      urlDomain = "";
+    }
+  }
 
   // Same read approach as the extension's attach box — FileReader to a
   // base64 data URL, so it can be sent as a plain JSON string field.
@@ -260,7 +368,7 @@ function FdaStatus() {
   // };
 
   const handlePushUpdate = async () => {
-    if (!selectedComplaint) return;
+    if (!selectedComplaint || isSampleCase) return;
 
     if (!newStatus) {
       setToastVariant("danger");
@@ -495,11 +603,14 @@ function FdaStatus() {
                     pagedComplaints.map((c) => (
                       <button
                         key={c.complaintId}
-                        className={`FdaCaseCard ${c.complaintId === selectedComplaintId ? "active" : ""}`}
+                        className={`FdaCaseCard ${c.complaintId === selectedComplaint?.complaintId ? "active" : ""}`}
                         onClick={() => setSelectedComplaintId(c.complaintId)}
                       >
                         <div className="FdaCaseCardTop">
                           <span className="FdaCaseCardId">{c.caseReference}</span>
+                          {c.complaintId === "mock-sample-case" && (
+                            <span className="FdaVerifMockBadge">Sample case (mockup)</span>
+                          )}
                           <span className="FdaBadge" style={getStatusBadgeStyle(c.status)}>
                             {STATUS_LABELS[c.status]}
                           </span>
@@ -572,7 +683,14 @@ function FdaStatus() {
 
                   <div className="FdaDetailPanelHeader">
                     <div>
-                      <small>{selectedComplaint.caseReference}</small>
+                      <small>
+                        {selectedComplaint.caseReference}
+                        {isSampleCase && (
+                          <span className="FdaVerifMockBadge FdaStatusSampleBadge">
+                            Sample case (mockup)
+                          </span>
+                        )}
+                      </small>
                       <h2>{selectedComplaint.productTitle}</h2>
                       <p>{selectedComplaint.manufacturer} · {selectedComplaint.region}</p>
                     </div>
@@ -583,6 +701,69 @@ function FdaStatus() {
                       </span>
                     </div>
                   </div>
+
+                  {/* ADDED — PROPOSED: Product Link directly under case header for extension cases */}
+                  {hasProductLink && (
+                    <div className="FdaStatusProductLinkWrap">
+                      <div className="FdaStatusProductLinkCard">
+                        <div className="FdaStatusProductLinkHeader">
+                          <div className="FdaStatusProductLinkTitleGroup">
+                            <Globe size={16} className="FdaVerifBlueIcon" />
+                            <h3 className="FdaStatusProductLinkTitle">Reported Product Link</h3>
+                            {USE_PRODUCT_LINK_MOCK && (
+                              <span className="FdaVerifMockBadge">Mock preview</span>
+                            )}
+                          </div>
+                          {urlDomain && (
+                            <span className="FdaStatusProductLinkDomain">
+                              {urlDomain}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="FdaStatusProductLinkBody">
+                          <div className="FdaStatusProductLinkUrlBox">
+                            <span className="FdaStatusProductLinkText" title={resolvedProductLink}>
+                              {resolvedProductLink}
+                            </span>
+                          </div>
+
+                          <div className="FdaStatusProductLinkActions">
+                            {isHttpUrl && (
+                              <a
+                                href={resolvedProductLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="FdaStatusProductLinkBtn FdaStatusProductLinkBtn_open"
+                                title="Open product link in new tab"
+                              >
+                                <ExternalLink size={13} />
+                                <span>Open link</span>
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              className="FdaStatusProductLinkBtn"
+                              onClick={() => handleCopyProductLink(resolvedProductLink)}
+                              title="Copy link to clipboard"
+                            >
+                              {copiedProductLink ? (
+                                <>
+                                  <Check size={13} className="FdaStatusProductLinkCopiedIcon" />
+                                  <span className="FdaStatusProductLinkCopiedText">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={13} />
+                                  <span>Copy link</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 {FINAL_STATUSES.includes(selectedComplaint.status) ? (
                   <div className="FdaNoticeBanner" style={{ marginTop: 16 }}>
@@ -597,10 +778,16 @@ function FdaStatus() {
                   <div className="FdaFormRow">
                     <div className="FdaFormGroup">
                       <label>New status</label>
+                      {isSampleCase && (
+                        <div className="FdaStatusSampleNotice">
+                          Sample case: updates are disabled.
+                        </div>
+                      )}
                       <select
                         className="FdaStatusSelect"
                         style={{ width: "100%" }}
                         value={newStatus}
+                        disabled={isSampleCase}
                         onChange={(e) => setNewStatus(e.target.value)}
                       >
                         <option value="" disabled>
@@ -776,8 +963,9 @@ function FdaStatus() {
                   <div className="FdaPushRow">
                     <button
                       className="BtnPushUpdate"
+                      disabled={isSampleCase}
                       onClick={() => {
-                        if (!selectedComplaint) return;
+                        if (!selectedComplaint || isSampleCase) return;
                         
                         if (!newStatus) {
                           setToastVariant("danger");
@@ -878,7 +1066,7 @@ function FdaStatus() {
           </div>
 
           {/* CONFIRMATION MODAL */}
-          {showConfirmModal && selectedComplaint && (
+          {showConfirmModal && selectedComplaint && !isSampleCase && (
             <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true">
               <div className="FdaVerifModalContainer" style={{ maxWidth: "480px" }}>
                 <div className="FdaVerifModalHeader">

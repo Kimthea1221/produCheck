@@ -4754,3 +4754,793 @@
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
 }
+
+/* ============================================================================ */
+/* ADDED — LEA SAVED DRAFT VIEW MODAL SIZING & SECTION STYLING                  */
+/* Matches dimensions and layout of FDA draft modal:                            */
+/* width: 92vw; max-width: 1100px; height: 90vh; max-height: 94vh;             */
+/* ============================================================================ */
+
+.LeaDraftModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.LeaDraftModalContainer {
+  background: #FDFDFD;
+  width: 92vw;
+  max-width: 1100px;
+  height: 90vh;
+  max-height: 94vh;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+}
+
+.LeaDraftModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding-bottom: 12px;
+  background: transparent;
+}
+
+.LeaDraftModalTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.LeaDraftHeaderIcon {
+  color: #13213C;
+  flex-shrink: 0;
+}
+
+.LeaDraftModalTitleGroup h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0 0 2px 0;
+}
+
+.LeaDraftModalSubtitle {
+  font-size: 12px;
+  color: #6B7280;
+  margin: 0;
+}
+
+.LeaDraftModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.LeaDraftModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #EDEDED;
+  background: transparent;
+}
+
+.LeaDraftBtnClose {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1.5px solid #d8d8d8;
+  background: #FDFDFD;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #030303;
+  transition: background 0.2s;
+}
+
+.LeaDraftBtnClose:hover {
+  background: #EDEDED;
+}
+
+.LeaDraftBtnContinue {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #13213C;
+  color: #FDFDFD;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.LeaDraftBtnContinue:hover {
+  background: #FCA311;
+  color: #030303;
+}
+
+.LeaDraftSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.LeaDraftSectionHeader h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0;
+}
+
+.LeaDraftSectionDivider {
+  border: none;
+  border-top: 1px solid #EDEDED;
+  margin: 4px 0;
+}
+
+.LeaDraftGrid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.LeaDraftGridFull {
+  grid-column: span 2;
+}
+
+.LeaDraftInfoGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.LeaDraftInfoLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1F2937;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.LeaDraftInfoValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #030303;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.LeaDraftInfoValueHighlight {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #13213C;
+  font-family: monospace;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.LeaDraftCodeBadge {
+  display: inline-block;
+  background: #EDEDED;
+  color: #13213C;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  width: fit-content;
+}
+
+.LeaDraftPriorityBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.LeaDraftPriority_standard {
+  background: #E0F2FE;
+  color: #0369A1;
+  border: 1px solid #BAE6FD;
+}
+
+.LeaDraftPriority_high {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.LeaDraftPriority_urgent {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.LeaDraftPriority_critical {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #F87171;
+  font-weight: 700;
+}
+
+.LeaDraftNotesBox {
+  background: #EDEDED;
+  border-left: 3px solid #13213C;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.LeaDraftNotesBox p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #1F2937;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.LeaDraftLoadingLine {
+  font-size: 13px;
+  color: #6B7280;
+  font-style: italic;
+  padding: 16px 0;
+  margin: 0;
+}
+
+.LeaDraftAlertLine {
+  color: #B91C1C;
+  padding: 10px 14px;
+  background: rgba(185, 28, 28, 0.06);
+  border-left: 3px solid #B91C1C;
+  border-radius: 4px;
+  font-size: 12.5px;
+  margin: 6px 0;
+}
+
+.LeaDraftNoDocsText {
+  font-size: 12.5px;
+  color: #1F2937;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.LeaDraftPreviewOverlay {
+  z-index: 1200 !important;
+}
+
+@media (max-width: 640px) {
+  .LeaDraftModalContainer {
+    width: 95vw;
+    padding: 16px;
+  }
+  .LeaDraftGrid2 {
+    grid-template-columns: 1fr;
+  }
+  .LeaDraftGridFull {
+    grid-column: span 1;
+  }
+}
+
+/* ============================================================================ */
+/* LEA WALK-IN COMPLAINTS — VERIFICATION & ENFORCEMENT PROGRESS SECTION         */
+/* ============================================================================ */
+
+/* Added status badge classes for takedown progression */
+.WcStatus-takedown-initiated {
+  background: rgba(252, 163, 17, 0.12);
+  color: #13213C;
+  border: 1px solid rgba(252, 163, 17, 0.5);
+}
+
+.WcStatus-completed {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+/* Card container for verification progress */
+.WcVerifSectionCard {
+  background: #FFFFFF;
+  border: 1px solid #EDEDED;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.WcVerifSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #EDEDED;
+}
+
+.WcVerifSectionHeader h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #13213C;
+  font-family: 'Poppins', sans-serif;
+}
+
+.WcVerifBlueIcon {
+  color: #13213C;
+  flex-shrink: 0;
+}
+
+/* Stage A: Muted info box for queued status */
+.WcVerifInfoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.WcVerifInfoIcon {
+  color: #3B82F6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.WcVerifInfoBox p {
+  margin: 0;
+}
+
+/* Stage B: Verification Request Subsection */
+.WcVerifSubSection {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.WcVerifSubHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.WcVerifSubHeader h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #13213C;
+}
+
+.WcVerifRequestGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.WcVerifGridItem {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.WcVerifFullWidth {
+  grid-column: 1 / -1;
+}
+
+.WcVerifFieldLabel {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #7A8796;
+  margin-bottom: 4px;
+}
+
+.WcVerifFieldValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #13213C;
+  margin: 0;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.WcVerifNotesBox {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+.WcVerifNotesText {
+  margin: 0;
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Stage C: Awaiting FDA Response Banner */
+.WcVerifAwaitingBanner {
+  background: #FFFBEB;
+  border: 1.5px solid #F59E0B;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.WcVerifAwaitingHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.WcVerifWaitingIconBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #FEF3C7;
+  color: #D97706;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.WcVerifAwaitingHeader h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400E;
+  font-family: 'Poppins', sans-serif;
+}
+
+.WcVerifAwaitingText {
+  margin: 0;
+  font-size: 12.5px;
+  color: #78350F;
+  line-height: 1.5;
+}
+
+.WcVerifReminderNotice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #B45309;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* Stage G: LEA Follow-up Stepper */
+.WcVerifStepperWrap {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-top: 16px;
+}
+
+.WcVerifStepperHeaderLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748B;
+  margin-bottom: 14px;
+}
+
+.WcVerifStepper {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.WcVerifStep {
+  display: flex;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.WcVerifStep:last-child {
+  padding-bottom: 0;
+}
+
+.WcVerifStep:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  bottom: 0;
+  width: 2px;
+  background: #E2E8F0;
+  transition: background 0.2s ease;
+}
+
+.WcVerifStep.is-completed:not(:last-child)::before {
+  background: #13213C;
+}
+
+.WcVerifStepIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 700;
+  background: #FFFFFF;
+  border: 2px solid #CBD5E1;
+  color: #94A3B8;
+  transition: all 0.2s ease;
+}
+
+.WcVerifStep.is-completed .WcVerifStepIcon {
+  background: #E8F5E9;
+  border-color: #10B981;
+  color: #10B981;
+}
+
+.WcVerifStep.is-current .WcVerifStepIcon {
+  background: #13213C;
+  border-color: #13213C;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(19, 33, 60, 0.16);
+}
+
+.WcVerifStep.is-future .WcVerifStepIcon {
+  background: #F1F5F9;
+  border-color: #E2E8F0;
+  color: #94A3B8;
+}
+
+.WcVerifStepContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 3px;
+  min-width: 0;
+}
+
+.WcVerifStepHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.WcVerifStepTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.WcVerifStep.is-current .WcVerifStepTitle {
+  color: #13213C;
+  font-weight: 700;
+}
+
+.WcVerifStep.is-future .WcVerifStepTitle {
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.WcVerifStepCurrentTag {
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(19, 33, 60, 0.1);
+  color: #13213C;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.WcVerifStepMeta {
+  font-size: 11.5px;
+  color: #475569;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.WcVerifStepMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.WcVerifStep.is-future .WcVerifStepMeta {
+  color: #94A3B8;
+}
+
+.WcVerifStepNotes {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-left: 3px solid #13213C;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.WcVerifStepNotesClosing {
+  border-left-color: #2563EB;
+  background: #F8FAFC;
+}
+
+.WcVerifStepNotesReason {
+  border-left-color: #FCA311;
+  background: #FFFDF5;
+}
+
+.WcVerifStepNotes strong {
+  color: #0F172A;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: block;
+  margin-bottom: 3px;
+}
+
+@media (max-width: 640px) {
+  .WcVerifRequestGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================ */
+/* ADDED — LEA CLOSED CASES DETAIL MODAL CONTAINER & BODY                       */
+/* Same dimensions as LeaVerifDocModalContainer (width: 92vw, max: 1100px,      */
+/* height: 90vh, max: 94vh, border-radius: 12px, padding: 20px)                */
+/* ============================================================================ */
+
+.LeaVerifClosedModalContainer {
+  background: #FDFDFD;
+  border-radius: 12px;
+  max-width: 1100px;
+  width: 92vw;
+  height: 90vh;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.LeaVerifClosedModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+}
+
+.LeaVerifClosedModalHeader h4 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0;
+}
+
+.LeaVerifClosedModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.LeaVerifClosedModalBody > * {
+  flex-shrink: 0;
+  min-height: auto;
+}
+
+.LeaVerifClosedModalBody .ResponseBox {
+  height: auto;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.LeaVerifClosedModalBody .LeaVerifResultFieldsGrid,
+.LeaVerifClosedModalBody .LeaVerifRejectionFieldsGrid {
+  height: auto;
+  overflow: visible;
+}
+
+.LeaVerifClosedModalBody p,
+.LeaVerifClosedModalBody span,
+.LeaVerifClosedModalBody div {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.LeaVerifClosedModalBody .ReasonDetail,
+.LeaVerifClosedModalBody .VerificationNotes p,
+.LeaVerifClosedModalBody .LeaVerifFullWidthField .LeaVerifFieldValue {
+  white-space: pre-wrap;
+}
+
+.LeaVerifClosedModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #EDEDED;
+}
+
+
