@@ -1310,7 +1310,6 @@ function FDAProductDB() {
                   className="FdaSearchInput"
                   maxLength={150}
                   value={searchRegistered}
-                  maxLength={150}
                   onChange={(e) => {
                     setSearchRegistered(e.target.value);
                     setCurrentPage(1);
@@ -1390,7 +1389,6 @@ function FDAProductDB() {
                   className="FdaSearchInput"
                   maxLength={150}
                   value={searchAdvisory}
-                  maxLength={150}
                   onChange={(e) => {
                     setSearchAdvisory(e.target.value);
                     setCurrentPage(1);
@@ -1732,7 +1730,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.productName}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -1746,7 +1743,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
@@ -1759,7 +1755,6 @@ function FDAProductDB() {
                       placeholder="FDA-COS-YYYY-XXXXX"
                       maxLength={100}
                       value={productForm.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setProductForm({ ...productForm, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -1880,7 +1875,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.productName}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -1893,7 +1887,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
@@ -1905,7 +1898,6 @@ function FDAProductDB() {
                       type="text"
                       maxLength={100}
                       value={productForm.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setProductForm({ ...productForm, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -1964,7 +1956,6 @@ function FDAProductDB() {
                       maxLength={2000}
                       minLength={10}
                       value={conversionDetails.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -1987,7 +1978,6 @@ function FDAProductDB() {
                       placeholder="https://..."
                       maxLength={500}
                       value={conversionDetails.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
@@ -2025,7 +2015,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={advisoryForm.productName}
-                      maxLength={150}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -2038,7 +2027,6 @@ function FDAProductDB() {
                       placeholder="Provide reasoning or laboratory results detailing safety hazards..."
                       maxLength={2000}
                       value={advisoryForm.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -2061,7 +2049,6 @@ function FDAProductDB() {
                       placeholder="https://fda.gov.ph/advisories/..."
                       maxLength={500}
                       value={advisoryForm.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
@@ -2168,7 +2155,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={advisoryForm.productName}
-                      maxLength={150}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -2180,7 +2166,6 @@ function FDAProductDB() {
                       rows={5}
                       maxLength={2000}
                       value={advisoryForm.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -2202,7 +2187,6 @@ function FDAProductDB() {
                       type="text"
                       maxLength={500}
                       value={advisoryForm.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
@@ -2240,7 +2224,6 @@ function FDAProductDB() {
                       placeholder="FDA-COS-YYYY-XXXXX"
                       maxLength={100}
                       value={conversionDetails.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -2254,7 +2237,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={conversionDetails.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
