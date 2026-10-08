@@ -386,10 +386,11 @@ function LeaNewIntake() {
     return isValid
   }
 
-  // ADDED — shows a toast for 3 seconds then auto-clears
-  const showToast = (message, type = 'error') => {
+  // ADDED — shows a toast for 3 seconds (or longer for multi-line) then auto-clears
+  const showToast = (message, type = 'error', duration) => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+    const timeout = duration ?? (message && (message.length > 50 || message.includes(' | ')) ? 6000 : 3000)
+    setTimeout(() => setToast(null), timeout)
   }
 
   // ADDED — on page load, if editing a draft, fetch it and fill every field
@@ -422,15 +423,87 @@ function LeaNewIntake() {
       .finally(() => setLoading(false))
   }, [editingDraftId])
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
+  // 🔌 BACKEND: enforce the same limits (10 files, 25 MB each, PDF/JPG/PNG) on the server
+  const MAX_FILES_TOTAL = 10
+  const MAX_FILE_SIZE = 25 * 1024 * 1024
+  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png']
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/pjpeg',
+    'image/png',
+    'image/x-png',
+  ]
+
+  const isAllowedFileType = (file) => {
+    const name = file.name || ''
+    const dotIndex = name.lastIndexOf('.')
+    if (dotIndex === -1) return false
+    const ext = name.slice(dotIndex).toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return false
+    }
+    if (file.type) {
+      const mime = file.type.toLowerCase()
+      if (!ALLOWED_MIME_TYPES.includes(mime)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  const validateAndAddFiles = (newFiles) => {
+    if (!newFiles || newFiles.length === 0) return
+
+    const currentCount = files.length + existingAttachments.length
+    const incomingCount = newFiles.length
+
+    if (currentCount + incomingCount > MAX_FILES_TOTAL) {
+      showToast(
+        `You can attach at most ${MAX_FILES_TOTAL} files. You already have ${currentCount} and tried to add ${incomingCount}.`,
+        'error',
+        6000
+      )
+      return
+    }
+
+    const validFiles = []
+    const skipMessages = []
+
+    newFiles.forEach((file) => {
+      if (!file.size || file.size === 0) {
+        skipMessages.push(`${file.name} is empty and was not added.`)
+      } else if (!isAllowedFileType(file)) {
+        skipMessages.push(`${file.name} is not an allowed file type (PDF, JPG, PNG only).`)
+      } else if (file.size > MAX_FILE_SIZE) {
+        skipMessages.push(`${file.name} is larger than 25 MB and was not added.`)
+      } else {
+        validFiles.push(file)
+      }
+    })
+
+    if (validFiles.length > 0) {
       if (submitError) setSubmitError('')
-      const updated = [...files, ...Array.from(e.target.files)]
+      if (toast?.message === 'Fill in at least one field or attach a file before logging this complaint.') {
+        setToast(null)
+      }
+      const updated = [...files, ...validFiles]
       setFiles(updated)
       if (touched.attachments) {
         const err = validateSingleField('attachments', { files: updated, existingAttachments })
         setErrors((prev) => ({ ...prev, attachments: err }))
       }
+    }
+
+    if (skipMessages.length > 0) {
+      showToast(skipMessages.join(' | '), 'error', 6000)
+    }
+  }
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndAddFiles(Array.from(e.target.files))
       e.target.value = ""
     }
   }
@@ -466,13 +539,7 @@ function LeaNewIntake() {
     setIsDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      if (submitError) setSubmitError('')
-      const updated = [...files, ...Array.from(e.dataTransfer.files)]
-      setFiles(updated)
-      if (touched.attachments) {
-        const err = validateSingleField('attachments', { files: updated, existingAttachments })
-        setErrors((prev) => ({ ...prev, attachments: err }))
-      }
+      validateAndAddFiles(Array.from(e.dataTransfer.files))
       e.dataTransfer.clearData()
     }
   }
@@ -512,11 +579,55 @@ function LeaNewIntake() {
     return formData
   }
 
+  // 🔌 BACKEND: these fields are optional on the form now. This message appears only while
+  // the backend still requires them. Remove it when the backend accepts missing values.
+  const FIELD_LABELS = {
+    product_name: 'Product Name',
+    manufacturer: 'Manufacturer/Seller',
+    product_category: 'Category',
+    place_of_purchase: 'Place of Purchase',
+    date_of_purchase: 'Date of Purchase',
+    nature_of_complaint: 'Nature of Complaint',
+    files: 'Evidence & Attachment',
+    full_name: 'Full Name',
+    contact_number: 'Contact',
+    email: 'Email',
+    id_type: 'ID Presented',
+    address: 'Address',
+    amount_paid: 'Amount Paid',
+  }
+
   const parseBackendError = async (res) => {
     try {
       const errorData = await res.json()
+      if (typeof errorData.detail === 'string') {
+        return errorData.detail
+      }
       if (Array.isArray(errorData.detail)) {
-        return errorData.detail.map((e) => e.msg).join(', ')
+        const messages = errorData.detail.map((item) => {
+          if (typeof item === 'string') return item
+          const rawLoc = Array.isArray(item?.loc)
+            ? item.loc[item.loc.length - 1]
+            : (typeof item?.loc === 'string' ? item.loc : null)
+          const loc = rawLoc ? String(rawLoc).toLowerCase() : null
+          const label = loc ? (FIELD_LABELS[loc] || FIELD_LABELS[rawLoc]) : null
+          const rawMsg = item?.msg || 'Invalid value'
+
+          if (!label) {
+            return rawMsg
+          }
+
+          if (typeof rawMsg === 'string' && rawMsg.trim().toLowerCase() === 'field required') {
+            return `${label} is required by the server`
+          }
+
+          return `${label}: ${rawMsg}`
+        })
+
+        const uniqueMessages = Array.from(new Set(messages.filter(Boolean)))
+        if (uniqueMessages.length > 0) {
+          return uniqueMessages.join(' | ')
+        }
       }
       return errorData.detail || 'Something went wrong. Please try again.'
     } catch {
@@ -592,10 +703,9 @@ function LeaNewIntake() {
     e.preventDefault()
 
     if (!hasAtLeastOneField()) {
-      setSubmitError('Fill in at least one field or attach a file before logging this complaint.')
+      showToast('Fill in at least one field or attach a file before logging this complaint.')
       return
     }
-    setSubmitError('')
 
     if (!validateForm()) {
       showToast('Please fix the validation errors before submitting.')
@@ -961,6 +1071,12 @@ function LeaNewIntake() {
                     </div>
                   </label>
 
+                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#6b7280' }}>
+                    {files.length + existingAttachments.length > 0
+                      ? `${files.length + existingAttachments.length} of 10 files attached`
+                      : 'Up to 10 files, 25 MB each.'}
+                  </p>
+
                   {errors.attachments && (
                     <span className="LoginErrorMsg" style={{ marginTop: '8px' }}>
                       <AlertCircle size={12} /> {errors.attachments}
@@ -1036,11 +1152,6 @@ function LeaNewIntake() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                {submitError && (
-                  <span className="LoginErrorMsg" style={{ fontSize: '13px' }}>
-                    <AlertCircle size={14} /> {submitError}
-                  </span>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                   <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
                   {!editingComplaintId && (
@@ -1157,8 +1268,10 @@ function LeaNewIntake() {
             {toast.type === 'warning' && <AlertTriangle size={18} />}
             {(toast.type === 'error' || toast.type === 'danger') && <XCircle size={18} />}
           </div>
-          <div className="LeaToastBody">
-            <p className="LeaToastMessage">{toast.message}</p>
+          <div className="LeaToastBody" style={{ minWidth: 0 }}>
+            <p className="LeaToastMessage" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+              {toast.message}
+            </p>
           </div>
           <button
             className="LeaToastCloseBtn"
