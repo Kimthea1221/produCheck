@@ -22,7 +22,7 @@ function createWindow() {
   })
 
   // Open DevTools
-  //mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   // Stash the token here if it arrives before React has finished loading and
   // listening — we'll deliver it below, once did-finish-load confirms React is ready.

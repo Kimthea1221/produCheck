@@ -103,20 +103,23 @@ async def update_complaint_status(
     db.refresh(complaint)
 
     region = db.query(Region).filter(Region.region_id == current_user["region_id"]).first()
-    write_audit_log(
-        db=db,
-        user=None,
-        action=AuditAction.UPDATE_COMPLAINT_STATUS,
-        target_table="complaints",
-        target_id=complaint.complaint_id,
-        target_reference=complaint.case_reference,
-        old_value={"status": previous_status, "change_note": previous_change_note},
-        new_value={"status": payload.status, "change_note": payload.change_note},
-        request=request,
-        user_role_override=current_user["role"],
-        region_code=region.region_code if region else None,
-        user_id_override=current_user["user_id"],
-    )
+    try:
+        write_audit_log(
+            db=db,
+            user=None,
+            action=AuditAction.UPDATE_COMPLAINT_STATUS,
+            target_table="complaints",
+            target_id=complaint.complaint_id,
+            target_reference=complaint.case_reference,
+            old_value={"status": previous_status, "change_note": previous_change_note},
+            new_value={"status": payload.status, "change_note": payload.change_note},
+            request=request,
+            user_role_override=current_user["role"],
+            region_code=region.region_code if region else None,
+            user_id_override=current_user["user_id"],
+        )
+    except Exception:
+        logger.exception("Audit log failed for complaint %s", complaint.complaint_id)
 
     recipient_email = None
     notification_warning = None

@@ -121,7 +121,7 @@ function FdaStatus() {
 
   useEffect(() => {
     if (!toastError) return;
-    const duration = toastVariant === "warning" ? 8000 : 4000;
+    const duration = toastVariant === "warning" ? 8000 : toastVariant === "success" ? 5000 : 4000;
     const timer = setTimeout(() => {
       setToastError(null);
     }, duration);
@@ -153,8 +153,9 @@ function FdaStatus() {
         setSelectedComplaintId((prev) => prev || data[0].complaintId);
       }
       return data;
-    } catch (err) {
-      alert("Could not load complaints. Please refresh.");
+    }  catch (err) {
+      setToastVariant("danger");
+      setToastError("Could not load complaints. Please refresh.");
       return [];
     } finally {
       setIsLoading(false);
@@ -318,14 +319,29 @@ function FdaStatus() {
             change_note: outgoingMessage,
             // Optional — null when no file was attached. Backend needs to
             // accept these two fields; see fda-status.jsx attachment notes.
-            attachment_data: attachmentPreview,
-            attachment_name: attachmentName,
+            // attachment_data: attachmentPreview,
+            // attachment_name: attachmentName,
           }),
         });
   
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          alert(err.detail || "Failed to update status. Please try again.");
+
+          let message;
+          if (typeof err.detail === "string") {
+            message = err.detail;
+          } else if (Array.isArray(err.detail)) {
+            // FastAPI 422 validation errors
+            message = err.detail.map((d) => d.msg).join("; ");
+          } else if (res.status >= 500) {
+            message = "Something went wrong on the server. Please refresh and check the complaint's status before trying again.";
+          } else {
+            message = "Failed to update status. Please try again.";
+          }
+
+          setToastVariant("danger");
+          setToastError(err.detail || "Failed to update status. Please try again.");
+          await fetchComplaints(true);
           return;
         }
   
@@ -347,10 +363,18 @@ function FdaStatus() {
         setNewStatus(nextStatus);
         setDismissPreset("");
         setDismissNote("");
-        
+
         if (updatedComplaint.notificationWarning) {
-          setIsToastWarning(true);
+          setToastVariant("warning");
           setToastError(updatedComplaint.notificationWarning);
+        } else {
+          const label = STATUS_LABELS[updatedComplaint.status];
+          setToastVariant("success");
+          setToastError(
+            selectedComplaint.reporterEmail
+              ? `${selectedComplaint.caseReference} updated to "${label}". The consumer has been notified.`
+              : `${selectedComplaint.caseReference} updated to "${label}". No email on file, so no email was sent.`
+          );
         }
 
       const entry = {
@@ -365,12 +389,17 @@ function FdaStatus() {
       };
       setStatusHistory((prev) => [entry, ...prev]);
       setHistoryPage(1);
-      setAttachmentFile(null);
-      setAttachmentPreview(null);
-      setAttachmentName(null);
+      // setAttachmentFile(null);
+      // setAttachmentPreview(null);
+      // setAttachmentName(null);
     } catch (err) {
-      setIsToastWarning(false);
-      alert("Network error — please check your connection and try again.");
+      console.error("Push update failed:", err);
+      setToastVariant("danger");
+      setToastError(
+        err instanceof TypeError
+          ? "Network error — please check your connection and try again."
+          : "Something went wrong while updating. Please refresh and check the complaint's status."
+      );
     }
   };
 

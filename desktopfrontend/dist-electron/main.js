@@ -1,39 +1,65 @@
-import { BrowserWindow as e, Menu as t, app as n } from "electron";
-import { fileURLToPath as r } from "url";
-import i from "path";
+import { BrowserWindow, Menu, app } from "electron";
+import { fileURLToPath } from "url";
+import path from "path";
 //#region src/electron/main.js
-var a = i.dirname(r(import.meta.url)), o = null, s = !1, c = null;
-function l() {
-	o = new e({
+var __dirname = path.dirname(fileURLToPath(import.meta.url));
+var mainWindow = null;
+var mainWindowReady = false;
+var pendingDeepLink = null;
+function createWindow() {
+	mainWindow = new BrowserWindow({
 		width: 1280,
 		height: 800,
 		minWidth: 800,
 		minHeight: 600,
 		webPreferences: {
-			nodeIntegration: !1,
-			contextIsolation: !0,
-			preload: i.join(a, "preload.cjs")
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.cjs")
 		}
-	}), o.webContents.on("did-finish-load", () => {
-		s = !0, c &&= (o.webContents.send("deep-link-token", c), null);
-	}), process.env.VITE_DEV_SERVER_URL ? o.loadURL(process.env.VITE_DEV_SERVER_URL) : o.loadFile(i.join(a, "../dist/index.html"));
+	});
+	mainWindow.webContents.on("did-finish-load", () => {
+		mainWindowReady = true;
+		if (pendingDeepLink) {
+			mainWindow.webContents.send("deep-link-token", pendingDeepLink);
+			pendingDeepLink = null;
+		}
+	});
+	if (process.env.VITE_DEV_SERVER_URL) mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+	else mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
 }
-console.log("argv:", process.argv), console.log("execPath:", process.execPath), process.env.VITE_DEV_SERVER_URL ? n.setAsDefaultProtocolClient("icmda", process.execPath, [i.resolve(process.argv[1])]) : n.setAsDefaultProtocolClient("icmda"), n.requestSingleInstanceLock() ? (n.on("second-instance", (e, t) => {
-	let n = t.find((e) => e.startsWith("icmda://"));
-	n && u(n);
-}), n.whenReady().then(() => {
-	t.setApplicationMenu(null), l();
-	let e = process.argv.find((e) => e.startsWith("icmda://"));
-	e && u(e);
-})) : n.quit(), n.on("open-url", (e, t) => {
-	u(t);
+console.log("argv:", process.argv);
+console.log("execPath:", process.execPath);
+if (process.env.VITE_DEV_SERVER_URL) app.setAsDefaultProtocolClient("icmda", process.execPath, [path.resolve(process.argv[1])]);
+else app.setAsDefaultProtocolClient("icmda");
+if (!app.requestSingleInstanceLock()) app.quit();
+else {
+	app.on("second-instance", (event, argv) => {
+		const url = argv.find((arg) => arg.startsWith("icmda://"));
+		if (url) handleDeepLink(url);
+	});
+	app.whenReady().then(() => {
+		Menu.setApplicationMenu(null);
+		createWindow();
+		const launchUrl = process.argv.find((arg) => arg.startsWith("icmda://"));
+		if (launchUrl) handleDeepLink(launchUrl);
+	});
+}
+app.on("open-url", (event, url) => {
+	handleDeepLink(url);
 });
-function u(e) {
-	let t = new URL(e).searchParams.get("token");
-	o && (o.isMinimized() && o.restore(), o.show(), o.focus()), o && s ? o.webContents.send("deep-link-token", t) : c = t;
+function handleDeepLink(url) {
+	const token = new URL(url).searchParams.get("token");
+	if (mainWindow) {
+		if (mainWindow.isMinimized()) mainWindow.restore();
+		mainWindow.show();
+		mainWindow.focus();
+	}
+	if (mainWindow && mainWindowReady) mainWindow.webContents.send("deep-link-token", token);
+	else pendingDeepLink = token;
 }
-n.on("window-all-closed", () => {
-	process.platform !== "darwin" && n.quit();
+app.on("window-all-closed", () => {
+	if (process.platform !== "darwin") app.quit();
 });
 //#endregion
 export {};

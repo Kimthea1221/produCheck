@@ -25,7 +25,6 @@ marketing_words = [
     'promo',
     'discount',
     'free shipping',
-    '100 genuine',
     'guaranteed'
 ]
 
@@ -46,6 +45,32 @@ brand_aliases = {
     'unilvr': 'unilever'
 }
 
+# Precompile the word-boundary patterns once (faster on 90k+ rows)
+alias_patterns = [
+    (re.compile(rf'(?<!\w){re.escape(alias)}(?!\w)'), standard)
+    for alias, standard in brand_aliases.items()
+]
+marketing_patterns = [
+    re.compile(rf'\b{re.escape(word)}\b') for word in marketing_words
+]
+genuine_pattern = re.compile(r'\b100\s*%?\s*genuine\b')
+
+unit_patterns = [
+    (re.compile(r'(\d+)\s*ml\b'), r'\1 milliliter'),
+    (re.compile(r'(\d+)\s*mg\b'), r'\1 milligram'),
+    (re.compile(r'(\d+)\s*kg\b'), r'\1 kilogram'),
+    (re.compile(r'(\d+)\s*g\b'),  r'\1 gram'),
+]
+
+
+def dedupe_tokens(text, sort_tokens=False):
+    toks = text.split()
+    toks = list(dict.fromkeys(toks))      # drop repeats, keep first-seen order
+    if sort_tokens:
+        toks = sorted(toks)
+    return " ".join(toks)
+
+
 def clean_title(text):
 
     if pd.isna(text):
@@ -62,19 +87,18 @@ def clean_title(text):
     # Remove emojis and unicode symbols
     text = text.encode('ascii', 'ignore').decode('ascii')
 
-    # Handle brand aliases
-    for alias, standard in brand_aliases.items():
-        text = text.replace(alias, standard)
+    # Handle brand aliases (whole words only)
+    for pattern, standard in alias_patterns:
+        text = pattern.sub(standard, text)
 
-    # Remove marketing words
-    for word in marketing_words:
-        text = text.replace(word, '')
+    # Remove marketing words (whole words only)
+    text = genuine_pattern.sub(' ', text)
+    for pattern in marketing_patterns:
+        text = pattern.sub(' ', text)
 
-    # Normalize units
-    text = re.sub(r'(\d+)\s*ml', r'\1 milliliter', text)
-    text = re.sub(r'(\d+)\s*mg', r'\1 milligram', text)
-    text = re.sub(r'(\d+)\s*kg', r'\1 kilogram', text)
-    text = re.sub(r'(\d+)\s*g', r'\1 gram', text)
+    # Normalize units (unit must end at a word boundary)
+    for pattern, repl in unit_patterns:
+        text = pattern.sub(repl, text)
 
     # Expand abbreviations
     words = text.split()
@@ -87,6 +111,9 @@ def clean_title(text):
     # Normalize whitespace
     text = re.sub(r'\s+', ' ', text).strip()
 
+    # Remove duplicated tokens
+    text = dedupe_tokens(text)
+
     return text
 
 
@@ -96,12 +123,12 @@ def main():
     df = pd.read_csv(file_path, low_memory=False)
 
 
-    # Change this if needed after checking the output above
+    
     TITLE_COLUMN = "PRODUCT_NAME"
     BRAND_COLUMN = "BRAND_NAME"
     COMPANY_COLUMN = "COMPANY_NAME"
 
-    # Apply the cleaning function to the specified column
+    
     df[TITLE_COLUMN] = df[TITLE_COLUMN].apply(clean_title)
     df[BRAND_COLUMN] = df[BRAND_COLUMN].apply(clean_title)
     df[COMPANY_COLUMN] = df[COMPANY_COLUMN].apply(clean_title)
@@ -117,7 +144,7 @@ def main():
 
     #### Cleaning of Unregistered Product to build BM25 index ####
 
-    # Load CSV file of registered products
+    # Load CSV file of unregistered products
     file_path = datasets_dir / "unregistered.csv"
     df = pd.read_csv(file_path)
 

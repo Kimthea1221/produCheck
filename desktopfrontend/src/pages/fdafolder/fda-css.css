@@ -2533,7 +2533,18 @@ h6 {
 }
 
 .FdaVerifToast_success {
+  background: #ecfdf5;
+  border: 1px solid #1B4332;
   border-left: 4px solid #1B4332;
+  color: #1B4332;
+}
+
+.FdaVerifToast_success .FdaVerifToastCloseBtn {
+  color: rgba(27, 67, 50, 0.6);
+}
+.FdaVerifToast_success .FdaVerifToastCloseBtn:hover {
+  color: #1B4332;
+  background: rgba(27, 67, 50, 0.08);
 }
 
 .FdaVerifToast_info {
