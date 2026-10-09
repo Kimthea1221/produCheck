@@ -1,13 +1,13 @@
-from pydantic import BaseModel, ConfigDict, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl, Field
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
 
 class CreateComplaint(BaseModel):
-    product_title: str
-    store_name: str
+    product_title: str = Field(max_length=150)
+    store_name: str = Field(max_length=100)
     product_url: HttpUrl
-    consumer_description: str
+    consumer_description: str = Field(max_length=500)
     platform: str
     verification_result: str 
     attachment_data: Optional[str] = None

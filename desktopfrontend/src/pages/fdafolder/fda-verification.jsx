@@ -1,5 +1,5 @@
 // desktopfrontend/src/pages/fdafolder/fda-verification.jsx
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from "../component/sidebar";
 import TopBar from "../component/top-bar";
@@ -23,9 +23,16 @@ import {
   X,
   CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Footprints,
+  Image as ImageIcon,
+  AlertCircle // ADDED — for upload error message
 } from 'lucide-react';
 import { apiFetch } from '../../utils/apiFetch';
+// ADDED — processing overlay
+import { useProcessing } from '../../utils/useProcessing';
+import ProcessingOverlay from '../component/processing-overlay';
+import mammoth from 'mammoth'; // CHANGED — added for .docx preview in Queue attachment modal
 
 
 // ============================================================================
@@ -49,210 +56,379 @@ import { apiFetch } from '../../utils/apiFetch';
 // ============================================================================
 
 // ============================================================================
-// DUMMY DATASETS - FDA VERIFICATION WORKFLOW (LEA REQUESTS ONLY)
+// 🔌 BACKEND: set to false once GET /verification-requests/lea-follow-up exists
 // ============================================================================
+const USE_LEA_RESPONSE_MOCK = true;
 
-// BACKEND: GET /api/fda/verification-requests?status=pending
-// Returns newly received verification requests submitted by LEA-CIDG requiring FDA review.
-const dummyQueueRequests = [
+// 🔌 BACKEND: set UPLOAD to true once POST /verification-requests/{request_id}/fda-attachments exists.
+const FDA_ATTACHMENTS_UI_ENABLED = true;
+const FDA_ATTACHMENTS_UPLOAD_ENABLED = false;
+
+// ADDED — FDA evidence attachment limits (matching LEA)
+const FDA_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+const FDA_MAX_FILES = 10;
+const FDA_ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf', '.docx'];
+
+const formatFdaFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+// ⚠️ REMOVE THIS — Mock dataset for LEA Response tracking until backend endpoint is available.
+// Covers: awaiting_lea, acknowledged, takedown_initiated, closed, registered+acknowledged, and rejected+acknowledged.
+const MOCK_LEA_RESPONSE_RECORDS = [
   {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00501',
-    caseId: 'ICM-2026-00501',
-    productName: 'PureGlow Whitening Soap',
-    manufacturer: 'Lumina Beauty Philippines Inc.',
-    complainant: 'PO3 R. Dela Cruz (LEA-CIDG)',
-    category: 'Cosmetics',
-    dateLogged: '2026-07-28 08:30 AM',
-    dateReceived: '2026-07-28 08:35 AM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-COS-2026-9081',
-    priority: 'Urgent',
-    leaNotes: 'Seized 500 units during enforcement operation at Divisoria market. Packaging displays suspicious FDA registration mark. Immediate validation requested prior to legal filing.',
-    documents: [
-      { id: 'doc-101', name: 'Product_Label_Front_Back.jpg', size: '2.4 MB', type: 'image/jpeg', category: 'Evidence Photo' },
-      { id: 'doc-102', name: 'LEA_Seizure_Intake_Report_00501.pdf', size: '1.2 MB', type: 'application/pdf', category: 'Official Report' },
-      { id: 'doc-103', name: 'LEA_Chain_of_Custody_Form.pdf', size: '480 KB', type: 'application/pdf', category: 'Chain of Custody' }
-    ]
+    // 🔌 BACKEND: expected field
+    request_id: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0301",
+    // 🔌 BACKEND: expected field
+    product_title: "Glow Skin Rejuvenating Facial Toner 60ml",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Brilliant Skin Essentials Inc.",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: "LOT-2025-BR-991",
+    // 🔌 BACKEND: expected field
+    fda_result: "unregistered",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-09-28T09:30:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Maria Santos, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "awaiting_lea",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-09-28T09:30:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: null,
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: null,
+    // 🔌 BACKEND: expected field
+    field_operation_notes: null,
+    // 🔌 BACKEND: expected field
+    closed_at: null,
+    // 🔌 BACKEND: expected field
+    closed_by_name: null,
+    // 🔌 BACKEND: expected field
+    close_reason: null,
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: null,
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: "2026-10-01T14:15:00Z",
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-01",
+        file_name: "toner_bottle_sample.jpg",
+        mime_type: "image/jpeg",
+        file_size_display: "1.4 MB",
+      },
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-02",
+        file_name: "walkin_sworn_complaint.pdf",
+        mime_type: "application/pdf",
+        file_size_display: "520.8 KB",
+      },
+    ],
   },
   {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00498',
-    caseId: 'ICM-2026-00498',
-    productName: 'VigorMax Male Energy Capsules',
-    manufacturer: 'BioHealth Apex Labs Co.',
-    complainant: 'Agent G. Tan (LEA-CIDG)',
-    category: 'Food',
-    dateLogged: '2026-07-27 03:45 PM',
-    dateReceived: '2026-07-27 04:10 PM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-SUP-2026-4412',
-    priority: 'High',
-    leaNotes: 'Product identified during field operations without CPR badge. LEA field team flagged potential counterfeit packaging. Request urgent verification of CPR and LTO status.',
-    documents: [
-      { id: 'doc-104', name: 'Blister_Pack_HighRes.png', size: '3.1 MB', type: 'image/png', category: 'Evidence Photo' },
-      { id: 'doc-105', name: 'Field_Seizure_Photos.pdf', size: '1.8 MB', type: 'application/pdf', category: 'Seizure Evidence' }
-    ]
+    // 🔌 BACKEND: expected field
+    request_id: "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0284",
+    // 🔌 BACKEND: expected field
+    product_title: "Rosmar Kagayaku Bleaching Whipped Soap 100g",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Rosmar Skin Essentials",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: "NN-100000849201",
+    // 🔌 BACKEND: expected field
+    fda_result: "registered",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-09-25T11:00:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Arlene Cruz, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "acknowledged",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-09-26T08:45:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: "2026-09-26T08:45:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: null,
+    // 🔌 BACKEND: expected field
+    field_operation_notes: null,
+    // 🔌 BACKEND: expected field
+    closed_at: null,
+    // 🔌 BACKEND: expected field
+    closed_by_name: null,
+    // 🔌 BACKEND: expected field
+    close_reason: null,
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: null,
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: null,
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [],
   },
   {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00492',
-    caseId: 'ICM-2026-00492',
-    productName: 'KetoFast Slimming Tea Bags',
-    manufacturer: 'GreenHerb Organics Mfg.',
-    complainant: 'Insp. A. Mercado (LEA-CIDG)',
-    category: 'Food',
-    dateLogged: '2026-07-26 11:20 AM',
-    dateReceived: '2026-07-26 11:45 AM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-SUP-2026-1290',
-    priority: 'Standard',
-    leaNotes: 'LEA intelligence unit flagged batch samples. Request verification if GreenHerb Organics holds a valid License to Operate (LTO).',
-    documents: [
-      { id: 'doc-106', name: 'Box_Packaging_Photo.jpg', size: '1.5 MB', type: 'image/jpeg', category: 'Evidence Photo' },
-      { id: 'doc-107', name: 'LEA_Request_Statement.pdf', size: '890 KB', type: 'application/pdf', category: 'Official Statement' }
-    ]
-  }
+    // 🔌 BACKEND: expected field
+    request_id: "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0268",
+    // 🔌 BACKEND: expected field
+    product_title: "Dr. Alvin Kojic Acid Dipalmitate Soap 135g",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Dr. Alvin Health and Beauty",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: "DA-LOT-7742",
+    // 🔌 BACKEND: expected field
+    fda_result: "unregistered",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-09-20T14:10:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Maria Santos, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "takedown_initiated",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-09-22T16:20:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: "2026-09-21T09:15:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: "Maj. Arthur Morales, CIDG",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: "2026-09-22T16:20:00Z",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: "Maj. Arthur Morales, CIDG",
+    // 🔌 BACKEND: expected field
+    field_operation_notes: "Joint surveillance scheduled with Divisoria retail enforcement unit.\nCounterfeit batch verified at stall #41. Takedown notice served.",
+    // 🔌 BACKEND: expected field
+    closed_at: null,
+    // 🔌 BACKEND: expected field
+    closed_by_name: null,
+    // 🔌 BACKEND: expected field
+    close_reason: null,
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: null,
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: null,
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-03",
+        file_name: "divisoria_stall_evidence.jpg",
+        mime_type: "image/jpeg",
+        file_size_display: "2.1 MB",
+      },
+    ],
+  },
+  {
+    // 🔌 BACKEND: expected field
+    request_id: "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0240",
+    // 🔌 BACKEND: expected field
+    product_title: "Kojie San Skin Lightening Classic Soap 65g",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Beauty Elements Ventures Inc.",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: "KS-BATCH-9931",
+    // 🔌 BACKEND: expected field
+    fda_result: "unregistered",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-09-12T10:00:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Arlene Cruz, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "closed",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-09-18T15:30:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: "2026-09-13T11:20:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: "2026-09-14T13:00:00Z",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: "Maj. Arthur Morales, CIDG",
+    // 🔌 BACKEND: expected field
+    field_operation_notes: "Physical seizure scheduled at Quiapo market stall. Warrant served on merchant.",
+    // 🔌 BACKEND: expected field
+    closed_at: "2026-09-18T15:30:00Z",
+    // 🔌 BACKEND: expected field
+    closed_by_name: "Col. Renato Mendoza, CIDG",
+    // 🔌 BACKEND: expected field
+    close_reason: "Completed",
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: "140 counterfeit bars confiscated and logged into CIDG evidence locker.\nSeller issued citation and online storefront takedown notice successfully executed.",
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: null,
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-04",
+        file_name: "confiscation_inventory.pdf",
+        mime_type: "application/pdf",
+        file_size_display: "340.5 KB",
+      },
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-05",
+        file_name: "storefront_takedown_receipt.pdf",
+        mime_type: "application/pdf",
+        file_size_display: "185.0 KB",
+      },
+    ],
+  },
+  {
+    // 🔌 BACKEND: expected field
+    request_id: "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9a0b",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0222",
+    // 🔌 BACKEND: expected field
+    product_title: "Fair & White Gold Ultimate Radiance Serum 30ml",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Labo Derma Paris (Imported)",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: null,
+    // 🔌 BACKEND: expected field
+    fda_result: "rejected",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-09-08T16:45:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Maria Santos, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "acknowledged",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-09-09T10:15:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: "2026-09-09T10:15:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: null,
+    // 🔌 BACKEND: expected field
+    field_operation_notes: null,
+    // 🔌 BACKEND: expected field
+    closed_at: null,
+    // 🔌 BACKEND: expected field
+    closed_by_name: null,
+    // 🔌 BACKEND: expected field
+    close_reason: null,
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: null,
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: null,
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [],
+  },
+  {
+    // 🔌 BACKEND: expected field
+    request_id: "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f9a0b1c",
+    // 🔌 BACKEND: expected field
+    case_reference: "VR-2026-0210",
+    // 🔌 BACKEND: expected field
+    product_title: "Belo SunExpert Whitening Sunscreen SPF 50 50ml",
+    // 🔌 BACKEND: expected field
+    product_category: "Cosmetics",
+    // 🔌 BACKEND: expected field
+    manufacturer: "Intelligent Skin Care, Inc. (Belo)",
+    // 🔌 BACKEND: expected field
+    source: "walk_in",
+    // 🔌 BACKEND: expected field
+    product_code: "NN-100000918234",
+    // 🔌 BACKEND: expected field
+    fda_result: "registered",
+    // 🔌 BACKEND: expected field
+    responded_at: "2026-10-02T13:40:00Z",
+    // 🔌 BACKEND: expected field
+    verified_by_name: "Arlene Cruz, RPh",
+    // 🔌 BACKEND: expected field
+    lea_stage: "awaiting_lea",
+    // 🔌 BACKEND: expected field
+    last_updated_at: "2026-10-02T13:40:00Z",
+    // 🔌 BACKEND: expected field
+    acknowledged_at: null,
+    // 🔌 BACKEND: expected field
+    acknowledged_by_name: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_at: null,
+    // 🔌 BACKEND: expected field
+    takedown_initiated_by_name: null,
+    // 🔌 BACKEND: expected field
+    field_operation_notes: null,
+    // 🔌 BACKEND: expected field
+    closed_at: null,
+    // 🔌 BACKEND: expected field
+    closed_by_name: null,
+    // 🔌 BACKEND: expected field
+    close_reason: null,
+    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
+    closing_notes: null,
+    // 🔌 BACKEND: expected field
+    reminder_sent_at: null,
+    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
+    // as GET /verification-requests/completed/{id}
+    attached_files: [
+      // ⚠️ REMOVE THIS
+      {
+        file_id: "mock-lea-file-06",
+        file_name: "sunscreen_label_scan.jpg",
+        mime_type: "image/jpeg",
+        file_size_display: "890.1 KB",
+      },
+    ],
+  },
 ];
-
-
-
-// BACKEND: GET /api/fda/verification-requests?status=completed
-// Returns historical verifications completed by FDA and transmitted back to LEA-CIDG.
-const dummyCompletedRequests = [
-  {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00412',
-    caseId: 'ICM-2026-00412',
-    productName: 'GlowSkin Moisturizing Cream',
-    manufacturer: 'Radiant Beauty Co.',
-    complainant: 'Insp. A. Santos (LEA-CIDG)',
-    category: 'Cosmetics',
-    dateLogged: '2026-06-01 09:15 AM',
-    dateReceived: '2026-06-01 09:30 AM',
-    dateCompleted: '2026-06-03 02:20 PM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-COS-2026-1109',
-    priority: 'Standard',
-    verificationResult: 'Registered',
-    cprNumber: 'FDA-NN-1000003819',
-    cprExpiry: '2029-04-30',
-    ltoNumber: 'FDA-LTO-30000019283',
-    verifierName: 'Dr. Maria Santos',
-    verifierTitle: 'FDA Senior Regulatory Officer',
-    remarks: 'Valid CPR and LTO found. Product is fully registered, active, and compliant with national cosmetic safety standards.',
-    documents: [
-      { id: 'doc-301', name: 'FDA_Official_CPR_Certificate.pdf', size: '1.1 MB', type: 'application/pdf', category: 'Official Certificate' },
-      { id: 'doc-302', name: 'GlowSkin_Lab_Analysis_Report.pdf', size: '2.5 MB', type: 'application/pdf', category: 'Lab Report' }
-    ]
-  },
-  {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2025-00185',
-    caseId: 'ICM-2025-00185',
-    productName: 'HerbalSlim Weight Loss Capsules',
-    manufacturer: 'NatureFit Labs Inc.',
-    complainant: 'Insp. M. Reyes (LEA-CIDG)',
-    category: 'Food',
-    dateLogged: '2026-05-17 10:42 AM',
-    dateReceived: '2026-05-17 10:50 AM',
-    dateCompleted: '2026-05-17 04:02 PM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-SUP-2025-8812',
-    priority: 'Urgent',
-    verificationResult: 'Unregistered',
-    verifierName: 'Inspector J. Bautista',
-    verifierTitle: 'FDA Enforcement Officer',
-    unregisteredReason: 'No CPR or LTO found for manufacturer NatureFit Labs Inc. in the official FDA database. Product presents potential public health risks.',
-    remarks: 'Product is UNREGISTERED. Immediate enforcement, public health advisory, and online marketplace takedown coordination strongly recommended.',
-    documents: [
-      { id: 'doc-303', name: 'HerbalSlim_Packaging_Evidence.pdf', size: '3.4 MB', type: 'application/pdf', category: 'Evidence File' },
-      { id: 'doc-304', name: 'FDA_Verification_Response_Form.pdf', size: '920 KB', type: 'application/pdf', category: 'Official Response' }
-    ]
-  },
-  {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00330',
-    caseId: 'ICM-2026-00330',
-    productName: 'AstraMed Pain Relief Patch 5s',
-    manufacturer: 'Astra Therapeutics Inc.',
-    complainant: 'Agent E. Gomez (LEA-CIDG)',
-    category: 'Health Devices',
-    dateLogged: '2026-05-08 01:10 PM',
-    dateReceived: '2026-05-08 01:25 PM',
-    dateCompleted: '2026-05-10 11:00 AM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-DEV-2026-0044',
-    priority: 'High',
-    verificationResult: 'Registered',
-    cprNumber: 'FDA-DVR-2025-01928',
-    cprExpiry: '2027-12-31',
-    ltoNumber: 'FDA-LTO-30000055192',
-    verifierName: 'Dr. E. Gomez',
-    verifierTitle: 'FDA Medical Device Officer',
-    remarks: 'Verified active registration under Medical Device Regulation Office. License to Operate valid.',
-    documents: [
-      { id: 'doc-305', name: 'AstraMed_Device_License.pdf', size: '1.4 MB', type: 'application/pdf', category: 'Official License' }
-    ]
-  }
-];
-
-// BACKEND: GET /api/fda/verification-requests?status=rejected
-// Returns verification requests rejected by FDA due to missing information, invalid inputs, or duplication.
-const dummyRejectedRequests = [
-  {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00188',
-    caseId: 'ICM-2026-00188',
-    productName: 'PureVita Daily Multivitamin',
-    manufacturer: 'Vita Manufacturing Inc.',
-    complainant: 'Insp. J. Cruz (LEA-CIDG)',
-    category: 'Food',
-    dateLogged: '2026-05-16 11:21 AM',
-    dateReceived: '2026-05-16 11:35 AM',
-    dateRejected: '2026-05-17 09:00 AM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-SUP-2026-0019',
-    priority: 'Standard',
-    rejectedBy: 'Dr. M. Dela Cruz',
-    verifierTitle: 'FDA Verifier',
-    rejectionReason: 'Incomplete product information. The submission lacks clear high-resolution photos of the product back-label lot number and complete manufacturer street address. Please obtain complete packaging photos from LEA field office before re-submitting.',
-    leaNotes: 'Initial request submitted by LEA intake desk.',
-    documents: [
-      { id: 'doc-401', name: 'Blurry_Packaging_Photo.jpg', size: '520 KB', type: 'image/jpeg', category: 'Incomplete Evidence' }
-    ]
-  },
-  {
-    // BACKEND: maps to verification_requests.id & case_id
-    id: 'VR-2026-00120',
-    caseId: 'ICM-2026-00120',
-    productName: 'YouthElixir Anti-Aging Gel',
-    manufacturer: 'Unknown Distributor / Unmarked Pack',
-    complainant: 'Insp. R. Solis (LEA-CIDG)',
-    category: 'Cosmetics',
-    dateLogged: '2026-04-10 03:15 PM',
-    dateReceived: '2026-04-10 03:30 PM',
-    dateRejected: '2026-04-12 04:30 PM',
-    source: 'LEA Verification Request',
-    productCode: 'PRD-COS-2026-0002',
-    priority: 'High',
-    rejectedBy: 'Officer K. Ramos',
-    verifierTitle: 'FDA Senior Inspector',
-    rejectionReason: 'Duplicate verification request. Case ID ICM-2026-00105 was already processed and verified for this exact product batch on April 05, 2026.',
-    leaNotes: 'Re-submitted by regional field office.',
-    documents: [
-      { id: 'doc-402', name: 'Field_Referral_Notice.pdf', size: '780 KB', type: 'application/pdf', category: 'Referral Document' }
-    ]
-  }
-];
-
 
 function FDAVerification() {
+  const proc = useProcessing(); // ADDED — processing overlay state
 
 
 
 
-  // BACKEND: active tab filter state ('queue' | 'completed' | 'rejected')
+  // BACKEND: active tab filter state ('queue' | 'completed' | 'rejected' | 'lea_response')
   const [fdaActiveTab, setFdaActiveTab] = useState('queue');
 
   // CHANGED — starts empty; real data is loaded by the fetch useEffect below.
@@ -261,6 +437,16 @@ function FDAVerification() {
   const [fdaCompletedList, setFdaCompletedList] = useState([]);
   // CHANGED — starts empty; replaced by real fetch from GET /verification-requests/rejected.
   const [fdaRejectedList, setFdaRejectedList] = useState([]);
+
+  // LEA Response tracking state
+  const [leaResponseList, setLeaResponseList] = useState(USE_LEA_RESPONSE_MOCK ? MOCK_LEA_RESPONSE_RECORDS : []);
+  const [leaResponseLoading, setLeaResponseLoading] = useState(false);
+  const [leaResponseTotal, setLeaResponseTotal] = useState(USE_LEA_RESPONSE_MOCK ? MOCK_LEA_RESPONSE_RECORDS.length : 0);
+  const [leaSearch, setLeaSearch] = useState('');
+  const [leaStageFilter, setLeaStageFilter] = useState('');
+  const [leaResultFilter, setLeaResultFilter] = useState('');
+  const [leaPage, setLeaPage] = useState(1);
+  const leaTableWrapperRef = useRef(null);
 
   // ADDED — tracks whether the completed list fetch is in progress.
   const [completedLoading, setCompletedLoading] = useState(false);
@@ -342,6 +528,24 @@ function FDAVerification() {
   const completedTableWrapperRef = useRef(null);
   const rejectedTableWrapperRef = useRef(null);
 
+  // CHANGED — refs for stale response guard (Fix 1 & 3) and unsaved changes tracking (Fix 2)
+  const latestRequestIdRef = useRef(null);
+  const formBaselineRef = useRef({
+    status: '',
+    cprNumber: '',
+    cprExpiry: '',
+    officialRemarks: '',
+    advisoryRemarks: '',
+    unregisteredReason: '',
+    rejectionReason: '',
+    attachedFilesCount: 0, // CHANGED — track attached files count for unsaved changes
+  });
+
+  // ADDED — FDA verification evidence attachment states
+  const [fdaAttachedFiles, setFdaAttachedFiles] = useState([]);
+  const [fdaFileError, setFdaFileError] = useState('');
+  const [isFdaDragActive, setIsFdaDragActive] = useState(false);
+
   useEffect(() => {
     if (completedTableWrapperRef.current) {
       completedTableWrapperRef.current.scrollTop = 0;
@@ -353,6 +557,12 @@ function FDAVerification() {
       rejectedTableWrapperRef.current.scrollTop = 0;
     }
   }, [rejectedPage]);
+
+  useEffect(() => {
+    if (leaTableWrapperRef.current) {
+      leaTableWrapperRef.current.scrollTop = 0;
+    }
+  }, [leaPage]);
 
   // BACKEND: UI view toggles & modal states
   const [fdaIsRejecting, setFdaIsRejecting] = useState(false);
@@ -367,20 +577,66 @@ function FDAVerification() {
   const [fdaDocPreviewUrl, setFdaDocPreviewUrl] = useState(null);
   const [fdaDocPreviewLoading, setFdaDocPreviewLoading] = useState(false);
   const [fdaDocPreviewError, setFdaDocPreviewError] = useState(false);
+  // CHANGED — three states for .docx conversion via mammoth (Fix 2)
+  const [docxHtml, setDocxHtml] = useState('');
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxError, setDocxError] = useState(false);
 
-  // ADDED — fetches a preview blob from GET /shared-files/{file_id}/preview whenever
-  // fdaDocPreviewModal changes. Supports images and PDFs; other types are left to
-  // the download-only fallback. Object URL is revoked on cleanup to avoid memory leaks.
+  // CHANGED — fetches a preview blob from GET /shared-files/{file_id}/preview whenever
+  // fdaDocPreviewModal changes. Supports images, PDFs, and Word (.docx via mammoth);
+  // other types are left to the download-only fallback.
+  // Amendment 2: resets all three docx states at the top of every open run.
+  // Amendment 3: uses a `cancelled` flag so async callbacks are no-ops after cleanup.
   useEffect(() => {
     if (!fdaDocPreviewModal) {
       setFdaDocPreviewUrl(null);
       setFdaDocPreviewError(false);
+      // CHANGED — reset docx states when modal closes (Fix 2)
+      setDocxHtml('');
+      setDocxLoading(false);
+      setDocxError(false);
       return;
     }
 
-    const isImage = fdaDocPreviewModal.mime_type?.startsWith('image/');
-    const isPdf = fdaDocPreviewModal.mime_type === 'application/pdf';
-    if (!isImage && !isPdf) return; // unsupported types keep the placeholder
+    // CHANGED — derive type from mime_type with file-extension fallback (Amendment 1)
+    const mime = fdaDocPreviewModal.mime_type || '';
+    const name = fdaDocPreviewModal.file_name || '';
+    const isImage = mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+    const isPdf = mime === 'application/pdf' || /\.pdf$/i.test(name);
+    const isDocx = mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || /\.docx$/i.test(name);
+
+    if (!isImage && !isPdf && !isDocx) return; // unsupported types keep the placeholder
+
+    // CHANGED — reset docx states at start of every open run (Amendment 2)
+    setDocxHtml('');
+    setDocxLoading(false);
+    setDocxError(false);
+
+    if (isDocx) {
+      // CHANGED — docx branch with cancellation flag (Amendment 3)
+      let cancelled = false;
+      setDocxLoading(true);
+      setDocxError(false);
+      apiFetch(`/shared-files/${fdaDocPreviewModal.file_id}/preview`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
+        .then((result) => {
+          if (!cancelled) setDocxHtml(result.value);
+        })
+        .catch((err) => {
+          console.error('Docx conversion error:', err);
+          if (!cancelled) setDocxError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setDocxLoading(false);
+        });
+      return () => {
+        cancelled = true; // CHANGED — prevent stale setState after unmount/file switch
+      };
+    }
 
     let objectUrl = null;
     setFdaDocPreviewLoading(true);
@@ -399,7 +655,7 @@ function FDAVerification() {
       .finally(() => setFdaDocPreviewLoading(false));
 
     return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl); // CHANGED — blob cleanup preserved
     };
   }, [fdaDocPreviewModal]);
 
@@ -424,44 +680,26 @@ function FDAVerification() {
     setFdaActiveTab('queue');
 
     if (existing) {
-      handleSelectItem(existing);
+      applySelection(existing, true); // CHANGED — direct switch, bypasses prompt (Fix 2)
     } else {
+      latestRequestIdRef.current = requestId; // CHANGED — update latestRequestIdRef (Fix 3)
       setSelectedQueueItem({ request_id: requestId });
+      // CHANGED — reset formBaselineRef in minimal { request_id } branch (Fix 2 Amendment 2)
+      formBaselineRef.current = {
+        status: '',
+        cprNumber: '',
+        cprExpiry: '',
+        officialRemarks: '',
+        advisoryRemarks: '',
+        unregisteredReason: '',
+        rejectionReason: '',
+        attachedFilesCount: 0,
+      };
     }
 
     if (draftId) {
-      apiFetch(`/drafts/fda-verification/${draftId}`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          if (data.draft_verification_status === 'registered' || data.draft_verification_status?.toLowerCase() === 'registered') {
-            setFdaOfficialRemarks(data.draft_response_notes ?? '');
-            setFdaAdvisoryRemarks('');
-          } else if (data.draft_verification_status === 'unregistered' || data.draft_verification_status?.toLowerCase() === 'unregistered') {
-            setFdaAdvisoryRemarks(data.draft_response_notes ?? '');
-            setFdaOfficialRemarks('');
-          } else {
-            setFdaOfficialRemarks('');
-            setFdaAdvisoryRemarks('');
-          }
-          setFdaCprNumber(data.draft_cpr_number ?? '');
-          setFdaCprExpiry(data.draft_cpr_expiry ?? '');
-          setFdaUnregisteredReason(data.draft_unregistered_reason ?? '');
-          const rawStatus = data.draft_verification_status ?? '';
-          const formattedStatus = rawStatus ? (rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()) : '';
-          setFdaVerificationStatus(formattedStatus);
-        })
-        .catch(() => {
-          triggerAlert('Could not load the saved draft values. Starting with a blank form.', 'danger');
-          setFdaVerificationStatus('');
-          setFdaCprNumber('');
-          setFdaCprExpiry('');
-          setFdaOfficialRemarks('');
-          setFdaAdvisoryRemarks('');
-          setFdaUnregisteredReason('');
-        });
+      // CHANGED — use shared loadDraftIntoForm helper (Fix 1)
+      loadDraftIntoForm(draftId, requestId);
     } else {
       // No draft to restore — arrived from clicking a live queue card
       // directly, so just clear any stale form values from before.
@@ -471,6 +709,17 @@ function FDAVerification() {
       setFdaOfficialRemarks('');
       setFdaAdvisoryRemarks('');
       setFdaUnregisteredReason('');
+      // CHANGED — reset formBaselineRef to blank in no draft branch (Fix 2 Amendment 2)
+      formBaselineRef.current = {
+        status: '',
+        cprNumber: '',
+        cprExpiry: '',
+        officialRemarks: '',
+        advisoryRemarks: '',
+        unregisteredReason: '',
+        rejectionReason: '',
+        attachedFilesCount: 0,
+      };
     }
 
     // Clear navigation state so refreshing/back doesn't re-trigger this.
@@ -560,26 +809,35 @@ function FDAVerification() {
   }, [fdaRejectedList, rejectedSearch, rejectedCategory, rejectedDateFrom, rejectedDateTo]); */
   const filteredRejected = fdaRejectedList;
 
+  // Filtered and sorted dataset for LEA Response tracking table
+  // Default sort: most recently updated first (last_updated_at descending)
+  const filteredLeaResponse = useMemo(() => {
+    let list = [...leaResponseList];
+    const q = leaSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (item) =>
+          (item.case_reference || '').toLowerCase().includes(q) ||
+          (item.product_title || '').toLowerCase().includes(q) ||
+          (item.manufacturer || '').toLowerCase().includes(q)
+      );
+    }
+    if (leaStageFilter) {
+      list = list.filter((item) => item.lea_stage === leaStageFilter);
+    }
+    if (leaResultFilter) {
+      list = list.filter((item) => (item.fda_result || '').toLowerCase() === leaResultFilter.toLowerCase());
+    }
+    list.sort((a, b) => {
+      const timeA = a.last_updated_at ? new Date(a.last_updated_at).getTime() : 0;
+      const timeB = b.last_updated_at ? new Date(b.last_updated_at).getTime() : 0;
+      return timeB - timeA;
+    });
+    return list;
+  }, [leaResponseList, leaSearch, leaStageFilter, leaResultFilter]);
+
   // Active item in Verification Queue
   const currentItem = selectedQueueItem;
-
-  // CHANGED — sets selectedQueueItem on card click; fetchDetail is triggered
-  // automatically by the useEffect that watches selectedQueueItem.request_id,
-  // so it also fires on the initial auto-select after the list loads.
-  const handleSelectItem = (item) => {
-    setFdaIsRejecting(false);
-    if (fdaActiveTab === 'queue') {
-      setSelectedQueueItem(item);
-      setFdaVerificationStatus('');
-      setFdaCprNumber('');
-      setFdaCprExpiry('');
-      setFdaOfficialRemarks('');
-      setFdaAdvisoryRemarks('');
-      setFdaUnregisteredReason('');
-      // fetchDetail is called below (defined after triggerAlert to avoid TDZ).
-      // The call is deferred to the useEffect that watches selectedQueueItem.
-    }
-  };
 
   // Helper for success alerts
   const triggerAlert = (message, type = 'success') => {
@@ -587,6 +845,212 @@ function FDAVerification() {
     setTimeout(() => {
       setFdaSuccessAlert(null);
     }, 4500);
+  };
+
+  // CHANGED — shared helper to fetch saved draft and load into determination form (Fix 1)
+  const loadDraftIntoForm = (draftId, targetRequestId) => {
+    apiFetch(`/drafts/fda-verification/${draftId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        // CHANGED — stale-response guard: ignore draft response if active card changed (Fix 1)
+        if (targetRequestId && latestRequestIdRef.current !== targetRequestId) return;
+
+        let formattedStatus = '';
+        const rawStatus = data.draft_verification_status ?? '';
+        if (rawStatus) {
+          formattedStatus = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
+        }
+
+        let official = '';
+        let advisory = '';
+        if (data.draft_verification_status === 'registered' || data.draft_verification_status?.toLowerCase() === 'registered') {
+          official = data.draft_response_notes ?? '';
+        } else if (data.draft_verification_status === 'unregistered' || data.draft_verification_status?.toLowerCase() === 'unregistered') {
+          advisory = data.draft_response_notes ?? '';
+        }
+
+        const cprNo = data.draft_cpr_number ?? '';
+        const cprExp = data.draft_cpr_expiry ?? '';
+        const unregReason = data.draft_unregistered_reason ?? '';
+
+        setFdaOfficialRemarks(official);
+        setFdaAdvisoryRemarks(advisory);
+        setFdaCprNumber(cprNo);
+        setFdaCprExpiry(cprExp);
+        setFdaUnregisteredReason(unregReason);
+        setFdaVerificationStatus(formattedStatus);
+
+        // CHANGED — update baseline ref with loaded draft values (Fix 2 Amendment 2)
+        formBaselineRef.current = {
+          status: formattedStatus,
+          cprNumber: cprNo,
+          cprExpiry: cprExp,
+          officialRemarks: official,
+          advisoryRemarks: advisory,
+          unregisteredReason: unregReason,
+          rejectionReason: '',
+          attachedFilesCount: 0,
+        };
+      })
+      .catch(() => {
+        // CHANGED — stale-response guard: ignore draft response if active card changed (Fix 1)
+        if (targetRequestId && latestRequestIdRef.current !== targetRequestId) return;
+        triggerAlert('Could not load the saved draft values. Starting with a blank form.', 'danger');
+        setFdaVerificationStatus('');
+        setFdaCprNumber('');
+        setFdaCprExpiry('');
+        setFdaOfficialRemarks('');
+        setFdaAdvisoryRemarks('');
+        setFdaUnregisteredReason('');
+        // CHANGED — reset formBaselineRef to blank on load error (Fix 2 Amendment 2)
+        formBaselineRef.current = {
+          status: '',
+          cprNumber: '',
+          cprExpiry: '',
+          officialRemarks: '',
+          advisoryRemarks: '',
+          unregisteredReason: '',
+          rejectionReason: '',
+          attachedFilesCount: 0,
+        };
+      });
+  };
+
+  // CHANGED — check if current form values differ from the baseline (Fix 2)
+  const hasUnsavedChanges = () => {
+    const base = formBaselineRef.current;
+    if (!base) return false;
+    return (
+      fdaVerificationStatus !== base.status ||
+      fdaCprNumber !== base.cprNumber ||
+      fdaCprExpiry !== base.cprExpiry ||
+      fdaOfficialRemarks !== base.officialRemarks ||
+      fdaAdvisoryRemarks !== base.advisoryRemarks ||
+      fdaUnregisteredReason !== base.unregisteredReason ||
+      fdaRejectionReason !== base.rejectionReason ||
+      fdaAttachedFiles.length !== (base.attachedFilesCount || 0)
+    );
+  };
+
+  // ADDED — FDA evidence attachment handlers
+  const handleFdaFileSelection = (incomingFiles) => {
+    setFdaFileError('');
+    if (!incomingFiles || incomingFiles.length === 0) return;
+
+    const validFiles = [];
+    let errorMsg = '';
+
+    for (const file of incomingFiles) {
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!FDA_ALLOWED_EXTENSIONS.includes(ext)) {
+        if (!errorMsg) errorMsg = 'Only JPG, PNG, PDF, and DOCX files are allowed.';
+        continue;
+      }
+      if (file.size > FDA_MAX_FILE_SIZE_BYTES) {
+        if (!errorMsg) errorMsg = `${file.name} exceeds the 25 MB file size limit.`;
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (fdaAttachedFiles.length + validFiles.length > FDA_MAX_FILES) {
+      errorMsg = 'You can attach a maximum of 10 files.';
+      const availableSlots = Math.max(0, FDA_MAX_FILES - fdaAttachedFiles.length);
+      const capped = validFiles.slice(0, availableSlots);
+      setFdaAttachedFiles((prev) => [...prev, ...capped]);
+    } else {
+      setFdaAttachedFiles((prev) => [...prev, ...validFiles]);
+    }
+
+    if (errorMsg) {
+      setFdaFileError(errorMsg);
+    }
+  };
+
+  const handleFdaFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFdaFileSelection(Array.from(e.target.files));
+      e.target.value = '';
+    }
+  };
+
+  const handleFdaDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFdaDragActive(true);
+  };
+
+  const handleFdaDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFdaDragActive(false);
+  };
+
+  const handleFdaDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFdaDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFdaFileSelection(Array.from(e.dataTransfer.files));
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handleRemoveFdaFile = (indexToRemove) => {
+    setFdaAttachedFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setFdaFileError('');
+  };
+
+  // CHANGED — card selection switch logic with state resets and draft loading (Fix 1 & 2)
+  const applySelection = (item, skipTabCheck = false) => {
+    setFdaIsRejecting(false); // CHANGED — preserve setFdaIsRejecting(false) (Fix 2 Amendment 3)
+    if (skipTabCheck || fdaActiveTab === 'queue') { // CHANGED — preserve fdaActiveTab === 'queue' guard (Fix 2 Amendment 3)
+      latestRequestIdRef.current = item.request_id; // CHANGED — synchronously update latestRequestIdRef (Fix 3 Amendment)
+      setSelectedQueueItem(item);
+      setFdaRejectionReason(''); // CHANGED — clear fdaRejectionReason on card selection change (Fix 2b)
+      setFdaVerificationStatus('');
+      setFdaCprNumber('');
+      setFdaCprExpiry('');
+      setFdaOfficialRemarks('');
+      setFdaAdvisoryRemarks('');
+      setFdaUnregisteredReason('');
+      setFdaAttachedFiles([]); // ADDED — reset attached files on card selection switch
+      setFdaFileError(''); // ADDED — reset file error on card switch
+      formBaselineRef.current = {
+        status: '',
+        cprNumber: '',
+        cprExpiry: '',
+        officialRemarks: '',
+        advisoryRemarks: '',
+        unregisteredReason: '',
+        rejectionReason: '',
+        attachedFilesCount: 0,
+      };
+      // NOTE: backend does not return has_draft/draft_id on list or detail; only drafts saved this session reload here.
+      if (item.has_draft && (item.draft_id || item.draftId)) {
+        loadDraftIntoForm(item.draft_id || item.draftId, item.request_id);
+      }
+    }
+  };
+
+  // CHANGED — checks for unsaved changes before switching to a different card (Fix 2)
+  const handleSelectItem = (item) => {
+    if (selectedQueueItem?.request_id === item.request_id) return;
+    if (hasUnsavedChanges()) {
+      setFdaModalConfig({
+        type: 'discard',
+        title: 'Discard unsaved changes?',
+        description: 'The entered verification details for this request will be lost.',
+        confirmText: 'Discard & Switch',
+        confirmVariant: 'danger',
+        targetItem: item,
+      });
+      return;
+    }
+    applySelection(item);
   };
 
   // ADDED — fetches the full detail for a queue item by its request_id.
@@ -602,21 +1066,31 @@ function FDAVerification() {
         return res.json();
       })
       .then((data) => {
+        // CHANGED — stale-response guard: ignore if user has switched to a different card (Fix 3)
+        if (latestRequestIdRef.current !== requestId) return;
         setSelectedQueueDetail(data);
         // FIX 1 — keep selectedQueueItem in sync so currentItem (used in toasts & dialogs)
         // is enriched with case_reference and other fields when arriving via Continue Editing.
         setSelectedQueueItem((prev) => (prev ? { ...prev, ...data } : data));
       })
       .catch(() => {
+        // CHANGED — stale-response guard: ignore if user has switched to a different card (Fix 3)
+        if (latestRequestIdRef.current !== requestId) return;
         triggerAlert('Could not load the verification request details.', 'danger');
       })
-      .finally(() => setDetailLoading(false));
+      .finally(() => {
+        // CHANGED — stale-response guard: only reset loading for active card (Fix 3)
+        if (latestRequestIdRef.current === requestId) {
+          setDetailLoading(false);
+        }
+      });
   };
 
   // ADDED — helper function to fetch badge counts from the backend endpoint.
   // Called on component mount and after successful submit or reject actions.
   const fetchCounts = () => {
-    apiFetch('/verification-requests/counts')
+    // CHANGED — return promise so await fetchCounts() waits
+    return apiFetch('/verification-requests/counts')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -689,6 +1163,8 @@ function FDAVerification() {
   // panel from blanking/flickering every time the user clicks a different card.
   useEffect(() => {
     if (selectedQueueItem?.request_id) {
+      // CHANGED — set latestRequestIdRef.current immediately before fetchDetail (Fix 3 Amendment)
+      latestRequestIdRef.current = selectedQueueItem.request_id;
       fetchDetail(selectedQueueItem.request_id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -774,6 +1250,52 @@ function FDAVerification() {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rejectedSearch, rejectedCategory, rejectedDateFrom, rejectedDateTo, rejectedPage, dataRefreshTrigger]);
+
+  // 🔌 BACKEND: Fetch function for GET /verification-requests/lea-follow-up (list)
+  // Reuses apiFetch with loading and error handling.
+  // When USE_LEA_RESPONSE_MOCK is true, uses mock records instead of calling backend.
+  useEffect(() => {
+    if (USE_LEA_RESPONSE_MOCK) {
+      setLeaResponseList(MOCK_LEA_RESPONSE_RECORDS);
+      setLeaResponseTotal(MOCK_LEA_RESPONSE_RECORDS.length);
+      return;
+    }
+
+    const doFetch = () => {
+      if (leaResponseList.length === 0) {
+        setLeaResponseLoading(true);
+      }
+      const params = new URLSearchParams();
+      if (leaSearch.trim()) params.set('search', leaSearch.trim());
+      if (leaStageFilter) params.set('stage', leaStageFilter);
+      if (leaResultFilter) params.set('fda_result', leaResultFilter);
+      params.set('page', String(leaPage));
+      params.set('page_size', String(FDA_VERIF_TABLE_PAGE_SIZE));
+
+      apiFetch(`/verification-requests/lea-follow-up?${params.toString()}`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setLeaResponseList(data);
+            setLeaResponseTotal(data.length);
+          } else if (data && Array.isArray(data.items)) {
+            setLeaResponseList(data.items);
+            setLeaResponseTotal(data.total ?? data.items.length);
+          }
+        })
+        .catch(() => {
+          triggerAlert('Could not load LEA Response tracking records from the server.', 'danger');
+        })
+        .finally(() => setLeaResponseLoading(false));
+    };
+
+    const timer = setTimeout(doFetch, leaSearch ? 300 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaSearch, leaStageFilter, leaResultFilter, leaPage, dataRefreshTrigger]);
 
   // CONFIRMATION MODAL HANDLERS
 
@@ -869,34 +1391,67 @@ function FDAVerification() {
   // POST /verification-requests/{request_id}/fda-response and POST /verification-requests/{request_id}/fda-reject.
   // Performs error handling, item removal, form reset, and counts re-fetch.
   const handleExecuteModalAction = async () => {
-    if (!fdaModalConfig || !currentItem) return;
+    if (!fdaModalConfig) return;
+
+    if (fdaModalConfig.type === 'discard') {
+      // CHANGED — call setFdaModalConfig(null) first, then applySelection (Fix 2 Amendment 4)
+      const target = fdaModalConfig.targetItem;
+      setFdaModalConfig(null);
+      if (target) {
+        applySelection(target);
+      }
+      return;
+    }
+
+    if (!currentItem) return;
 
     if (fdaModalConfig.type === 'save_draft') {
-      try {
-        const payload = {
-          draft_verification_status: fdaVerificationStatus.toLowerCase() || null,
-          draft_cpr_number: fdaCprNumber.trim() || null,
-          draft_cpr_expiry: fdaCprExpiry.trim() || null,
-          draft_response_notes: fdaVerificationStatus.toLowerCase() === 'registered'
-            ? (fdaOfficialRemarks.trim() || null)
-            : (fdaAdvisoryRemarks.trim() || null),
-          draft_unregistered_reason: fdaUnregisteredReason.trim() || null,
-        };
+      // CHANGED — close modal before proc.run()
+      setFdaModalConfig(null);
+      let draftData = null;
 
-        const res = await apiFetch(`/drafts/fda-verification/${currentItem.request_id}`, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
+      const ok = await proc.run(
+        {
+          title: 'SAVING DRAFT...',
+          message: 'Saving verification findings draft...',
+          withSuccess: false,
+        },
+        async () => {
+          try {
+            const payload = {
+              draft_verification_status: fdaVerificationStatus.toLowerCase() || null,
+              draft_cpr_number: fdaCprNumber.trim() || null,
+              draft_cpr_expiry: fdaCprExpiry.trim() || null,
+              draft_response_notes: fdaVerificationStatus.toLowerCase() === 'registered'
+                ? (fdaOfficialRemarks.trim() || null)
+                : (fdaAdvisoryRemarks.trim() || null),
+              draft_unregistered_reason: fdaUnregisteredReason.trim() || null,
+            };
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          const errMsg = errData?.detail || 'Failed to save draft.';
-          triggerAlert(errMsg, 'danger');
-          return;
+            const res = await apiFetch(`/drafts/fda-verification/${currentItem.request_id}`, {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              const errMsg = errData?.detail || 'Failed to save draft.';
+              triggerAlert(errMsg, 'danger');
+              return false;
+            }
+
+            draftData = await res.json().catch(() => null);
+            // Re-fetch badge counts and trigger queue refresh (same mechanism as Submit/Reject)
+            await fetchCounts();
+            return true;
+          } catch (err) {
+            triggerAlert('Network error occurred while saving the draft.', 'danger');
+            return false;
+          }
         }
+      );
 
-        const draftData = await res.json().catch(() => null);
-
+      if (ok) {
         // Update active queue item and queue list to reflect saved draft
         if (currentItem) {
           const updatedItem = {
@@ -916,42 +1471,85 @@ function FDAVerification() {
           );
         }
 
-        // Re-fetch badge counts and trigger queue refresh (same mechanism as Submit/Reject)
-        fetchCounts();
+        // Trigger queue refresh in background
         setDataRefreshTrigger((prev) => prev + 1);
 
         triggerAlert(`Draft saved successfully for Case ID ${currentItem.case_reference}.`, 'success');
-        setFdaModalConfig(null);
-
-      } catch (err) {
-        triggerAlert('Network error occurred while saving the draft.', 'danger');
+        // CHANGED — update formBaselineRef to current form values on draft save success (Fix 2)
+        formBaselineRef.current = {
+          status: fdaVerificationStatus,
+          cprNumber: fdaCprNumber,
+          cprExpiry: fdaCprExpiry,
+          officialRemarks: fdaOfficialRemarks,
+          advisoryRemarks: fdaAdvisoryRemarks,
+          unregisteredReason: fdaUnregisteredReason,
+          rejectionReason: '',
+          attachedFilesCount: 0,
+        };
       }
     }
     else if (fdaModalConfig.type === 'submit') {
-      try {
-        const payload = {
-          verification_status: fdaVerificationStatus.toLowerCase(),
-          cpr_number: fdaCprNumber.trim() || null,
-          cpr_expiry: fdaCprExpiry.trim() || null,
-          response_notes: fdaVerificationStatus.toLowerCase() === 'registered'
-            ? (fdaOfficialRemarks.trim() || null)
-            : (fdaAdvisoryRemarks.trim() || null),
-          unregistered_reason: fdaUnregisteredReason.trim() || null
-        };
+      // CHANGED — close modal before proc.run()
+      setFdaModalConfig(null);
 
-        const res = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-response`, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
+      const ok = await proc.run(
+        {
+          title: 'SUBMITTING VERIFICATION...',
+          message: 'Submitting official FDA verification response...',
+          withSuccess: false,
+        },
+        async () => {
+          try {
+            // CHANGED — upload attachments first if upload feature flag is active and files exist
+            if (FDA_ATTACHMENTS_UPLOAD_ENABLED && fdaAttachedFiles.length > 0) {
+              const formData = new FormData();
+              fdaAttachedFiles.forEach((file) => formData.append('files', file));
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          const errMsg = errData?.detail || 'Failed to submit verification response.';
-          triggerAlert(errMsg, 'danger');
-          setFdaModalConfig(null);
-          return;
+              const uploadRes = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-attachments`, {
+                method: 'POST',
+                body: formData,
+              });
+
+              if (!uploadRes.ok) {
+                const uploadErrData = await uploadRes.json().catch(() => null);
+                const uploadErrMsg = uploadErrData?.detail || 'Failed to upload attachments.';
+                triggerAlert(uploadErrMsg, 'danger');
+                return false;
+              }
+            }
+
+            const payload = {
+              verification_status: fdaVerificationStatus.toLowerCase(),
+              cpr_number: fdaCprNumber.trim() || null,
+              cpr_expiry: fdaCprExpiry.trim() || null,
+              response_notes: fdaVerificationStatus.toLowerCase() === 'registered'
+                ? (fdaOfficialRemarks.trim() || null)
+                : (fdaAdvisoryRemarks.trim() || null),
+              unregistered_reason: fdaUnregisteredReason.trim() || null
+            };
+
+            const res = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-response`, {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              const errMsg = errData?.detail || 'Failed to submit verification response.';
+              triggerAlert(errMsg, 'danger');
+              return false;
+            }
+
+            await fetchCounts();
+            return true;
+          } catch (err) {
+            triggerAlert('Network error occurred while submitting verification.', 'danger');
+            return false;
+          }
         }
+      );
 
+      if (ok) {
         const caseRef = currentItem.case_reference || selectedQueueDetail?.case_reference || '';
         triggerAlert(`Verification submitted successfully for Case ID ${caseRef}.`, 'success');
 
@@ -971,35 +1569,62 @@ function FDAVerification() {
         setFdaOfficialRemarks('');
         setFdaAdvisoryRemarks('');
         setFdaUnregisteredReason('');
+        setFdaAttachedFiles([]); // ADDED — reset attached files on submit success
+        setFdaFileError(''); // ADDED — reset file error on submit success
+        // CHANGED — reset formBaselineRef to blank on submit success (Fix 2 Amendment 1)
+        formBaselineRef.current = {
+          status: '',
+          cprNumber: '',
+          cprExpiry: '',
+          officialRemarks: '',
+          advisoryRemarks: '',
+          unregisteredReason: '',
+          rejectionReason: '',
+          attachedFilesCount: 0,
+        };
 
-        fetchCounts();
         setDataRefreshTrigger((prev) => prev + 1);
-
-      } catch (err) {
-        triggerAlert('Network error occurred while submitting verification.', 'danger');
-      } finally {
-        setFdaModalConfig(null);
       }
     }
     else if (fdaModalConfig.type === 'reject') {
-      try {
-        const payload = {
-          rejection_reason: fdaRejectionReason.trim()
-        };
+      // CHANGED — close modal before proc.run()
+      setFdaModalConfig(null);
 
-        const res = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-reject`, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
+      const ok = await proc.run(
+        {
+          title: 'REJECTING REQUEST...',
+          message: 'Submitting rejection reason to LEA...',
+          withSuccess: false,
+        },
+        async () => {
+          try {
+            const payload = {
+              rejection_reason: fdaRejectionReason.trim()
+            };
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          const errMsg = errData?.detail || 'Failed to reject verification request.';
-          triggerAlert(errMsg, 'danger');
-          setFdaModalConfig(null);
-          return;
+            const res = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-reject`, {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              const errMsg = errData?.detail || 'Failed to reject verification request.';
+              triggerAlert(errMsg, 'danger');
+              return false;
+            }
+
+            // Re-fetch badge counts and trigger Completed/Rejected table refresh (FIX 4)
+            await fetchCounts();
+            return true;
+          } catch (err) {
+            triggerAlert('Network error occurred while rejecting verification request.', 'danger');
+            return false;
+          }
         }
+      );
 
+      if (ok) {
         const caseRef = currentItem.case_reference || selectedQueueDetail?.case_reference || '';
         triggerAlert(`Verification request rejected for Case ID ${caseRef}.`, 'success');
 
@@ -1023,15 +1648,22 @@ function FDAVerification() {
         setFdaOfficialRemarks('');
         setFdaAdvisoryRemarks('');
         setFdaUnregisteredReason('');
+        setFdaAttachedFiles([]); // ADDED — reset attached files on reject success
+        setFdaFileError(''); // ADDED — reset file error on reject success
+        // CHANGED — reset formBaselineRef to blank on reject success (Fix 2 Amendment 1)
+        formBaselineRef.current = {
+          status: '',
+          cprNumber: '',
+          cprExpiry: '',
+          officialRemarks: '',
+          advisoryRemarks: '',
+          unregisteredReason: '',
+          rejectionReason: '',
+          attachedFilesCount: 0,
+        };
 
-        // Re-fetch badge counts and trigger Completed/Rejected table refresh (FIX 4)
-        fetchCounts();
+        // Trigger Completed/Rejected table refresh (FIX 4)
         setDataRefreshTrigger((prev) => prev + 1);
-
-      } catch (err) {
-        triggerAlert('Network error occurred while rejecting verification request.', 'danger');
-      } finally {
-        setFdaModalConfig(null);
       }
     }
   };
@@ -1068,6 +1700,69 @@ function FDAVerification() {
       .catch(() => {
         triggerAlert('Could not load the rejected request record details.', 'danger');
       });
+  };
+
+  // Open modal for LEA Response record view
+  // Uses list data directly since the list payload includes all required follow-up fields
+  const handleViewLeaRecord = (item) => {
+    setFdaRecordModalData({ ...item, _type: 'lea_response' });
+  };
+
+  const getLatestNotePreview = (item) => {
+    return item?.closing_notes || item?.field_operation_notes || item?.close_reason || null;
+  };
+
+  const getLeaStageLabel = (stage, fdaResult) => {
+    const normResult = (fdaResult || '').toLowerCase();
+    switch (stage) {
+      case 'awaiting_lea':
+        return 'Awaiting LEA Action';
+      case 'acknowledged':
+        if (normResult === 'registered' || normResult === 'rejected') {
+          return 'Acknowledged - Case Closed';
+        }
+        return 'Acknowledged';
+      case 'takedown_initiated':
+        return 'Takedown Initiated';
+      case 'closed':
+        return 'Case Closed';
+      default:
+        return stage || '—';
+    }
+  };
+
+  const getLeaStageBadgeClass = (stage, fdaResult) => {
+    const normResult = (fdaResult || '').toLowerCase();
+    switch (stage) {
+      case 'awaiting_lea':
+        return 'FdaVerif-lea-badge FdaVerif-lea-badge-awaiting';
+      case 'acknowledged':
+        if (normResult === 'registered' || normResult === 'rejected') {
+          return 'FdaVerif-lea-badge FdaVerif-lea-badge-closed';
+        }
+        return 'FdaVerif-lea-badge FdaVerif-lea-badge-acknowledged';
+      case 'takedown_initiated':
+        return 'FdaVerif-lea-badge FdaVerif-lea-badge-initiated';
+      case 'closed':
+        return 'FdaVerif-lea-badge FdaVerif-lea-badge-closed';
+      default:
+        return 'FdaVerif-lea-badge FdaVerif-lea-badge-awaiting';
+    }
+  };
+
+  const getFdaResultBadgeClass = (result) => {
+    const res = (result || '').toLowerCase();
+    if (res === 'registered') return 'FdaVerifResultTag FdaVerifTagReg';
+    if (res === 'unregistered') return 'FdaVerifResultTag FdaVerifTagUnreg';
+    if (res === 'rejected') return 'FdaVerifResultTag FdaVerifTagRejected';
+    return 'FdaVerifResultTag';
+  };
+
+  const getSourceLabel = (source) => {
+    if (source === 'walk_in') return 'Walk-in';
+    if (source === 'citizen_app') return 'Citizen Mobile App';
+    if (source === 'extension') return 'Browser Extension';
+    return source || '—';
   };
 
   // CHANGED — switch cases updated to lowercase to match the backend's priority
@@ -1171,12 +1866,23 @@ function FDAVerification() {
               <span className="FdaVerifStatLabel">Rejected Requests</span>
             </div>
 
+            <div className="FdaVerifStatCard">
+              <div className="FdaVerifStatCardTop">
+                <span className="FdaVerifStatBadge FdaVerifStatBadgeLea">
+                  <Send size={14} />
+                </span>
+              </div>
+              <span className="FdaVerifStatValue">{leaResponseTotal}</span>
+              <span className="FdaVerifStatLabel">LEA Response</span>
+            </div>
+
           </div>
 
           {/* WORKFLOW NAVIGATION TABS - VISUALLY IDENTICAL TO VIEW REPORTS PILL TABS */}
           {/* BACKEND: Tab switching triggers state filter & loads corresponding API dataset */}
           <div className="FdaFilterRow FdaVerifTabsRow">
             <div className="FdaPillContainer">
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'queue' ? 'active' : ''}`}
                 onClick={() => handleTabChange('queue')}
@@ -1185,6 +1891,7 @@ function FDAVerification() {
                 Verification Queue
               </button>
 
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'completed' ? 'active' : ''}`}
                 onClick={() => handleTabChange('completed')}
@@ -1193,12 +1900,22 @@ function FDAVerification() {
                 Completed
               </button>
 
+              {/* CHANGED — removed count badge from tab button */}
               <button
                 className={`FdaPill ${fdaActiveTab === 'rejected' ? 'active' : ''}`}
                 onClick={() => handleTabChange('rejected')}
                 id="fda-tab-rejected"
               >
                 Rejected Requests
+              </button>
+
+              {/* CHANGED — removed count badge from tab button */}
+              <button
+                className={`FdaPill ${fdaActiveTab === 'lea_response' ? 'active' : ''}`}
+                onClick={() => handleTabChange('lea_response')}
+                id="fda-tab-lea-response"
+              >
+                LEA Response
               </button>
             </div>
           </div>
@@ -1456,7 +2173,8 @@ function FDAVerification() {
                               </div>
 
                               <div className="FdaVerifInfoGroup">
-                                <span className="FdaVerifInfoLabel">Date Logged &amp; Received:</span>
+                                {/* CHANGED — label updated to Date Received: (Fix 4) */}
+                                <span className="FdaVerifInfoLabel">Date Received:</span>
                                 {/* CHANGED — was currentItem.dateLogged (dummy string); now
                                     formats selectedQueueDetail.requested_at (ISO 8601) using
                                     the same toLocaleString pattern used elsewhere in this file. */}
@@ -1522,7 +2240,8 @@ function FDAVerification() {
                                 {/* CHANGED — was currentItem.leaNotes (dummy); now
                                     complaint_statement from selectedQueueDetail. */}
                                 <div className="FdaVerifNotesBox">
-                                  <p>{selectedQueueDetail?.complaint_statement ?? 'No statement provided.'}</p>
+                                  {/* CHANGED — use trim() || so empty/whitespace strings fall back (Fix 3) */}
+                                  <p>{selectedQueueDetail?.complaint_statement?.trim() || 'No statement provided.'}</p>
                                 </div>
                               </div>
                             </div>
@@ -1756,6 +2475,86 @@ function FDAVerification() {
                                   ></textarea>
                                 </div>
                               </div>
+                            )}
+
+                            {/* CHANGED — FDA Evidence Attachment Section */}
+                            {FDA_ATTACHMENTS_UI_ENABLED &&
+                              (fdaVerificationStatus === 'Registered' || fdaVerificationStatus === 'Unregistered') &&
+                              !fdaIsRejecting && (
+                                <div className="FdaVerifFormGroup">
+                                  <label className="FdaVerifFormLabel">
+                                    Attach Files / Evidence <span className="FdaVerifUploadNote">(Optional)</span>
+                                  </label>
+
+                                  <div className="FdaVerifUploadArea">
+                                    <input
+                                      type="file"
+                                      id="fdaEvidenceUpload"
+                                      multiple
+                                      accept=".jpg,.jpeg,.png,.pdf,.docx"
+                                      onChange={handleFdaFileChange}
+                                      hidden
+                                    />
+
+                                    <label
+                                      htmlFor="fdaEvidenceUpload"
+                                      className={`FdaFileUploadWrapper ${isFdaDragActive ? 'FdaFileUploadWrapperDragActive' : ''}`}
+                                      onDragOver={handleFdaDragOver}
+                                      onDragLeave={handleFdaDragLeave}
+                                      onDrop={handleFdaDrop}
+                                    >
+                                      <div className="FdaFileUploadContent">
+                                        <Paperclip size={22} />
+                                        <span className="FdaVerifUploadTitle">Drop files or click to upload</span>
+                                        <span className="FdaVerifUploadSub">PDF, JPG, PNG, DOCX · Max 25 MB each · Up to 10 files</span>
+                                      </div>
+                                    </label>
+
+                                    <span className="FdaVerifUploadNote">Attachments are not saved in drafts.</span>
+
+                                    {fdaFileError && (
+                                      <span className="FdaVerifUploadError">
+                                        <AlertCircle size={12} /> {fdaFileError}
+                                      </span>
+                                    )}
+
+                                    {fdaAttachedFiles.length > 0 && (
+                                      <div className="FdaVerifDocsGrid">
+                                        {fdaAttachedFiles.map((file, index) => {
+                                          const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+                                          return (
+                                            <div key={`${file.name}-${index}`} className="FdaVerifDocCard">
+                                              <div className="FdaVerifDocIcon">
+                                                {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                              </div>
+                                              <div className="FdaVerifDocInfo">
+                                                <p className="FdaVerifDocName" title={file.name}>{file.name}</p>
+                                                <span className="FdaVerifDocMeta">{formatFdaFileSize(file.size)}</span>
+                                              </div>
+                                              <div className="FdaVerifDocActions">
+                                                <button
+                                                  type="button"
+                                                  className="FdaVerifDocActionBtn"
+                                                  title="Remove File"
+                                                  onClick={() => handleRemoveFdaFile(index)}
+                                                >
+                                                  <X size={13} />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
+                                    {/* TEMP — remove once the backend endpoint exists. */}
+                                    {!FDA_ATTACHMENTS_UPLOAD_ENABLED && fdaAttachedFiles.length > 0 && (
+                                      <span className="FdaVerifUploadNotice">
+                                        Attachments are not sent yet. Backend upload is coming.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                             )}
 
                           </div>
@@ -2171,7 +2970,7 @@ function FDAVerification() {
                         onChange={(e) => { setRejectedCategory(e.target.value); setRejectedPage(1); }}
                         id="fda-rejected-category-filter"
                       >
-                        <option value="All">All Categories</option>
+                        <option value="">All Categories</option> {/* CHANGED — value="" matches initial state and Completed tab (Fix 1) */}
                         <option value="Cosmetics">Cosmetics</option>
                         <option value="Food">Food</option>
                         <option value="Devices">Devices</option>
@@ -2325,16 +3124,251 @@ function FDAVerification() {
           })()}
 
           {/* ============================================================================ */}
+          {/* LEA RESPONSE TRACKING — FULL-WIDTH TABLE */}
+          {/* ============================================================================ */}
+          {fdaActiveTab === 'lea_response' && (() => {
+            const LEA_PAGE_SIZE = FDA_VERIF_TABLE_PAGE_SIZE;
+            const totalLeaPages = Math.ceil(filteredLeaResponse.length / LEA_PAGE_SIZE) || 1;
+            const safeLeaPage = Math.min(Math.max(1, leaPage), totalLeaPages);
+            const lStartIdx = (safeLeaPage - 1) * LEA_PAGE_SIZE;
+            const lEndIdx = Math.min(lStartIdx + LEA_PAGE_SIZE, filteredLeaResponse.length);
+            const paginatedLea = filteredLeaResponse.slice(lStartIdx, lEndIdx);
+
+            return (
+              <div className="FdaVerifTableSection">
+
+                {/* Filter Panel — search fixed-width left, dropdowns grouped right */}
+                <div className="FdaVerifFilterPanel">
+                  <div className="FdaSearchWrapper FdaSearchFixed">
+                    <Search size={16} className="FdaSearchIcon" />
+                    <input
+                      type="text"
+                      placeholder="Search Case ID or Product Name..."
+                      className="FdaSearchInput"
+                      maxLength={150}
+                      value={leaSearch}
+                      onChange={(e) => { setLeaSearch(e.target.value); setLeaPage(1); }}
+                      id="fda-lea-search-input"
+                    />
+                    {leaSearch && (
+                      <button className="FdaVerifClearSearchBtn" onClick={() => { setLeaSearch(''); setLeaPage(1); }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="FdaFilterGroupsRight">
+                    <div className="FdaFilterGroup">
+                      <label>FDA Result</label>
+                      <select
+                        value={leaResultFilter}
+                        onChange={(e) => {
+                          const newRes = e.target.value;
+                          setLeaResultFilter(newRes);
+                          setLeaPage(1);
+                          if ((newRes === 'registered' || newRes === 'rejected') && (leaStageFilter === 'takedown_initiated' || leaStageFilter === 'closed')) {
+                            setLeaStageFilter('');
+                          } else if (newRes === 'unregistered' && leaStageFilter === 'acknowledged') {
+                            setLeaStageFilter('');
+                          }
+                        }}
+                        id="fda-lea-result-filter"
+                      >
+                        <option value="">All Results</option>
+                        <option value="registered">Registered</option>
+                        <option value="unregistered">Unregistered</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+
+                    <div className="FdaFilterGroup">
+                      <label>LEA Stage</label>
+                      <select
+                        value={leaStageFilter}
+                        onChange={(e) => { setLeaStageFilter(e.target.value); setLeaPage(1); }}
+                        id="fda-lea-stage-filter"
+                      >
+                        <option value="">All Stages</option>
+                        <option value="awaiting_lea">Awaiting LEA Action</option>
+                        {(!leaResultFilter || leaResultFilter === 'registered' || leaResultFilter === 'rejected') && (
+                          <option value="acknowledged">
+                            {leaResultFilter === 'registered' || leaResultFilter === 'rejected'
+                              ? 'Acknowledged - Case Closed'
+                              : 'Acknowledged'}
+                          </option>
+                        )}
+                        {(!leaResultFilter || leaResultFilter === 'unregistered') && (
+                          <>
+                            <option value="takedown_initiated">Takedown Initiated</option>
+                            <option value="closed">Case Closed</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+
+                    <button
+                      className="BtnClearFiltersIcon"
+                      onClick={() => { setLeaSearch(''); setLeaStageFilter(''); setLeaResultFilter(''); setLeaPage(1); }}
+                      disabled={!(leaSearch || leaStageFilter || leaResultFilter)}
+                      aria-label="Clear Filters"
+                      title="Clear Filters"
+                      style={{
+                        display: (leaSearch || leaStageFilter || leaResultFilter) ? 'inline-flex' : 'none'
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* LEA Response Records Table */}
+                <div className="FdaTableCard FdaVerifTableCard">
+                  <div className="FdaTableWrapper" ref={leaTableWrapperRef}>
+                    <table className="FdaTable">
+                      <thead>
+                        <tr>
+                          <th>CASE ID</th>
+                          <th>PRODUCT NAME</th>
+                          <th>FDA RESULT</th>
+                          <th>DATE FDA RESPONDED</th>
+                          <th>LEA STAGE</th>
+                          <th>LAST UPDATED</th>
+                          <th style={{ width: '60px', textAlign: 'center' }}>ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaResponseLoading && filteredLeaResponse.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="FdaEmptyState">
+                              <Clock size={28} style={{ opacity: 0.4 }} />
+                              <p>Loading LEA response tracking records…</p>
+                            </td>
+                          </tr>
+                        ) : paginatedLea.length > 0 ? (
+                          paginatedLea.map((item) => {
+                            const latestNote = getLatestNotePreview(item);
+                            return (
+                              <tr key={item.request_id}>
+                                <td className="CaseIdCell">{item.case_reference}</td>
+                                <td>
+                                  <div className="ProductCell">
+                                    <span className="ProductCellTitle">{item.product_title}</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className={getFdaResultBadgeClass(item.fda_result)}>
+                                    {item.fda_result
+                                      ? item.fda_result.charAt(0).toUpperCase() + item.fda_result.slice(1)
+                                      : '—'}
+                                  </span>
+                                </td>
+                                <td style={{ whiteSpace: 'nowrap' }}>
+                                  {item.responded_at
+                                    ? new Date(item.responded_at).toLocaleString('en-US', {
+                                      year: 'numeric', month: '2-digit', day: '2-digit',
+                                      hour: '2-digit', minute: '2-digit', hour12: true,
+                                    })
+                                    : '—'}
+                                </td>
+                                <td>
+                                  <span className={getLeaStageBadgeClass(item.lea_stage, item.fda_result)}>
+                                    {getLeaStageLabel(item.lea_stage, item.fda_result)}
+                                  </span>
+                                  {latestNote && (
+                                    <span
+                                      className="FdaVerif-lea-stage-note-preview"
+                                      title={latestNote}
+                                    >
+                                      {latestNote}
+                                    </span>
+                                  )}
+                                </td>
+                                <td
+                                  style={{ whiteSpace: 'nowrap' }}
+                                  title={latestNote ? `Latest update: ${latestNote}` : undefined}
+                                >
+                                  {item.last_updated_at
+                                    ? new Date(item.last_updated_at).toLocaleString('en-US', {
+                                      year: 'numeric', month: '2-digit', day: '2-digit',
+                                      hour: '2-digit', minute: '2-digit', hour12: true,
+                                    })
+                                    : '—'}
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <button
+                                    className="BtnActionView"
+                                    onClick={() => handleViewLeaRecord(item)}
+                                    title="View LEA follow-up details"
+                                    id={`fda-btn-view-lea-${item.request_id}`}
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="7" className="FdaEmptyState">
+                              <Search size={32} />
+                              <p>No LEA response tracking records match your current filters.</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination Footer */}
+                  <div className="FdaTableFooter">
+                    <span className="FdaFooterInfo">
+                      Showing {filteredLeaResponse.length === 0 ? 0 : lStartIdx + 1}–{lEndIdx} of {filteredLeaResponse.length} entries
+                    </span>
+                    <div className="FdaPagination">
+                      <button
+                        className="BtnPageNav"
+                        disabled={safeLeaPage === 1}
+                        onClick={() => setLeaPage(safeLeaPage - 1)}
+                      >
+                        <ChevronLeft size={14} />
+                        Prev
+                      </button>
+                      {Array.from({ length: totalLeaPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          className={`FdaPageNumber ${safeLeaPage === page ? 'active' : ''}`}
+                          onClick={() => setLeaPage(page)}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        className="BtnPageNav"
+                        disabled={safeLeaPage === totalLeaPages}
+                        onClick={() => setLeaPage(safeLeaPage + 1)}
+                      >
+                        Next
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ============================================================================ */}
           {/* CONFIRMATION MODAL OVERLAY */}
           {/* ============================================================================ */}
           {fdaModalConfig && (
             <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true">
               <div className="FdaVerifModalContainer">
                 <div className="FdaVerifModalHeader">
-                  <div className={`FdaVerifModalIconWrap FdaVerifModalIcon_${fdaModalConfig.type}`}>
+                  {/* CHANGED — reuse FdaVerifModalIcon_reject and AlertTriangle icon for discard type (Fix 2) */}
+                  <div className={`FdaVerifModalIconWrap FdaVerifModalIcon_${fdaModalConfig.type === 'discard' ? 'reject' : fdaModalConfig.type}`}>
                     {fdaModalConfig.type === 'submit' && <ShieldCheck size={22} />}
                     {fdaModalConfig.type === 'save_draft' && <Save size={22} />}
-                    {fdaModalConfig.type === 'reject' && <AlertTriangle size={22} />}
+                    {(fdaModalConfig.type === 'reject' || fdaModalConfig.type === 'discard') && <AlertTriangle size={22} />}
                   </div>
                   <div>
                     <h3 className="FdaVerifModalTitle">{fdaModalConfig.title}</h3>
@@ -2375,12 +3409,29 @@ function FDAVerification() {
               still renders without changes. */}
           {fdaRecordModalData && (
             <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true">
-              <div className="FdaRecordModalContainer">
+              {/* CHANGED — added FdaVerif-rejected-modal-container modifier for rejected records to match preview modal size */}
+              <div className={`FdaRecordModalContainer${fdaRecordModalData._type === 'completed' ? ' FdaVerif-completed-modal-container' : fdaRecordModalData._type === 'lea_response' ? ' FdaVerif-lea-modal-container' : fdaRecordModalData._type === 'rejected' ? ' FdaVerif-rejected-modal-container' : ''}`}>
 
                 {/* Modal Header */}
                 <div className="FdaRecordModalHeader">
                   <div className="FdaRecordModalTitleGroup">
-                    {fdaRecordModalData._type === 'completed' ? (
+                    {fdaRecordModalData._type === 'lea_response' ? (
+                      <>
+                        <Send size={20} className="FdaVerifBlueIcon" />
+                        <div>
+                          <h3>LEA Follow-up Tracking Record</h3>
+                          <p className="FdaRecordModalSubtitle">
+                            {fdaRecordModalData.case_reference} &bull; Last updated on
+                            {fdaRecordModalData.last_updated_at
+                              ? ` ${new Date(fdaRecordModalData.last_updated_at).toLocaleString('en-US', {
+                                year: 'numeric', month: '2-digit', day: '2-digit',
+                                hour: '2-digit', minute: '2-digit', hour12: true,
+                              })}`
+                              : ''}
+                          </p>
+                        </div>
+                      </>
+                    ) : fdaRecordModalData._type === 'completed' ? (
                       <>
                         <ShieldCheck size={20} className="FdaVerifGreenIcon" />
                         <div>
@@ -2431,38 +3482,125 @@ function FDAVerification() {
                     </div>
                     <div className="FdaRecordInfoItem">
                       <span className="FdaVerifInfoLabel">PRODUCT NAME</span>
-                      {/* CHANGED — was .productName; now product_name */}
-                      <span className="FdaVerifInfoValue">{fdaRecordModalData.product_name ?? fdaRecordModalData.productName}</span>
+                      {/* CHANGED — was .productName; now product_title / product_name */}
+                      <span className="FdaVerifInfoValue">{fdaRecordModalData.product_title ?? fdaRecordModalData.product_name ?? fdaRecordModalData.productName}</span>
                     </div>
                     <div className="FdaRecordInfoItem">
                       <span className="FdaVerifInfoLabel">MANUFACTURER</span>
-                      <span className="FdaVerifInfoValue">{fdaRecordModalData.manufacturer}</span>
+                      <span className="FdaVerifInfoValue">{fdaRecordModalData.manufacturer || '—'}</span>
                     </div>
                     <div className="FdaRecordInfoItem">
                       <span className="FdaVerifInfoLabel">PRODUCT CATEGORY</span>
                       {/* CHANGED — was .category; now product_category */}
-                      <span className="FdaVerifInfoValue">{fdaRecordModalData.product_category ?? fdaRecordModalData.category}</span>
+                      <span className="FdaVerifInfoValue">{fdaRecordModalData.product_category ?? fdaRecordModalData.category ?? '—'}</span>
                     </div>
-                    <div className="FdaRecordInfoItem">
-                      <span className="FdaVerifInfoLabel">DATE RECEIVED</span>
-                      {/* CHANGED — was .dateReceived (pre-formatted string);
-                          now requested_at (ISO) formatted inline. */}
-                      <span className="FdaVerifInfoValue">
-                        {fdaRecordModalData.requested_at
-                          ? new Date(fdaRecordModalData.requested_at).toLocaleString('en-US', {
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit', hour12: true,
-                          })
-                          : (fdaRecordModalData.dateReceived ?? '—')}
-                      </span>
-                    </div>
-                    <div className="FdaRecordInfoItem">
-                      <span className="FdaVerifInfoLabel">REQUESTING LEA OFFICER</span>
-                      {/* CHANGED — was .complainant; now requested_by_name (null → 'N/A') */}
-                      <span className="FdaVerifInfoValue">
-                        {fdaRecordModalData.requested_by_name ?? fdaRecordModalData.complainant ?? 'N/A'}
-                      </span>
-                    </div>
+                    {fdaRecordModalData._type === 'lea_response' ? (
+                      <>
+                        <div className="FdaRecordInfoItem">
+                          <span className="FdaVerifInfoLabel">SOURCE</span>
+                          {/* 🔌 BACKEND: lea-follow-up should return walk-in cases only (source = 'walk_in') */}
+                          <span className="FdaSourceBadge" style={{ width: 'fit-content' }}>
+                            <Footprints size={11} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            Walk-in
+                          </span>
+                        </div>
+                        <div className="FdaRecordInfoItem">
+                          <span className="FdaVerifInfoLabel">PRODUCT CODE</span>
+                          <span className="FdaVerifInfoValue">{fdaRecordModalData.product_code || '—'}</span>
+                        </div>
+                        <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
+                          <span className="FdaVerifInfoLabel">Attached Files / Evidence</span>
+                          <div className="FdaVerifDocsGrid">
+                            {fdaRecordModalData.attached_files && fdaRecordModalData.attached_files.length > 0 ? (
+                              fdaRecordModalData.attached_files.map((file) => {
+                                const isImage = file.mime_type?.startsWith('image/') ||
+                                  /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || '');
+                                return (
+                                  <div key={file.file_id} className="FdaVerifDocCard">
+                                    <div className="FdaVerifDocIcon">
+                                      {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                    </div>
+                                    <div className="FdaVerifDocInfo">
+                                      <p className="FdaVerifDocName" title={file.file_name}>{file.file_name}</p>
+                                      <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+                                    </div>
+                                    <div className="FdaVerifDocActions">
+                                      <button
+                                        className="FdaVerifDocActionBtn"
+                                        title="Inspect Attachment"
+                                        onClick={() => setFdaDocPreviewModal(file)}
+                                      >
+                                        <Eye size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="FdaVerifNoDocsText">No attached files</p>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="FdaRecordInfoItem">
+                          <span className="FdaVerifInfoLabel">DATE RECEIVED</span>
+                          {/* CHANGED — was .dateReceived (pre-formatted string);
+                              now requested_at (ISO) formatted inline. */}
+                          <span className="FdaVerifInfoValue">
+                            {fdaRecordModalData.requested_at
+                              ? new Date(fdaRecordModalData.requested_at).toLocaleString('en-US', {
+                                year: 'numeric', month: '2-digit', day: '2-digit',
+                                hour: '2-digit', minute: '2-digit', hour12: true,
+                              })
+                              : (fdaRecordModalData.dateReceived ?? '—')}
+                          </span>
+                        </div>
+                        <div className="FdaRecordInfoItem">
+                          <span className="FdaVerifInfoLabel">REQUESTING LEA OFFICER</span>
+                          {/* CHANGED — was .complainant; now requested_by_name (null → 'N/A') */}
+                          <span className="FdaVerifInfoValue">
+                            {fdaRecordModalData.requested_by_name ?? fdaRecordModalData.complainant ?? 'N/A'}
+                          </span>
+                        </div>
+                        {fdaRecordModalData._type === 'completed' && (
+                          <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
+                            <span className="FdaVerifInfoLabel">Attached Files / Evidence</span>
+                            <div className="FdaVerifDocsGrid">
+                              {fdaRecordModalData.attached_files && fdaRecordModalData.attached_files.length > 0 ? (
+                                fdaRecordModalData.attached_files.map((file) => {
+                                  const isImage = file.mime_type?.startsWith('image/') ||
+                                    /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || '');
+                                  return (
+                                    <div key={file.file_id} className="FdaVerifDocCard">
+                                      <div className="FdaVerifDocIcon">
+                                        {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                      </div>
+                                      <div className="FdaVerifDocInfo">
+                                        <p className="FdaVerifDocName" title={file.file_name}>{file.file_name}</p>
+                                        <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+                                      </div>
+                                      <div className="FdaVerifDocActions">
+                                        <button
+                                          className="FdaVerifDocActionBtn"
+                                          title="Inspect Attachment"
+                                          onClick={() => setFdaDocPreviewModal(file)}
+                                        >
+                                          <Eye size={13} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <p className="FdaVerifNoDocsText">No attached files</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* COMPLETED RECORD DETAILS */}
@@ -2571,6 +3709,198 @@ function FDAVerification() {
                     </div>
                   )}
 
+                  {/* LEA RESPONSE RECORD DETAILS & TIMELINE */}
+                  {fdaRecordModalData._type === 'lea_response' && (
+                    <>
+                      {/* Section b: FDA Result */}
+                      <div className="FdaRecordResultSection" style={{ background: '#FFFFFF', border: '1.5px solid #EDEDED' }}>
+                        <div className="FdaRecordSectionTitle" style={{ color: '#1B4332' }}>
+                          <ShieldCheck size={15} className="FdaVerifGreenIcon" />
+                          <span>Official FDA Result</span>
+                        </div>
+                        <div className="FdaRecordInfoGrid" style={{ background: '#FDFDFD', border: '1px solid #EDEDED' }}>
+                          <div className="FdaRecordInfoItem">
+                            <span className="FdaVerifInfoLabel">DETERMINATION</span>
+                            <span className={getFdaResultBadgeClass(fdaRecordModalData.fda_result)}>
+                              {(fdaRecordModalData.fda_result || '').toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="FdaRecordInfoItem">
+                            <span className="FdaVerifInfoLabel">VERIFIED BY</span>
+                            <span className="FdaVerifInfoValue">{fdaRecordModalData.verified_by_name || 'N/A'}</span>
+                          </div>
+                          <div className="FdaRecordInfoItem">
+                            <span className="FdaVerifInfoLabel">DATE RESPONDED</span>
+                            <span className="FdaVerifInfoValue">
+                              {fdaRecordModalData.responded_at
+                                ? new Date(fdaRecordModalData.responded_at).toLocaleString('en-US', {
+                                  year: 'numeric', month: 'short', day: 'numeric',
+                                  hour: '2-digit', minute: '2-digit', hour12: true,
+                                })
+                                : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section d: Reminders (if present) */}
+                      {fdaRecordModalData.reminder_sent_at && (
+                        <div className="FdaVerif-lea-reminder-card">
+                          <AlertTriangle size={16} />
+                          <div>
+                            <strong>LEA Reminder Sent:</strong> LEA officers transmitted an expedited follow-up reminder on{' '}
+                            {new Date(fdaRecordModalData.reminder_sent_at).toLocaleString('en-US', {
+                              year: 'numeric', month: 'short', day: 'numeric',
+                              hour: '2-digit', minute: '2-digit', hour12: true,
+                            })}.
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Section c: LEA Follow-up Timeline (Vertical Stepper) */}
+                      <div className="FdaVerif-lea-stepper-wrap">
+                        <span className="FdaVerifInfoLabel" style={{ marginBottom: '8px', display: 'block' }}>
+                          LEA FOLLOW-UP PROGRESSION
+                        </span>
+
+                        <div className="FdaVerif-lea-stepper">
+                          {(() => {
+                            const normResult = (fdaRecordModalData.fda_result || '').toLowerCase();
+                            const isRegisteredOrRejected = normResult === 'registered' || normResult === 'rejected';
+
+                            const stageOrder = isRegisteredOrRejected
+                              ? ['awaiting_lea', 'acknowledged']
+                              // CHANGED — LEA has no acknowledge step for unregistered cases; goes straight to takedown
+                              : ['awaiting_lea', 'takedown_initiated', 'closed'];
+
+                            const currentStageIndex = stageOrder.indexOf(fdaRecordModalData.lea_stage);
+                            const effectiveCurrentIndex = currentStageIndex >= 0 ? currentStageIndex : 0;
+
+                            const stepsConfig = isRegisteredOrRejected
+                              ? [
+                                  {
+                                    key: 'awaiting_lea',
+                                    title: 'Awaiting LEA Action',
+                                    date: fdaRecordModalData.responded_at,
+                                    dateLabel: 'Date FDA Responded:',
+                                    actor: null,
+                                  },
+                                  {
+                                    key: 'acknowledged',
+                                    title: 'Acknowledged - Case Closed',
+                                    date: fdaRecordModalData.acknowledged_at,
+                                    dateLabel: 'Acknowledged At:',
+                                    actor: fdaRecordModalData.acknowledged_by_name,
+                                    actorLabel: 'Acknowledged By:',
+                                  },
+                                ]
+                              : [
+                                  {
+                                    key: 'awaiting_lea',
+                                    title: 'Awaiting LEA Action',
+                                    date: fdaRecordModalData.responded_at,
+                                    dateLabel: 'Date FDA Responded:',
+                                    actor: null,
+                                  },
+                                  // CHANGED — removed 'acknowledged' step; LEA transitions directly from awaiting_lea to takedown_initiated
+                                  {
+                                    key: 'takedown_initiated',
+                                    title: 'Takedown Initiated',
+                                    date: fdaRecordModalData.takedown_initiated_at,
+                                    dateLabel: 'Initiated At:',
+                                    actor: fdaRecordModalData.takedown_initiated_by_name,
+                                    actorLabel: 'Initiated By:',
+                                    fieldOperationNotes: fdaRecordModalData.field_operation_notes,
+                                  },
+                                  {
+                                    key: 'closed',
+                                    title: 'Case Closed',
+                                    date: fdaRecordModalData.closed_at,
+                                    dateLabel: 'Closed At:',
+                                    actor: fdaRecordModalData.closed_by_name,
+                                    actorLabel: 'Closed By:',
+                                    closingNotes: fdaRecordModalData.closing_notes,
+                                    closeReason: fdaRecordModalData.close_reason,
+                                  },
+                                ];
+
+                            return stepsConfig.map((step, idx) => {
+                              const isCompleted = idx < effectiveCurrentIndex;
+                              const isCurrent = idx === effectiveCurrentIndex;
+                              const isFuture = idx > effectiveCurrentIndex;
+
+                              let stepClass = 'FdaVerif-lea-step';
+                              if (isCompleted) stepClass += ' is-completed';
+                              if (isCurrent) stepClass += ' is-current';
+                              if (isFuture) stepClass += ' is-future';
+
+                              return (
+                                <div key={step.key} className={stepClass}>
+                                  <div className="FdaVerif-lea-step-icon">
+                                    {isCompleted ? <CheckCircle2 size={16} /> : idx + 1}
+                                  </div>
+                                  <div className="FdaVerif-lea-step-content">
+                                    <div className="FdaVerif-lea-step-header">
+                                      <span className="FdaVerif-lea-step-title">
+                                        {step.title}
+                                        {isCurrent && <span className="FdaVerif-lea-step-current-tag">Current Stage</span>}
+                                      </span>
+                                    </div>
+
+                                    {(step.date || step.actor) && (
+                                      <div className="FdaVerif-lea-step-meta">
+                                        {step.date && (
+                                          <span>
+                                            <Calendar size={12} />
+                                            <strong>{step.dateLabel}</strong>{' '}
+                                            {new Date(step.date).toLocaleString('en-US', {
+                                              year: 'numeric', month: 'short', day: 'numeric',
+                                              hour: '2-digit', minute: '2-digit', hour12: true,
+                                            })}
+                                          </span>
+                                        )}
+                                        {step.actor && (
+                                          <span>
+                                            <FileText size={12} />
+                                            <strong>{step.actorLabel}</strong> {step.actor}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Takedown Initiated notes block */}
+                                    {step.fieldOperationNotes && (
+                                      <div className="FdaVerif-lea-step-notes">
+                                        <strong>Field operation status update</strong>
+                                        <p className="FdaVerif-lea-notes-text">{step.fieldOperationNotes}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Closing notes block */}
+                                    {step.closingNotes && (
+                                      <div className="FdaVerif-lea-step-notes FdaVerif-lea-step-notes-closing">
+                                        <strong>Field operation status update (at closing)</strong>
+                                        <p className="FdaVerif-lea-notes-text">{step.closingNotes}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Reason Closed block */}
+                                    {step.closeReason && (
+                                      <div className="FdaVerif-lea-step-notes FdaVerif-lea-step-notes-reason">
+                                        <strong>Reason Closed</strong>
+                                        <p className="FdaVerif-lea-notes-text">{step.closeReason}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                 </div>
 
                 {/* Modal Footer */}
@@ -2579,37 +3909,39 @@ function FDAVerification() {
                   {/* CHANGED — wired to real export endpoints (CHANGE 3).
                       Routes to completed or rejected export based on _type tag.
                       Also fixed fdaRecordModalData.caseId → case_reference. */}
-                  <button
-                    className="FdaVerifBtnOutline"
-                    onClick={() => {
-                      const endpoint = fdaRecordModalData._type === 'completed'
-                        ? `/verification-requests/completed/${fdaRecordModalData.request_id}/export-pdf`
-                        : `/verification-requests/rejected/${fdaRecordModalData.request_id}/export-pdf`;
+                  {fdaRecordModalData._type !== 'lea_response' && (
+                    <button
+                      className="FdaVerifBtnOutline"
+                      onClick={() => {
+                        const endpoint = fdaRecordModalData._type === 'completed'
+                          ? `/verification-requests/completed/${fdaRecordModalData.request_id}/export-pdf`
+                          : `/verification-requests/rejected/${fdaRecordModalData.request_id}/export-pdf`;
 
-                      // CHANGE — swap the raw fetch + manual header for apiFetch:
-                      apiFetch(endpoint)
-                        .then((res) => {
-                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                          return res.blob();
-                        })
-                        .then((blob) => {
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `${fdaRecordModalData.case_reference}-${fdaRecordModalData._type}-record.pdf`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                          triggerAlert(`Exported record for ${fdaRecordModalData.case_reference} as PDF.`, 'info');
-                          setFdaRecordModalData(null);
-                        })
-                        .catch(() => {
-                          triggerAlert('Could not export the PDF. Please try again.', 'danger');
-                        });
-                    }}
-                  >
-                    <Download size={14} />
-                    <span>Export Record as PDF</span>
-                  </button>
+                        // CHANGE — swap the raw fetch + manual header for apiFetch:
+                        apiFetch(endpoint)
+                          .then((res) => {
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            return res.blob();
+                          })
+                          .then((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${fdaRecordModalData.case_reference}-${fdaRecordModalData._type}-record.pdf`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            triggerAlert(`Exported record for ${fdaRecordModalData.case_reference} as PDF.`, 'info');
+                            setFdaRecordModalData(null);
+                          })
+                          .catch(() => {
+                            triggerAlert('Could not export the PDF. Please try again.', 'danger');
+                          });
+                      }}
+                    >
+                      <Download size={14} />
+                      <span>Export Record as PDF</span>
+                    </button>
+                  )}
                   <button
                     className="FdaVerifBtnModalCancel"
                     onClick={() => setFdaRecordModalData(null)}
@@ -2632,7 +3964,7 @@ function FDAVerification() {
               → blob → anchor click) lives here in the "Download Attachment" button,
               moved from the inline card button. */}
           {fdaDocPreviewModal && (
-            <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true">
+            <div className="FdaVerifModalOverlay" role="dialog" aria-modal="true" style={{ zIndex: 1100 }}>
               <div className="FdaVerifDocModalContainer">
                 <div className="FdaVerifDocModalHeader">
                   <div className="FdaVerifDocModalTitleGroup">
@@ -2654,42 +3986,74 @@ function FDAVerification() {
                   </button>
                 </div>
 
-                {/* CHANGED — replaced static placeholder with live image/PDF preview.
-                    Fetched from GET /shared-files/{file_id}/preview (CHANGE 2). */}
+                {/* CHANGED — replaced static placeholder with live image/PDF/docx preview.
+                    Fetched from GET /shared-files/{file_id}/preview (CHANGE 2).
+                    Amendment 1: isImage/isPdf/isDocx computed from mime_type OR file extension
+                    to avoid bare .mime_type.startsWith() calls when mime_type is missing. */}
                 <div className="FdaVerifDocModalBody">
-                  {(fdaDocPreviewModal.mime_type?.startsWith('image/') || fdaDocPreviewModal.mime_type === 'application/pdf') ? (
-                    fdaDocPreviewLoading ? (
-                      <div className="FdaVerifDocPlaceholderPreview">
-                        <p className="FdaVerifPreviewText">Loading preview&hellip;</p>
-                      </div>
-                    ) : fdaDocPreviewError ? (
+                  {/* CHANGED — compute type flags inline using same logic as the effect (Amendment 1) */}
+                  {(() => {
+                    const _mime = fdaDocPreviewModal.mime_type || '';
+                    const _name = fdaDocPreviewModal.file_name || '';
+                    const isImage = _mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(_name);
+                    const isPdf = _mime === 'application/pdf' || /\.pdf$/i.test(_name);
+                    const isDocx = _mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || /\.docx$/i.test(_name);
+                    if (isImage || isPdf) {
+                      return fdaDocPreviewLoading ? (
+                        <div className="FdaVerifDocPlaceholderPreview">
+                          <p className="FdaVerifPreviewText">Loading preview&hellip;</p>
+                        </div>
+                      ) : fdaDocPreviewError ? (
+                        <div className="FdaVerifDocPlaceholderPreview">
+                          <FileText size={48} className="FdaVerifDocPreviewIcon" />
+                          <p className="FdaVerifPreviewTitle">Preview unavailable</p>
+                          <p className="FdaVerifPreviewText">Try downloading the file instead.</p>
+                        </div>
+                      ) : isImage ? (
+                        <img
+                          src={fdaDocPreviewUrl}
+                          alt={fdaDocPreviewModal.file_name}
+                          className="FdaVerifDocImagePreview"
+                        />
+                      ) : (
+                        <iframe
+                          src={fdaDocPreviewUrl}
+                          title={fdaDocPreviewModal.file_name}
+                          className="FdaVerifDocPdfPreview"
+                        />
+                      );
+                    }
+                    // CHANGED — docx branch added (Fix 2), mirrors lea-verification-request.jsx
+                    if (isDocx) {
+                      return docxLoading ? (
+                        <div className="FdaVerifDocPlaceholderPreview">
+                          <p className="FdaVerifPreviewText">Converting Word document for preview&hellip;</p>
+                        </div>
+                      ) : docxError ? (
+                        <div className="FdaVerifDocPlaceholderPreview">
+                          <FileText size={48} className="FdaVerifDocPreviewIcon" />
+                          <p className="FdaVerifPreviewTitle">Could not render Word preview</p>
+                          <p className="FdaVerifPreviewText">Try downloading the document to view its full contents.</p>
+                        </div>
+                      ) : (
+                        <div className="FdaVerifDocDocxPreview">
+                          <div
+                            className="FdaVerifDocxContent"
+                            dangerouslySetInnerHTML={{ __html: docxHtml }}
+                          />
+                        </div>
+                      );
+                    }
+                    return (
                       <div className="FdaVerifDocPlaceholderPreview">
                         <FileText size={48} className="FdaVerifDocPreviewIcon" />
-                        <p className="FdaVerifPreviewTitle">Preview unavailable</p>
-                        <p className="FdaVerifPreviewText">Try downloading the file instead.</p>
+                        <p className="FdaVerifPreviewTitle">Preview not supported</p>
+                        <p className="FdaVerifPreviewText">
+                          <strong>{fdaDocPreviewModal.file_name}</strong> can't be previewed inline &mdash; use download instead.
+                        </p>
                       </div>
-                    ) : fdaDocPreviewModal.mime_type.startsWith('image/') ? (
-                      <img
-                        src={fdaDocPreviewUrl}
-                        alt={fdaDocPreviewModal.file_name}
-                        className="FdaVerifDocImagePreview"
-                      />
-                    ) : (
-                      <iframe
-                        src={fdaDocPreviewUrl}
-                        title={fdaDocPreviewModal.file_name}
-                        className="FdaVerifDocPdfPreview"
-                      />
-                    )
-                  ) : (
-                    <div className="FdaVerifDocPlaceholderPreview">
-                      <FileText size={48} className="FdaVerifDocPreviewIcon" />
-                      <p className="FdaVerifPreviewTitle">Preview not supported</p>
-                      <p className="FdaVerifPreviewText">
-                        <strong>{fdaDocPreviewModal.file_name}</strong> can't be previewed inline &mdash; use download instead.
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 <div className="FdaVerifModalFooter">
@@ -2734,6 +4098,13 @@ function FDAVerification() {
             </div>
           )}
 
+          {/* ADDED — Centered processing overlay */}
+          <ProcessingOverlay
+            isVisible={proc.isVisible}
+            title={proc.title}
+            message={proc.message}
+            status={proc.status}
+          />
         </div>
       </div>
     </div>

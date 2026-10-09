@@ -4,11 +4,15 @@ import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+app.name = 'ICMDA'
+
 let mainWindow = null        // reference to our window, so other functions can reach it
+let mainWindowReady = false  // ADDED - tracks whether the page has actually finished loading
 let pendingDeepLink = null   // holds a token if it arrives before the window is ready
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    title: 'ICMDA',
     width: 1280,
     height: 800,
     minWidth: 800,
@@ -21,11 +25,12 @@ function createWindow() {
   })
 
   // Open DevTools
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   // Stash the token here if it arrives before React has finished loading and
   // listening — we'll deliver it below, once did-finish-load confirms React is ready.
   mainWindow.webContents.on('did-finish-load', () => {
+    mainWindowReady = true   // ADDED
     if (pendingDeepLink) {
       mainWindow.webContents.send('deep-link-token', pendingDeepLink)
       pendingDeepLink = null
@@ -95,9 +100,12 @@ function handleDeepLink(url) {
   const token = new URL(url).searchParams.get('token')
 
   if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore() //added this line to restore the window if it is minimized
-    mainWindow.show() //added this line to show the window if it is hidden
-    mainWindow.focus() //added this line to focus the window if it is not focused
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+
+  if (mainWindow && mainWindowReady) {
     mainWindow.webContents.send('deep-link-token', token)
   } else {
     pendingDeepLink = token

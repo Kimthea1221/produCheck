@@ -110,6 +110,24 @@ def save_workspace_location(
             detail="Administrator does not have an assigned region.",
         )
 
+    if payload.latitude < -90.0 or payload.latitude > 90.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Latitude must be between -90 and 90.",
+        )
+
+    if payload.longitude < -180.0 or payload.longitude > 180.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Longitude must be between -180 and 180.",
+        )
+
+    if payload.radius_meters < 1 or payload.radius_meters > 50000:
+        raise HTTPException(
+            status_code=400,
+            detail="Geofence radius must be between 1 and 50,000 meters.",
+        )
+
     region = db.query(Region).filter(Region.region_id == user.region_id).first()
     region_name = region.region_name if region else "Unknown Region"
 
@@ -187,28 +205,5 @@ def save_workspace_location(
         message=f"{actor_display_name} updated the workspace office coordinates and geofence radius for {region_name}.",
         related_user_id=user.user_id,
     )
-
-    # 2. Notify all active personnel in this agency and region
-    personnel_role = Role.FDA_PERSONNEL if agency == "FDA" else Role.LEA_PERSONNEL
-    personnel_users = (
-        db.query(User)
-        .filter(
-            User.role == personnel_role,
-            User.region_id == user.region_id,
-            User.is_active == True,
-        )
-        .all()
-    )
-    for p in personnel_users:
-        p_notif = Notification(
-            recipient_type="personnel",
-            user_id=p.user_id,
-            title="Workspace location updated",
-            message=f"The workspace office location and geofence radius for {region_name} have been updated.",
-        )
-        db.add(p_notif)
-
-    if personnel_users:
-        db.commit()
 
     return build_workspace_location_response(db, loc)

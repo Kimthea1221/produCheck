@@ -1,6 +1,7 @@
-import base64
+import base64, binascii
 import re
 import uuid
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.complaints import Complaint
@@ -14,6 +15,24 @@ from app.core.config import settings
 UPLOAD_DIR = Path(settings.UPLOAD_DIR)  
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+
+def decode_and_check_image(data_url: str) -> tuple[bytes, str]:
+    _, _, b64 = data_url.partition(",")
+    try:
+        raw = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid image data.")
+    if len(raw) > MAX_ATTACHMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large. Maximum is 5 MB.")
+    if raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        return raw, "png"
+    if raw.startswith(b"\xff\xd8\xff"):
+        return raw, "jpg"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return raw, "webp"
+    raise HTTPException(status_code=400, detail="Only PNG, JPG, or WEBP images are allowed.")
+    
 def save_attachment(attachment_data: str, original_name: str) -> tuple[str, str]:
     match = re.match(r"data:(image/\w+);base64,(.+)", attachment_data)
     if not match:

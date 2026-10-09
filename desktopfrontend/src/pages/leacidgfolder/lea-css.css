@@ -702,7 +702,7 @@
   background: #FDFDFD;
   border-radius: 12px;
   padding: 32px 32px 0 32px;
-  width: 700px;
+  width: 750px;
   max-width: 92vw;
   max-height: 90vh;
   overflow-y: auto;
@@ -768,6 +768,103 @@
   border-top: 1px solid #EDEDED;
   z-index: 10;
   border-radius: 0 0 12px 12px;
+}
+
+/* ============================================================================ */
+/* LEA WALK-IN VIEW MODAL (lea-walkin-complaints.jsx) — INFO DISPLAY RESTYLE      */
+/* Presentation matches FDA case details view modal info display:                 */
+/* - Small uppercase muted label above bold value                                */
+/* - Two-column grid, gap, font sizes, weights and spacing matching FDA modal    */
+/* - Complainant statement box with soft gray background & pre-wrap wrapping      */
+/* ============================================================================ */
+
+.WcDetailModal .ModalSummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+  margin: 16px 0 20px 0;
+  padding: 16px 0;
+  border-top: 1px solid #EDEDED;
+  border-bottom: 1px solid #EDEDED;
+}
+
+.WcDetailModal .ModalSummary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.WcDetailModal .ModalSummary p {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #030303;
+  line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.WcDetailModal .ModalSummary p br {
+  display: none;
+}
+
+.WcDetailModal .ModalSummary strong {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(31, 41, 55, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+.WcDetailModal .Statementcomp {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(31, 41, 55, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  margin: 0 0 6px 0;
+}
+
+.WcDetailModal .StatementBox {
+  width: 100%;
+  height: auto;
+  min-height: 70px;
+  max-height: 160px;
+  background: #EDEDED;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0 0 16px 0;
+  box-sizing: border-box;
+  box-shadow: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.WcDetailModal .StatementBox p {
+  font-size: 13px;
+  color: rgba(31, 41, 55, 0.85);
+  line-height: 1.6;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .WcDetailModal .ModalSummary {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
 }
 
 /* LEA NEW INTAKE PAGE*/
@@ -1162,17 +1259,10 @@
 
 .VerificationTabs {
     display: flex;
-    gap: 8px;
     margin-bottom: 20px;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.VerificationTabs::-webkit-scrollbar {
-    display: none;
+    overflow: visible;
 }
 
 .VerificationTabsButton {
@@ -1188,6 +1278,14 @@
     gap: 4px;
     flex-wrap: nowrap;
     white-space: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.VerificationTabsButton::-webkit-scrollbar {
+    display: none;
 }
 
 .ButtonTab {
@@ -4369,6 +4467,1080 @@
     font-size: 11px;
     height: 32px;
   }
+}
+
+/* ============================================================================ */
+/* ADDED — LEA WALK-IN VIEW MODAL FDA SIZING & THREE-PART LAYOUT ALIGNMENT       */
+/* Matches dimensions, fixed header, scrollable body, and fixed footer of       */
+/* .FdaReportsDetailModal (.FdaModalContent:909 & fda-css.css:6029-6122)        */
+/* ============================================================================ */
+
+.ModalViewButton.WcDetailModalFdaSize {
+  width: 92vw !important;
+  max-width: 1100px !important;
+  height: 90vh !important;
+  max-height: 94vh !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+}
+
+.ModalViewButton.WcDetailModalFdaSize .WcDetailModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding-bottom: 12px;
+}
+
+/* Header h4 title rule — copied from .FdaDetailHeader h2 (fda-css.css:1293 & fda-css.css:23) */
+.ModalViewButton.WcDetailModalFdaSize .WcDetailModalHeader h4 {
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  color: #030303 !important;
+  margin: 6px 0 4px !important;
+  word-break: break-word;
+}
+
+.ModalViewButton.WcDetailModalFdaSize .WcDetailModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+.ModalViewButton.WcDetailModalFdaSize .WcDetailModalFooter {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  margin-top: 14px !important;
+  padding: 14px 0 0 0 !important;
+  border-top: 1px solid #EDEDED !important;
+  position: static !important;
+  background: transparent !important;
+  z-index: auto !important;
+  border-radius: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .ModalViewButton.WcDetailModalFdaSize {
+    width: 94vw !important;
+    padding: 16px !important;
+  }
+}
+
+/* ============================================================================ */
+/* ADDED — ITEMS 1, 2, 3, 5: LEA MODAL UI ENHANCEMENTS & FILTER WIDTH ALIGNMENT */
+/* Scoped strictly to .WcDetailModalFdaSize and .LeaWalkinComplaintsFeed        */
+/* ============================================================================ */
+
+/* Item 5: Eyebrow label in header — copied from .FdaDetailHeader small (fda-css.css:947-953) */
+.ModalViewButton.WcDetailModalFdaSize .WcDetailEyebrow {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  display: block !important;
+}
+
+/* CHANGED — restored original gray label color, bold weight kept */
+.ModalViewButton.WcDetailModalFdaSize .ModalSummary strong {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* Item 1: Bordered value box for saved records in LEA Walk-in Detail Modal */
+.ModalViewButton.WcDetailModalFdaSize .WcFieldValueBox {
+  background: #FDFDFD !important;
+  border: 1.5px solid #EDEDED !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #030303 !important;
+  min-height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  margin-top: 4px !important;
+}
+
+/* Item 2: Auto-height complainant statement (overflow: visible on both axes eliminates inner scroll) */
+.ModalViewButton.WcDetailModalFdaSize .StatementBox {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* Item 2: Neutralize any potential max-height / overflow trapping inside modal body */
+.ModalViewButton.WcDetailModalFdaSize .ModalSummary,
+.ModalViewButton.WcDetailModalFdaSize .LeaVerifSectionCard,
+.ModalViewButton.WcDetailModalFdaSize .LeaVerifDocsGrid {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Item 3: Filter container width matches TableCard width on Walk-in Complaints page only */
+.LeaWalkinComplaintsFeed .DraftsFilterSection {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* ============================================================================ */
+/* ADDED — BOLD GRAY LABELS IN RIGHT SIDE PANEL (READY, AWAITING, FDA RESPONSE) */
+/* Scoped strictly to the 3 tabs; excludes Initiated Cases & left queue         */
+/* ============================================================================ */
+
+/* Read-only field labels & form input labels in Ready to Send, Awaiting FDA, and FDA Response */
+.ReadySendButtonContent .VerificationDetails .CaseInfoGrid label,
+.AwaitingButtonContent .VerificationDetails .CaseInfoGrid label,
+.FDAResponseButtonContent:has(.ResponseBox) .VerificationDetails .CaseInfoGrid label,
+.ReadySendButtonContent .VerificationDetails .VerificationRow label,
+.ReadySendButtonContent .VerificationDetails .VerificationNotes label,
+.AwaitingButtonContent .VerificationDetails .VerificationRequestGrid label,
+.FDAResponseButtonContent:has(.ResponseBox) .VerificationDetails .ResponseUpdateBox h6,
+.FDAResponseButtonContent .VerificationDetails .ResponseBox ~ .ResponseUpdateBox h6 {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* Option B: Verdict field labels in FDA Response tab (weight, size & spacing only; verdict color tints kept) */
+.FDAResponseButtonContent:has(.ResponseBox) .VerificationDetails .LeaVerifFieldLabel,
+.FDAResponseButtonContent .VerificationDetails .ResponseBox .LeaVerifFieldLabel {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* ============================================================================ */
+/* ADDED — BOLD GRAY HEADER LABELS (CASE ID & MANUFACTURER)                     */
+/* Scoped to Ready to Send, Awaiting FDA, FDA Response, and Initiated Cases     */
+/* ============================================================================ */
+
+.ReadySendButtonContent .VerificationDetails .LeaHeaderFieldLabel,
+.AwaitingButtonContent .VerificationDetails .LeaHeaderFieldLabel,
+.FDAResponseButtonContent .VerificationDetails .LeaHeaderFieldLabel {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.04em !important;
+}
+
+/* ============================================================================ */
+/* ADDED — COMPLAINANT DETAILS SECTION (LEA ONLY, NOT SENT TO FDA)              */
+/* Scoped to Ready to Send, Awaiting FDA, FDA Response, and Initiated Cases     */
+/* ============================================================================ */
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantDetailsSection,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantDetailsSection,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantDetailsSection {
+  margin-top: 16px !important;
+  margin-bottom: 8px !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantDetailsTitle,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantDetailsTitle,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantDetailsTitle {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  margin: 0 0 10px 0 !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantError,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantError,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantError {
+  font-size: 12px !important;
+  color: #9ca3af !important;
+  font-style: italic !important;
+  margin: 0 0 10px 0 !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantGrid,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantGrid,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantGrid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px 16px !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantField,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantField,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantField {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantLabel,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantLabel,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantLabel {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: rgba(31, 41, 55, 0.55) !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 4px !important;
+}
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantValueBox,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantValueBox,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantValueBox {
+  background: #FDFDFD !important;
+  border: 1.5px solid #EDEDED !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #030303 !important;
+  min-height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+@media (max-width: 900px) {
+  .ReadySendButtonContent .VerificationDetails .LeaComplainantGrid,
+  .AwaitingButtonContent .VerificationDetails .LeaComplainantGrid,
+  .FDAResponseButtonContent .VerificationDetails .LeaComplainantGrid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ============================================================================ */
+/* ADDED — FULL-WIDTH FIELD IN COMPLAINANT DETAILS SECTION                       */
+/* Scoped to Ready to Send, Awaiting FDA, FDA Response, and Initiated Cases     */
+/* ============================================================================ */
+
+.ReadySendButtonContent .VerificationDetails .LeaComplainantFieldFullWidth,
+.AwaitingButtonContent .VerificationDetails .LeaComplainantFieldFullWidth,
+.FDAResponseButtonContent .VerificationDetails .LeaComplainantFieldFullWidth {
+  grid-column: 1 / -1 !important;
+}
+
+/* ============================================================================ */
+/* ADDED — MANUFACTURER VALUE WRAPPING IN HEADER GRID                           */
+/* Scoped to Ready to Send, Awaiting FDA, FDA Response, and Initiated Cases     */
+/* ============================================================================ */
+
+.ReadySendButtonContent .VerificationDetails .CaseInfoGrid p,
+.AwaitingButtonContent .VerificationDetails .CaseInfoGrid p,
+.FDAResponseButtonContent .VerificationDetails .CaseInfoGrid p {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* ============================================================================ */
+/* ADDED — LEA SAVED DRAFT VIEW MODAL SIZING & SECTION STYLING                  */
+/* Matches dimensions and layout of FDA draft modal:                            */
+/* width: 92vw; max-width: 1100px; height: 90vh; max-height: 94vh;             */
+/* ============================================================================ */
+
+.LeaDraftModalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.LeaDraftModalContainer {
+  background: #FDFDFD;
+  width: 92vw;
+  max-width: 1100px;
+  height: 90vh;
+  max-height: 94vh;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+}
+
+.LeaDraftModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+  padding-bottom: 12px;
+  background: transparent;
+}
+
+.LeaDraftModalTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.LeaDraftHeaderIcon {
+  color: #13213C;
+  flex-shrink: 0;
+}
+
+.LeaDraftModalTitleGroup h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0 0 2px 0;
+}
+
+.LeaDraftModalSubtitle {
+  font-size: 12px;
+  color: #6B7280;
+  margin: 0;
+}
+
+.LeaDraftModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.LeaDraftModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #EDEDED;
+  background: transparent;
+}
+
+.LeaDraftBtnClose {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1.5px solid #d8d8d8;
+  background: #FDFDFD;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #030303;
+  transition: background 0.2s;
+}
+
+.LeaDraftBtnClose:hover {
+  background: #EDEDED;
+}
+
+.LeaDraftBtnContinue {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #13213C;
+  color: #FDFDFD;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.LeaDraftBtnContinue:hover {
+  background: #FCA311;
+  color: #030303;
+}
+
+.LeaDraftSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.LeaDraftSectionHeader h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0;
+}
+
+.LeaDraftSectionDivider {
+  border: none;
+  border-top: 1px solid #EDEDED;
+  margin: 4px 0;
+}
+
+.LeaDraftGrid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+
+.LeaDraftGridFull {
+  grid-column: span 2;
+}
+
+.LeaDraftInfoGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.LeaDraftInfoLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1F2937;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.LeaDraftInfoValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #030303;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.LeaDraftInfoValueHighlight {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #13213C;
+  font-family: monospace;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.LeaDraftCodeBadge {
+  display: inline-block;
+  background: #EDEDED;
+  color: #13213C;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  width: fit-content;
+}
+
+.LeaDraftPriorityBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.LeaDraftPriority_standard {
+  background: #E0F2FE;
+  color: #0369A1;
+  border: 1px solid #BAE6FD;
+}
+
+.LeaDraftPriority_high {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.LeaDraftPriority_urgent {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.LeaDraftPriority_critical {
+  background: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #F87171;
+  font-weight: 700;
+}
+
+.LeaDraftNotesBox {
+  background: #EDEDED;
+  border-left: 3px solid #13213C;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.LeaDraftNotesBox p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #1F2937;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.LeaDraftLoadingLine {
+  font-size: 13px;
+  color: #6B7280;
+  font-style: italic;
+  padding: 16px 0;
+  margin: 0;
+}
+
+.LeaDraftAlertLine {
+  color: #B91C1C;
+  padding: 10px 14px;
+  background: rgba(185, 28, 28, 0.06);
+  border-left: 3px solid #B91C1C;
+  border-radius: 4px;
+  font-size: 12.5px;
+  margin: 6px 0;
+}
+
+.LeaDraftNoDocsText {
+  font-size: 12.5px;
+  color: #1F2937;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.LeaDraftPreviewOverlay {
+  z-index: 1200 !important;
+}
+
+@media (max-width: 640px) {
+  .LeaDraftModalContainer {
+    width: 95vw;
+    padding: 16px;
+  }
+  .LeaDraftGrid2 {
+    grid-template-columns: 1fr;
+  }
+  .LeaDraftGridFull {
+    grid-column: span 1;
+  }
+}
+
+/* ============================================================================ */
+/* LEA WALK-IN COMPLAINTS — VERIFICATION & ENFORCEMENT PROGRESS SECTION         */
+/* ============================================================================ */
+
+/* Added status badge classes for takedown progression */
+.WcStatus-takedown-initiated {
+  background: rgba(252, 163, 17, 0.12);
+  color: #13213C;
+  border: 1px solid rgba(252, 163, 17, 0.5);
+}
+
+.WcStatus-completed {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+/* Card container for verification progress */
+.WcVerifSectionCard {
+  background: #FFFFFF;
+  border: 1px solid #EDEDED;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.WcVerifSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #EDEDED;
+}
+
+.WcVerifSectionHeader h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #13213C;
+  font-family: 'Poppins', sans-serif;
+}
+
+.WcVerifBlueIcon {
+  color: #13213C;
+  flex-shrink: 0;
+}
+
+/* Stage A: Muted info box for queued status */
+.WcVerifInfoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.WcVerifInfoIcon {
+  color: #3B82F6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.WcVerifInfoBox p {
+  margin: 0;
+}
+
+/* Stage B: Verification Request Subsection */
+.WcVerifSubSection {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.WcVerifSubHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.WcVerifSubHeader h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #13213C;
+}
+
+.WcVerifRequestGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.WcVerifGridItem {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.WcVerifFullWidth {
+  grid-column: 1 / -1;
+}
+
+.WcVerifFieldLabel {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #7A8796;
+  margin-bottom: 4px;
+}
+
+.WcVerifFieldValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #13213C;
+  margin: 0;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.WcVerifNotesBox {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+.WcVerifNotesText {
+  margin: 0;
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Stage C: Awaiting FDA Response Banner */
+.WcVerifAwaitingBanner {
+  background: #FFFBEB;
+  border: 1.5px solid #F59E0B;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.WcVerifAwaitingHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.WcVerifWaitingIconBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #FEF3C7;
+  color: #D97706;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.WcVerifAwaitingHeader h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400E;
+  font-family: 'Poppins', sans-serif;
+}
+
+.WcVerifAwaitingText {
+  margin: 0;
+  font-size: 12.5px;
+  color: #78350F;
+  line-height: 1.5;
+}
+
+.WcVerifReminderNotice {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #B45309;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* Stage G: LEA Follow-up Stepper */
+.WcVerifStepperWrap {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-top: 16px;
+}
+
+.WcVerifStepperHeaderLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748B;
+  margin-bottom: 14px;
+}
+
+.WcVerifStepper {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.WcVerifStep {
+  display: flex;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.WcVerifStep:last-child {
+  padding-bottom: 0;
+}
+
+.WcVerifStep:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  bottom: 0;
+  width: 2px;
+  background: #E2E8F0;
+  transition: background 0.2s ease;
+}
+
+.WcVerifStep.is-completed:not(:last-child)::before {
+  background: #13213C;
+}
+
+.WcVerifStepIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 700;
+  background: #FFFFFF;
+  border: 2px solid #CBD5E1;
+  color: #94A3B8;
+  transition: all 0.2s ease;
+}
+
+.WcVerifStep.is-completed .WcVerifStepIcon {
+  background: #E8F5E9;
+  border-color: #10B981;
+  color: #10B981;
+}
+
+.WcVerifStep.is-current .WcVerifStepIcon {
+  background: #13213C;
+  border-color: #13213C;
+  color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(19, 33, 60, 0.16);
+}
+
+.WcVerifStep.is-future .WcVerifStepIcon {
+  background: #F1F5F9;
+  border-color: #E2E8F0;
+  color: #94A3B8;
+}
+
+.WcVerifStepContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 3px;
+  min-width: 0;
+}
+
+.WcVerifStepHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.WcVerifStepTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.WcVerifStep.is-current .WcVerifStepTitle {
+  color: #13213C;
+  font-weight: 700;
+}
+
+.WcVerifStep.is-future .WcVerifStepTitle {
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.WcVerifStepCurrentTag {
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(19, 33, 60, 0.1);
+  color: #13213C;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.WcVerifStepMeta {
+  font-size: 11.5px;
+  color: #475569;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.WcVerifStepMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.WcVerifStep.is-future .WcVerifStepMeta {
+  color: #94A3B8;
+}
+
+.WcVerifStepNotes {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-left: 3px solid #13213C;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.WcVerifStepNotesClosing {
+  border-left-color: #2563EB;
+  background: #F8FAFC;
+}
+
+.WcVerifStepNotesReason {
+  border-left-color: #FCA311;
+  background: #FFFDF5;
+}
+
+.WcVerifStepNotes strong {
+  color: #0F172A;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: block;
+  margin-bottom: 3px;
+}
+
+@media (max-width: 640px) {
+  .WcVerifRequestGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================ */
+/* ADDED — LEA CLOSED CASES DETAIL MODAL CONTAINER & BODY                       */
+/* Same dimensions as LeaVerifDocModalContainer (width: 92vw, max: 1100px,      */
+/* height: 90vh, max: 94vh, border-radius: 12px, padding: 20px)                */
+/* ============================================================================ */
+
+.LeaVerifClosedModalContainer {
+  background: #FDFDFD;
+  border-radius: 12px;
+  max-width: 1100px;
+  width: 92vw;
+  height: 90vh;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.LeaVerifClosedModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #EDEDED;
+}
+
+.LeaVerifClosedModalHeader h4 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #13213C;
+  margin: 0;
+}
+
+.LeaVerifClosedModalBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.LeaVerifClosedModalBody > * {
+  flex-shrink: 0;
+  min-height: auto;
+}
+
+.LeaVerifClosedModalBody .ResponseBox {
+  height: auto;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.LeaVerifClosedModalBody .LeaVerifResultFieldsGrid,
+.LeaVerifClosedModalBody .LeaVerifRejectionFieldsGrid {
+  height: auto;
+  overflow: visible;
+}
+
+.LeaVerifClosedModalBody p,
+.LeaVerifClosedModalBody span,
+.LeaVerifClosedModalBody div {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.LeaVerifClosedModalBody .ReasonDetail,
+.LeaVerifClosedModalBody .VerificationNotes p,
+.LeaVerifClosedModalBody .LeaVerifFullWidthField .LeaVerifFieldValue {
+  white-space: pre-wrap;
+}
+
+.LeaVerifClosedModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #EDEDED;
 }
 
 

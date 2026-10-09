@@ -24,7 +24,8 @@ from app.desktop.routers.profile_setting import profile as profile_router
 from app.desktop.routers.admin_notifications.admin_notifications import router as admin_notifications_router
 from app.desktop.routers.audit_logs.audit_logs import router as audit_logs_router  
 from app.desktop.routers.notifications.notifications import router as notifications_router  # ADDED     
-from app.desktop.routers.workspace_locations.workspace_location import router as workspace_location_router     
+from app.desktop.routers.workspace_locations.workspace_location import router as workspace_location_router 
+from app.desktop.routers.auth.password_reset_request import router as password_reset_request_router 
 
 
 from app.database.base import Base
@@ -87,6 +88,11 @@ from app.desktop.routers.complaints import complaint_status
 from app.core.extension_limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+#LLM/OCR
+from app.extension.routers import screenshot
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 # Base.metadata.create_all(bind=engine) wag na iuuncomment this line, since we are using alembic for migrations
@@ -156,6 +162,7 @@ app.include_router(admin_notifications_router)
 app.include_router(audit_logs_router)
 app.include_router(notifications_router)  # ADDED
 app.include_router(workspace_location_router)
+app.include_router(password_reset_request_router)   
 
 # @app.get("/", status_code=status.HTTP_200_OK)
 # async def user(consumer: consumer_dependency):
@@ -166,9 +173,11 @@ app.include_router(workspace_location_router)
 #         "User": consumer
 #     }
 
-#app.include_router(retrieval_router)
+# app.include_router(retrieval_router)
 
 app.include_router(verification.router)
 app.include_router(marketplace_detection_router)
 
 app.include_router(complaint_status.router)
+
+app.include_router(screenshot.router)

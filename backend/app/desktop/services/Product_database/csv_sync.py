@@ -1,3 +1,4 @@
+from datetime import date, datetime, timezone
 import csv
 import sys
 from pathlib import Path
@@ -5,23 +6,53 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from app.models.registered_products import RegisteredProduct
 from app.models.unregistered_advisories import UnregisteredAdvisory
+from app.models.users import User
+
 def clean_title(title: str) -> str:
     """Cleans and standardizes product titles."""
     if not title:
         return ""
     return " ".join(str(title).strip().split())
 
+def is_date_expired(val) -> bool:
+    """
+    Checks if a given date string or date/datetime object is expired.
+    Returns True if expired (date <= date.today()), False otherwise (valid or not set).
+    """
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return False
+    
+    today = date.today()
+    
+    if isinstance(val, (datetime, pd.Timestamp)):
+        return val.date() <= today
+    if isinstance(val, date):
+        return val <= today
+        
+    val_str = str(val).strip()
+    if not val_str or val_str.lower() in ("", "nan", "none", "null", "nat"):
+        return False
+        
+    try:
+        parsed_dt = pd.to_datetime(val_str, errors="coerce")
+        if pd.notna(parsed_dt):
+            return parsed_dt.date() <= today
+    except Exception:
+        pass
+        
+    return False
+
 # Get backend folder root relative to this file
 # __file__ is backend/app/desktop/services/Product_database/csv_sync.py
 BACKEND_DIR = Path(__file__).resolve().parents[4]
 REGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "Registered_cleaned.csv"
-UNREGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "Unregistered_cleaned.csv"
+UNREGISTERED_CSV_PATH = BACKEND_DIR / "nlp" / "datasets" / "unregistered.csv"
 
 def sync_registered_products_to_csv(db: Session):
     """
     Syncs the database's registered products changes into Registered_cleaned.csv.
-    Maintains the existing 100k+ rows while updating or appending new active products,
-    and removing any deleted products.
+    Maintains the existing rows while updating or appending new active products,
+    and removing any deleted or expired products.
     """
     try:
         REGISTERED_CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -38,8 +69,6 @@ def sync_registered_products_to_csv(db: Session):
 
         # 2. Query all products from database (both active and deleted)
         db_products = db.query(RegisteredProduct).all()
-        if not db_products:
-            return
 
         records = df.to_dict(orient="records")
         
@@ -50,44 +79,64 @@ def sync_registered_products_to_csv(db: Session):
                     return i
             return -1
 
-        for p in db_products:
-            reg_num = p.registration_number
-            if not reg_num:
-                continue
+        db_modified = False
+        if db_products:
+            for p in db_products:
+                reg_num = p.registration_number
+                if not reg_num:
+                    continue
 
-            idx = find_record_idx(reg_num)
+                idx = find_record_idx(reg_num)
+                is_expired = is_date_expired(p.expiry_date)
 
-            if p.deleted_at is not None:
-                # If deleted in system, remove from records if exists
-                if idx != -1:
-                    records.pop(idx)
-            else:
-                # If active, clean product name and upsert
-                cleaned_name = clean_title(p.product_name)
-                date_str = p.date_registered.strftime("%d %B %Y") if p.date_registered else ""
-                expiry_str = p.expiry_date.strftime("%d %B %Y") if p.expiry_date else ""
-                
-                updated_record = {
-                    "ACCOUNTCODE": reg_num,
-                    "PRODUCT_NAME": cleaned_name,
-                    "BRAND_NAME": p.brand_name or "",
-                    "PROD_VARIANTS": "",
-                    "PRODUCT_INTENDED_USE": p.product_category or "Cosmetics",
-                    "COMPANY_NAME": "",
-                    "NOTIFICATION_DECISION_DATE": date_str,
-                    "NOTIFICATION_VALIDITY": expiry_str,
-                    "NOTIFICATION_DECISION": "1"
-                }
-
-                if idx != -1:
-                    # Update existing record, preserving other columns that might exist
-                    for k, v in updated_record.items():
-                        records[idx][k] = v
+                if p.deleted_at is not None or is_expired:
+                    # If deleted in system or expired, remove from records if exists
+                    if idx != -1:
+                        records.pop(idx)
+                    
+                    # If expired but not yet soft-deleted in DB, soft-delete it
+                    if is_expired and p.deleted_at is None:
+                        p.deleted_at = datetime.now(timezone.utc)
+                        fallback_user = db.query(User.user_id).first()
+                        fallback_user_id = fallback_user[0] if fallback_user else None
+                        p.deleted_by = p.updated_by or p.added_by or fallback_user_id
+                        db_modified = True
                 else:
-                    # Append new record
-                    records.append(updated_record)
+                    # If active and not expired, clean product name and upsert
+                    cleaned_name = clean_title(p.product_name)
+                    date_str = p.date_registered.strftime("%d %B %Y") if p.date_registered else ""
+                    expiry_str = p.expiry_date.strftime("%d %B %Y") if p.expiry_date else ""
+                    
+                    updated_record = {
+                        "ACCOUNTCODE": reg_num,
+                        "PRODUCT_NAME": cleaned_name,
+                        "BRAND_NAME": p.brand_name or "",
+                        "PROD_VARIANTS": "",
+                        "PRODUCT_INTENDED_USE": p.product_category or "Cosmetics",
+                        "COMPANY_NAME": "",
+                        "NOTIFICATION_DECISION_DATE": date_str,
+                        "NOTIFICATION_VALIDITY": expiry_str,
+                        "NOTIFICATION_DECISION": "1"
+                    }
 
-        # 3. Save back to CSV
+                    if idx != -1:
+                        # Update existing record, preserving other columns that might exist
+                        for k, v in updated_record.items():
+                            records[idx][k] = v
+                    else:
+                        # Append new record
+                        records.append(updated_record)
+
+        if db_modified:
+            db.commit()
+
+        # 3. Also filter out any existing CSV rows whose NOTIFICATION_VALIDITY is expired
+        records = [
+            r for r in records
+            if not is_date_expired(r.get("NOTIFICATION_VALIDITY", ""))
+        ]
+
+        # 4. Save back to CSV
         new_df = pd.DataFrame(records)
         new_df.to_csv(REGISTERED_CSV_PATH, index=False)
         print(f"Successfully synced database changes to {REGISTERED_CSV_PATH}.", file=sys.stderr)

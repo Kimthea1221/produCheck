@@ -1,4 +1,5 @@
-﻿console.log("Background service worker started");
+﻿// https://everify.store
+console.log("Background service worker started");
 
 async function authorizedFetch(url, options = {}) {
   let { access_token, refresh_token } = await chrome.storage.local.get(['access_token', 'refresh_token']);
@@ -15,7 +16,7 @@ async function authorizedFetch(url, options = {}) {
 
   if (res.status === 401 && refresh_token) {
     const refreshRes = await fetch(
-      `https://everify.store/auth/refresh?refresh_token=${encodeURIComponent(refresh_token)}`,
+      `http://localhost:8001/auth/refresh?refresh_token=${encodeURIComponent(refresh_token)}`,
       { method: 'POST' }
     );
 
@@ -42,6 +43,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "captureScreenshot") {
+    const host = sender.tab ? new URL(sender.tab.url).hostname : "";
+    if (!/(^|\.)(shopee\.ph|lazada\.com\.ph|facebook\.com|tiktok\.com)$/.test(host)) {
+      sendResponse({ success: false, error: "Not an allowed site" });
+      return;
+    }
+
+    chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }, async (dataUrl) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+      try {
+        const res = await fetch('http://localhost:8001/verify-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: dataUrl, url: message.url, platform: message.platform })
+        });
+        const data = await res.json();
+        sendResponse({ success: true, dataUrl, title: data.title, store: data.store });
+      } catch (e) {
+        sendResponse({ success: false, error: e.message });
+      }
+    });
+    return true;  
+  }
+
   if (message.action === "openLogin") {
     chrome.tabs.create({ url: chrome.runtime.getURL('pages/auth.html') });
     return true;
@@ -52,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     //
     (async () => {
       try {
-        const response = await fetch('https://everify.store/verify', {
+        const response = await fetch('http://localhost:8001/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -81,7 +109,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         sendResponse({ status: 'success', data: data });
 
-        const res = await authorizedFetch('https://everify.store/submitVerification', {
+        const res = await authorizedFetch('http://localhost:8001/submitVerification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -126,7 +154,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
-        const response = await fetch('https://everify.store/marketplace-detections', { // http://localhost:8001 https://everify.store
+        const response = await fetch('http://localhost:8001/marketplace-detections', { // http://localhost:8001
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -148,7 +176,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'submitComplaint') {
     (async () => {
       try {
-        const res = await authorizedFetch('https://everify.store/submitComplaint', {
+        const res = await authorizedFetch('http://localhost:8001/submitComplaint', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

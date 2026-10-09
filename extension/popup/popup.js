@@ -1,6 +1,7 @@
 ﻿
 // extension/popup/popup.js
 import { whenSessionReady, isUserLoggedIn, getCurrentUser } from "../scripts/session.js";
+import { LIMITS, liveLengthCheck } from "../utils/validation.js";
 
 let lastProductTitle = '';
 let lastProductUrl = '';
@@ -155,6 +156,13 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.addEventListener('click', () => showState('home'));
     });
 
+    liveLengthCheck(
+      document.getElementById('manual-product-name'),
+      document.getElementById('manual-input-error'),
+      'Product name',
+      LIMITS.PRODUCT_NAME_MAX
+    );
+
     const btnManualInput = document.getElementById('manual-input-btn');
     if (btnManualInput) {
       btnManualInput.addEventListener('click', () => {
@@ -180,6 +188,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!value) {
           if (errorEl) errorEl.textContent = 'Please enter the product name.';
+          return;
+        }
+
+        if (value.length > LIMITS.PRODUCT_NAME_MAX) {
+          if (errorEl) errorEl.textContent = `Product name must be ${LIMITS.PRODUCT_NAME_MAX} characters or fewer (currently ${value.length}).`;
           return;
         }
         

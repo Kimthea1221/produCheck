@@ -10,10 +10,14 @@ import { useLocation, useNavigate } from 'react-router-dom' // ADDED: read nav d
 
 // ADDED — backend URL in one place, so it's easy to update later
 import { apiFetch } from '../../utils/apiFetch';
+// ADDED — processing overlay
+import { useProcessing } from '../../utils/useProcessing';
+import ProcessingOverlay from '../component/processing-overlay';
 
 function LeaNewIntake() {
   const location = useLocation()  // ADDED
   const navigate = useNavigate()  // ADDED
+  const proc = useProcessing()  // ADDED — processing overlay state
 
   // ADDED — draftId passed in from Saved Drafts "Edit Draft" click.
   // null = brand new intake, no draft involved.
@@ -117,6 +121,8 @@ function LeaNewIntake() {
   const [attachmentIdsToRemove, setAttachmentIdsToRemove] = useState([])
 
   const [loading, setLoading] = useState(false)  // ADDED — disables buttons mid-request
+  // CHANGED — tracks which action is in-flight ('draft' | 'submit' | null) so busy labels don't collide
+  const [pendingAction, setPendingAction] = useState(null)
 
   // ADDED — replaces errorMessage. { message, type: 'error' | 'success' }
   const [toast, setToast] = useState(null)
@@ -139,6 +145,26 @@ function LeaNewIntake() {
   // ADDED — Frontend field validation state
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
+  const [submitError, setSubmitError] = useState('')
+
+  // Helper to check if at least one field or file has a value
+  const hasAtLeastOneField = () => {
+    if (fullName && fullName.trim()) return true
+    if (contactNumber && contactNumber.trim()) return true
+    if (email && email.trim()) return true
+    if (idType && idType.trim()) return true
+    if (address && address.trim()) return true
+    if (productName && productName.trim()) return true
+    if (manufacturer && manufacturer.trim()) return true
+    if (productCategory && productCategory.trim()) return true
+    if (placeOfPurchase && placeOfPurchase.trim()) return true
+    if (dateOfPurchase && dateOfPurchase.trim()) return true
+    if (amountPaid !== '' && amountPaid !== null && amountPaid !== undefined && String(amountPaid).trim() !== '') return true
+    if (natureOfComplaint && natureOfComplaint.trim()) return true
+    if (files && files.length > 0) return true
+    if (existingAttachments && existingAttachments.length > 0) return true
+    return false
+  }
 
   // Helper to get current value for a given field name
   const getFieldValue = (field) => {
@@ -158,14 +184,8 @@ function LeaNewIntake() {
     }
   }
 
-  // lea-new-intake.jsx — validateSingleField
-  // CHANGED — added a second parameter so callers can distinguish
-  // "live typing feedback" (skip required/min-length) from
-  // "full submit validation" (enforce everything). Previously handleBlur
-  // and validateForm called this identically, so leaving a field early
-  // while typing showed the same "required"/"too short" errors that
-  // should only appear on a real submit attempt.
-  const validateSingleField = (field, value, { requireField = true } = {}) => {
+  // Format validation — runs ONLY when field has a value; empty never counts as invalid
+  const validateSingleField = (field, value) => {
     if (field === 'fullName') {
       if (value && value.trim()) {
         const nameRegex = /^[a-zA-Z\s.'\-]+$/
@@ -201,11 +221,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'productName') {
-      // CHANGED — required/min-length only enforced when requireField is true
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Product Name is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Product Name must be at least 2 characters.'
         }
@@ -214,10 +230,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'manufacturer') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Manufacturer/Seller is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Manufacturer/Seller must be at least 2 characters.'
         }
@@ -226,19 +239,11 @@ function LeaNewIntake() {
     }
 
     if (field === 'productCategory') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Category is required.'
-        }
-      }
       return ''
     }
 
     if (field === 'placeOfPurchase') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Place of Purchase is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 2) {
           return 'Place of Purchase must be at least 2 characters.'
         }
@@ -247,13 +252,6 @@ function LeaNewIntake() {
     }
 
     if (field === 'dateOfPurchase') {
-      // Future-date check stays unconditional — that's a format problem,
-      // not a "not filled in yet" problem, so it's still useful mid-draft
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Date of Purchase is required.'
-        }
-      }
       if (value && value.trim()) {
         const selectedDate = new Date(value)
         const today = new Date()
@@ -266,8 +264,6 @@ function LeaNewIntake() {
     }
 
     if (field === 'amountPaid') {
-      // Unchanged — already correctly format-only (never required),
-      // no requireField gating needed here
       if (value !== '' && value !== null && value !== undefined) {
         if (Number(value) < 0) {
           return 'Amount Paid cannot be negative.'
@@ -283,10 +279,7 @@ function LeaNewIntake() {
     }
 
     if (field === 'natureOfComplaint') {
-      if (requireField) {
-        if (!value || !value.trim()) {
-          return 'Nature of Complaint is required.'
-        }
+      if (value && value.trim()) {
         if (value.trim().length < 10) {
           return 'Nature of Complaint must be at least 10 characters.'
         }
@@ -295,48 +288,28 @@ function LeaNewIntake() {
     }
 
     if (field === 'attachments') {
-      if (requireField) {
-        const { files: fList, existingAttachments: eList } = value || {}
-        const isEditingWithExisting = (editingDraftId || editingComplaintId)
-        if ((!fList || fList.length === 0) && (!isEditingWithExisting || !eList || eList.length === 0)) {
-          return 'Please attach at least one supporting document or photo.'
-        }
-      }
       return ''
     }
 
     return ''
   }
 
-  // Optional fields list for real-time format validation
-  const optionalFields = ['fullName', 'contactNumber', 'email', 'amountPaid']
+  const minLengthFields = ['productName', 'manufacturer', 'placeOfPurchase', 'natureOfComplaint']
 
-  // lea-new-intake.jsx — handleBlur
-  // CHANGED — pass requireField: false so leaving a field early only
-  // surfaces real format problems (bad email, negative amount, future
-  // date), never "required"/"too short" — those belong to a real submit
-  // attempt only, not to normal mid-draft typing
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }))
-    const fieldError = validateSingleField(field, getFieldValue(field), { requireField: false })
+    const fieldError = validateSingleField(field, getFieldValue(field))
     setErrors((prev) => ({ ...prev, [field]: fieldError }))
   }
 
-  // lea-new-intake.jsx — handleChangeField
-  // CHANGED — pass requireField: false, matching the same fix applied to
-  // handleBlur. Real-time typing feedback should only catch actual format
-  // problems (e.g. a future date, invalid characters) — not "required" or
-  // "too short," which should only block a real submit attempt.
   const handleChangeField = (field, setter, val) => {
     setter(val)
-    const err = validateSingleField(field, val, { requireField: false })
+    if (submitError) setSubmitError('')
+    const err = validateSingleField(field, val)
 
-    if (optionalFields.includes(field)) {
-      setErrors((prev) => ({ ...prev, [field]: err }))
-      return
-    }
-
-    if (touched[field] || (err && err.includes('future'))) {
+    if (minLengthFields.includes(field) && !touched[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }))
+    } else {
       setErrors((prev) => ({ ...prev, [field]: err }))
     }
   }
@@ -413,10 +386,11 @@ function LeaNewIntake() {
     return isValid
   }
 
-  // ADDED — shows a toast for 3 seconds then auto-clears
-  const showToast = (message, type = 'error') => {
+  // ADDED — shows a toast for 3 seconds (or longer for multi-line) then auto-clears
+  const showToast = (message, type = 'error', duration) => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+    const timeout = duration ?? (message && (message.length > 50 || message.includes(' | ')) ? 6000 : 3000)
+    setTimeout(() => setToast(null), timeout)
   }
 
   // ADDED — on page load, if editing a draft, fetch it and fill every field
@@ -449,14 +423,87 @@ function LeaNewIntake() {
       .finally(() => setLoading(false))
   }, [editingDraftId])
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const updated = [...files, ...Array.from(e.target.files)]
+  // 🔌 BACKEND: enforce the same limits (10 files, 25 MB each, PDF/JPG/PNG) on the server
+  const MAX_FILES_TOTAL = 10
+  const MAX_FILE_SIZE = 25 * 1024 * 1024
+  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png']
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/pjpeg',
+    'image/png',
+    'image/x-png',
+  ]
+
+  const isAllowedFileType = (file) => {
+    const name = file.name || ''
+    const dotIndex = name.lastIndexOf('.')
+    if (dotIndex === -1) return false
+    const ext = name.slice(dotIndex).toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return false
+    }
+    if (file.type) {
+      const mime = file.type.toLowerCase()
+      if (!ALLOWED_MIME_TYPES.includes(mime)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  const validateAndAddFiles = (newFiles) => {
+    if (!newFiles || newFiles.length === 0) return
+
+    const currentCount = files.length + existingAttachments.length
+    const incomingCount = newFiles.length
+
+    if (currentCount + incomingCount > MAX_FILES_TOTAL) {
+      showToast(
+        `You can attach at most ${MAX_FILES_TOTAL} files. You already have ${currentCount} and tried to add ${incomingCount}.`,
+        'error',
+        6000
+      )
+      return
+    }
+
+    const validFiles = []
+    const skipMessages = []
+
+    newFiles.forEach((file) => {
+      if (!file.size || file.size === 0) {
+        skipMessages.push(`${file.name} is empty and was not added.`)
+      } else if (!isAllowedFileType(file)) {
+        skipMessages.push(`${file.name} is not an allowed file type (PDF, JPG, PNG only).`)
+      } else if (file.size > MAX_FILE_SIZE) {
+        skipMessages.push(`${file.name} is larger than 25 MB and was not added.`)
+      } else {
+        validFiles.push(file)
+      }
+    })
+
+    if (validFiles.length > 0) {
+      if (submitError) setSubmitError('')
+      if (toast?.message === 'Fill in at least one field or attach a file before logging this complaint.') {
+        setToast(null)
+      }
+      const updated = [...files, ...validFiles]
       setFiles(updated)
       if (touched.attachments) {
         const err = validateSingleField('attachments', { files: updated, existingAttachments })
         setErrors((prev) => ({ ...prev, attachments: err }))
       }
+    }
+
+    if (skipMessages.length > 0) {
+      showToast(skipMessages.join(' | '), 'error', 6000)
+    }
+  }
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndAddFiles(Array.from(e.target.files))
       e.target.value = ""
     }
   }
@@ -492,12 +539,7 @@ function LeaNewIntake() {
     setIsDragActive(false)
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const updated = [...files, ...Array.from(e.dataTransfer.files)]
-      setFiles(updated)
-      if (touched.attachments) {
-        const err = validateSingleField('attachments', { files: updated, existingAttachments })
-        setErrors((prev) => ({ ...prev, attachments: err }))
-      }
+      validateAndAddFiles(Array.from(e.dataTransfer.files))
       e.dataTransfer.clearData()
     }
   }
@@ -514,6 +556,7 @@ function LeaNewIntake() {
     setIsDragActive(false)
   }
 
+  // 🔌 BACKEND: the create/update endpoint must accept missing values for these fields
   const buildFormData = () => {
     const formData = new FormData()
     formData.append('full_name', fullName)
@@ -536,11 +579,55 @@ function LeaNewIntake() {
     return formData
   }
 
+  // 🔌 BACKEND: these fields are optional on the form now. This message appears only while
+  // the backend still requires them. Remove it when the backend accepts missing values.
+  const FIELD_LABELS = {
+    product_name: 'Product Name',
+    manufacturer: 'Manufacturer/Seller',
+    product_category: 'Category',
+    place_of_purchase: 'Place of Purchase',
+    date_of_purchase: 'Date of Purchase',
+    nature_of_complaint: 'Nature of Complaint',
+    files: 'Evidence & Attachment',
+    full_name: 'Full Name',
+    contact_number: 'Contact',
+    email: 'Email',
+    id_type: 'ID Presented',
+    address: 'Address',
+    amount_paid: 'Amount Paid',
+  }
+
   const parseBackendError = async (res) => {
     try {
       const errorData = await res.json()
+      if (typeof errorData.detail === 'string') {
+        return errorData.detail
+      }
       if (Array.isArray(errorData.detail)) {
-        return errorData.detail.map((e) => e.msg).join(', ')
+        const messages = errorData.detail.map((item) => {
+          if (typeof item === 'string') return item
+          const rawLoc = Array.isArray(item?.loc)
+            ? item.loc[item.loc.length - 1]
+            : (typeof item?.loc === 'string' ? item.loc : null)
+          const loc = rawLoc ? String(rawLoc).toLowerCase() : null
+          const label = loc ? (FIELD_LABELS[loc] || FIELD_LABELS[rawLoc]) : null
+          const rawMsg = item?.msg || 'Invalid value'
+
+          if (!label) {
+            return rawMsg
+          }
+
+          if (typeof rawMsg === 'string' && rawMsg.trim().toLowerCase() === 'field required') {
+            return `${label} is required by the server`
+          }
+
+          return `${label}: ${rawMsg}`
+        })
+
+        const uniqueMessages = Array.from(new Set(messages.filter(Boolean)))
+        if (uniqueMessages.length > 0) {
+          return uniqueMessages.join(' | ')
+        }
       }
       return errorData.detail || 'Something went wrong. Please try again.'
     } catch {
@@ -548,6 +635,7 @@ function LeaNewIntake() {
     }
   }
 
+  // CHANGED — wrapped with useProcessing run()
   const handleSaveAsDraft = async () => {
     if (editingComplaintId) {
       showToast('This complaint is already submitted and cannot be saved as a draft.')
@@ -560,37 +648,64 @@ function LeaNewIntake() {
     }
 
     setLoading(true)
-    const formData = buildFormData()
+    // CHANGED — set pendingAction to 'draft' while saving draft
+    setPendingAction('draft')
 
-    if (editingDraftId) {
-      attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
-    }
+    const ok = await proc.run(
+      {
+        title: 'SAVING DRAFT...',
+        message: 'Saving your complaint draft...',
+        successTitle: 'DRAFT SAVED',
+        successMessage: 'Draft saved. Redirecting to Saved Drafts...',
+        withSuccess: true,
+      },
+      async () => {
+        const formData = buildFormData()
 
-    const url = editingDraftId
-      ? `/drafts/walkin/${editingDraftId}`
-      : `/drafts/walkin/`
-    const method = editingDraftId ? 'PUT' : 'POST'
+        if (editingDraftId) {
+          attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+        }
 
-    try {
-      const res = await apiFetch(url, {
-        method,
-        body: formData,
-      })
-      if (!res.ok) {
-        showToast(await parseBackendError(res))
-        return
+        const url = editingDraftId
+          ? `/drafts/walkin/${editingDraftId}`
+          : `/drafts/walkin/`
+        const method = editingDraftId ? 'PUT' : 'POST'
+
+        try {
+          const res = await apiFetch(url, {
+            method,
+            body: formData,
+          })
+          if (!res.ok) {
+            showToast(await parseBackendError(res))
+            return false
+          }
+          showToast('Draft saved successfully.', 'success')
+          return true
+        } catch (err) {
+          showToast(err.message)
+          return false
+        } finally {
+          setLoading(false)
+          // CHANGED — reset pendingAction when draft save finishes
+          setPendingAction(null)
+        }
       }
-      showToast('Draft saved successfully.', 'success')
+    )
+
+    if (ok) {
       navigate('/leacidgfolder/lea-saved-draft')
-    } catch (err) {
-      showToast(err.message)
-    } finally {
-      setLoading(false)
     }
   }
 
+  // CHANGED — wrapped with useProcessing run()
   const handleLogComplaint = async (e) => {
     e.preventDefault()
+
+    if (!hasAtLeastOneField()) {
+      showToast('Fill in at least one field or attach a file before logging this complaint.')
+      return
+    }
 
     if (!validateForm()) {
       showToast('Please fix the validation errors before submitting.')
@@ -598,55 +713,73 @@ function LeaNewIntake() {
     }
 
     setLoading(true)
+    // CHANGED — set pendingAction to 'submit' while logging/submitting complaint
+    setPendingAction('submit')
 
-    try {
-      let res
-      if (editingComplaintId) {
-        const formData = buildFormData()
-        attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+    const ok = await proc.run(
+      {
+        title: 'LOGGING COMPLAINT...',
+        message: 'Submitting walk-in complaint details...',
+        successTitle: 'COMPLAINT LOGGED',
+        successMessage: 'Complaint logged successfully. Redirecting...',
+        withSuccess: true,
+      },
+      async () => {
+        try {
+          let res
+          if (editingComplaintId) {
+            const formData = buildFormData()
+            attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
 
-        res = await apiFetch(`/complaints/walkin/${editingComplaintId}`, {
-          method: 'PUT',
-          body: formData,
-        })
-      } else if (editingDraftId) {
-        const formData = buildFormData()
-        attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
+            res = await apiFetch(`/complaints/walkin/${editingComplaintId}`, {
+              method: 'PUT',
+              body: formData,
+            })
+          } else if (editingDraftId) {
+            const formData = buildFormData()
+            attachmentIdsToRemove.forEach((id) => formData.append('remove_attachment_ids', id))
 
-        const updateRes = await apiFetch(`/drafts/walkin/${editingDraftId}`, {
-          method: 'PUT',
-          body: formData,
-        })
+            const updateRes = await apiFetch(`/drafts/walkin/${editingDraftId}`, {
+              method: 'PUT',
+              body: formData,
+            })
 
-        if (!updateRes.ok) {
-          showToast(await parseBackendError(updateRes))
+            if (!updateRes.ok) {
+              showToast(await parseBackendError(updateRes))
+              return false
+            }
+
+            res = await apiFetch(`/drafts/walkin/${editingDraftId}/submit`, {
+              method: 'POST',
+            })
+          } else {
+            const formData = buildFormData()
+            res = await apiFetch('/complaints/walkin/', {
+              method: 'POST',
+              body: formData,
+            })
+          }
+
+          if (!res.ok) {
+            showToast(await parseBackendError(res))
+            return false
+          }
+          showToast('Complaint logged successfully.', 'success')
+          return true
+        } catch (err) {
+          showToast(err.message)
+          return false
+        } finally {
           setLoading(false)
-          return
+          // CHANGED — reset pendingAction when submission finishes
+          setPendingAction(null)
         }
-
-        res = await apiFetch(`/drafts/walkin/${editingDraftId}/submit`, {
-          method: 'POST',
-        })
-      } else {
-        const formData = buildFormData()
-        res = await apiFetch('/complaints/walkin/', {
-          method: 'POST',
-          body: formData,
-        })
       }
+    )
 
-      if (!res.ok) {
-        showToast(await parseBackendError(res))
-        return
-      }
-      showToast('Complaint logged successfully.', 'success')
+    if (ok) {
       navigate('/leacidgfolder/lea-walkin-complaints')
-    } catch (err) {
-      showToast(err.message)
-    } finally {
-      setLoading(false)
     }
-
   }
 
   return (
@@ -664,6 +797,9 @@ function LeaNewIntake() {
 
           <div className='FormForWalkin'>
             <form onSubmit={handleLogComplaint} noValidate>
+              <p style={{ margin: '0 0 -8px 0', fontSize: '13px', color: '#6b7280' }}>
+                All fields are optional, but at least one field or file is needed to log a complaint.
+              </p>
               <div className='FormSection'>
                 <h3>COMPLAINANT DETAILS</h3>
                 <div className='col'>
@@ -729,7 +865,10 @@ function LeaNewIntake() {
                     <select
                       id="idType"
                       value={idType}
-                      onChange={(e) => setIdType(e.target.value)}
+                      onChange={(e) => {
+                        setIdType(e.target.value)
+                        if (submitError) setSubmitError('')
+                      }}
                     >
                       <option value="">Select ID Type</option>
                       <option value="philsys">PhilSys</option>
@@ -746,7 +885,10 @@ function LeaNewIntake() {
                   type="text"
                   placeholder='Ex. Florida'
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value)
+                    if (submitError) setSubmitError('')
+                  }}
                   maxLength={300}
                 />
               </div>
@@ -755,7 +897,7 @@ function LeaNewIntake() {
                 <h3>REPORTED PRODUCT</h3>
                 <div className='col'>
                   <div>
-                    <label htmlFor="productName">Product Name</label>
+                    <label htmlFor="productName">Product Name (OPTIONAL)</label>
                     <input
                       id="productName"
                       type="text"
@@ -774,7 +916,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="manufacturer">Manufacturer/Seller</label>
+                    <label htmlFor="manufacturer">Manufacturer/Seller (OPTIONAL)</label>
                     <input
                       id="manufacturer"
                       type="text"
@@ -796,7 +938,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="productCategory">Category</label>
+                    <label htmlFor="productCategory">Category (OPTIONAL)</label>
                     <select
                       id="productCategory"
                       value={productCategory}
@@ -817,7 +959,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="placeOfPurchase">Place of Purchase</label>
+                    <label htmlFor="placeOfPurchase">Place of Purchase (OPTIONAL)</label>
                     <input
                       id="placeOfPurchase"
                       type="text"
@@ -839,7 +981,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="dateOfPurchase">Date of Purchase</label>
+                    <label htmlFor="dateOfPurchase">Date of Purchase (OPTIONAL)</label>
                     <input
                       id="dateOfPurchase"
                       type="date"
@@ -883,7 +1025,7 @@ function LeaNewIntake() {
 
               <div className='FormSection'>
                 <h3>Complainant Statement</h3>
-                <label htmlFor="natureOfComplaint">Nature Of Complaint</label>
+                <label htmlFor="natureOfComplaint">Nature Of Complaint (OPTIONAL)</label>
                 <textarea
                   id="natureOfComplaint"
                   rows='5'
@@ -928,6 +1070,12 @@ function LeaNewIntake() {
                       <p> PDF, JPG, PNG · Max 25 MB each</p>
                     </div>
                   </label>
+
+                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#6b7280' }}>
+                    {files.length + existingAttachments.length > 0
+                      ? `${files.length + existingAttachments.length} of 10 files attached`
+                      : 'Up to 10 files, 25 MB each.'}
+                  </p>
 
                   {errors.attachments && (
                     <span className="LoginErrorMsg" style={{ marginTop: '8px' }}>
@@ -1003,16 +1151,20 @@ function LeaNewIntake() {
                 </div>
               </div>
 
-              <div>
-                <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
-                {!editingComplaintId && (
-                  <button type="button" className='DraftButton' disabled={loading} onClick={handleSaveAsDraft}>
-                    {loading ? 'Saving...' : 'Save as Draft'}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button type="button" className='CancelButton' onClick={() => navigate(-1)}>Cancel</button>
+                  {!editingComplaintId && (
+                    <button type="button" className='DraftButton' disabled={loading} onClick={handleSaveAsDraft}>
+                      {/* CHANGED — only show Saving... when pendingAction is 'draft' */}
+                      {pendingAction === 'draft' ? 'Saving...' : 'Save as Draft'}
+                    </button>
+                  )}
+                  <button type="submit" className='LogButton' disabled={loading}>
+                    {/* CHANGED — only show Submitting... when pendingAction is 'submit' */}
+                    {pendingAction === 'submit' ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
                   </button>
-                )}
-                <button type="submit" className='LogButton' disabled={loading}>
-                  {loading ? 'Submitting...' : 'Log Complaint & Queue for FDA'}
-                </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1116,8 +1268,10 @@ function LeaNewIntake() {
             {toast.type === 'warning' && <AlertTriangle size={18} />}
             {(toast.type === 'error' || toast.type === 'danger') && <XCircle size={18} />}
           </div>
-          <div className="LeaToastBody">
-            <p className="LeaToastMessage">{toast.message}</p>
+          <div className="LeaToastBody" style={{ minWidth: 0 }}>
+            <p className="LeaToastMessage" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }}>
+              {toast.message}
+            </p>
           </div>
           <button
             className="LeaToastCloseBtn"
@@ -1128,6 +1282,14 @@ function LeaNewIntake() {
           </button>
         </div>
       )}
+
+      {/* ADDED — Centered processing overlay */}
+      <ProcessingOverlay
+        isVisible={proc.isVisible}
+        title={proc.title}
+        message={proc.message}
+        status={proc.status}
+      />
     </div>
   )
 }

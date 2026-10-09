@@ -1310,7 +1310,6 @@ function FDAProductDB() {
                   className="FdaSearchInput"
                   maxLength={150}
                   value={searchRegistered}
-                  maxLength={150}
                   onChange={(e) => {
                     setSearchRegistered(e.target.value);
                     setCurrentPage(1);
@@ -1390,7 +1389,6 @@ function FDAProductDB() {
                   className="FdaSearchInput"
                   maxLength={150}
                   value={searchAdvisory}
-                  maxLength={150}
                   onChange={(e) => {
                     setSearchAdvisory(e.target.value);
                     setCurrentPage(1);
@@ -1732,7 +1730,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.productName}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -1746,7 +1743,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
@@ -1759,7 +1755,6 @@ function FDAProductDB() {
                       placeholder="FDA-COS-YYYY-XXXXX"
                       maxLength={100}
                       value={productForm.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setProductForm({ ...productForm, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -1785,7 +1780,7 @@ function FDAProductDB() {
                     {formErrors.expiryDate && <span className="form-error-msg">{formErrors.expiryDate}</span>}
                   </div>
 
-                  <div className="FdaModalFooter span-two">
+                  <div className="FdaModalFooter FdaAddModalFooter span-two">
                     <button type="button" className="BtnModalCancel" onClick={() => setShowAddProductModal(false)}>Cancel</button>
                     <button type="submit" className="BtnModalSave">Save Product</button>
                   </div>
@@ -1797,7 +1792,7 @@ function FDAProductDB() {
           {/* Modal 2: View Registered Product Detail */}
           {showViewProductModal && selectedProduct && (
             <div className="FdaModalOverlay">
-              <div className="FdaModalContent" onClick={(e) => e.stopPropagation()}>
+              <div className="FdaModalContent FdaProductViewModal" onClick={(e) => e.stopPropagation()}>
                 <button className="FdaDetailClose" onClick={() => setShowViewProductModal(false)}>
                   <X size={16} />
                 </button>
@@ -1815,40 +1810,42 @@ function FDAProductDB() {
                   </div>
                 </div>
 
-                <div className="FdaDetailGrid">
-                  <div className="FdaDetailItem">
-                    <label>Category</label>
-                    <span>{selectedProduct.category}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Current Status</label>
-                    <span className="FdaBadge badge-registered" style={{ width: 'fit-content' }}>Registered</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Date Registered</label>
-                    <span>{formatDate(selectedProduct.dateRegistered)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Expiry Date</label>
-                    <span className={`FdaBadge ${getExpiryInfo(selectedProduct.expiryDate).className}`} style={{ width: 'fit-content' }}>
-                      {formatDate(selectedProduct.expiryDate)}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Added By</label>
-                    <span>{selectedProduct.addedBy}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Created On</label>
-                    <span>{formatDate(selectedProduct.createdAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated</label>
-                    <span>{formatDate(selectedProduct.updatedAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated By</label>
-                    <span>{selectedProduct.updatedBy}</span>
+                <div className="FdaProductViewBody">
+                  <div className="FdaDetailGrid">
+                    <div className="FdaDetailItem">
+                      <label>Category</label>
+                      <span>{selectedProduct.category}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Current Status</label>
+                      <span className="FdaBadge badge-registered" style={{ width: 'fit-content' }}>Registered</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Date Registered</label>
+                      <span>{formatDate(selectedProduct.dateRegistered)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Expiry Date</label>
+                      <span className={`FdaBadge ${getExpiryInfo(selectedProduct.expiryDate).className}`} style={{ width: 'fit-content' }}>
+                        {formatDate(selectedProduct.expiryDate)}
+                      </span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Added By</label>
+                      <span>{selectedProduct.addedBy}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Created On</label>
+                      <span>{formatDate(selectedProduct.createdAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated</label>
+                      <span>{formatDate(selectedProduct.updatedAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated By</label>
+                      <span>{selectedProduct.updatedBy}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1878,7 +1875,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.productName}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -1891,7 +1887,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={productForm.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setProductForm({ ...productForm, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
@@ -1903,7 +1898,6 @@ function FDAProductDB() {
                       type="text"
                       maxLength={100}
                       value={productForm.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setProductForm({ ...productForm, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -1962,7 +1956,6 @@ function FDAProductDB() {
                       maxLength={2000}
                       minLength={10}
                       value={conversionDetails.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -1985,7 +1978,6 @@ function FDAProductDB() {
                       placeholder="https://..."
                       maxLength={500}
                       value={conversionDetails.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
@@ -2023,7 +2015,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={advisoryForm.productName}
-                      maxLength={150}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -2036,7 +2027,6 @@ function FDAProductDB() {
                       placeholder="Provide reasoning or laboratory results detailing safety hazards..."
                       maxLength={2000}
                       value={advisoryForm.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -2059,13 +2049,12 @@ function FDAProductDB() {
                       placeholder="https://fda.gov.ph/advisories/..."
                       maxLength={500}
                       value={advisoryForm.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
                   </div>
 
-                  <div className="FdaModalFooter span-two">
+                  <div className="FdaModalFooter FdaAddModalFooter span-two">
                     <button type="button" className="BtnModalCancel" onClick={() => setShowAddAdvisoryModal(false)}>Cancel</button>
                     {/* 🔌 BACKEND: POST /api/advisories */}
                     <button type="submit" className="BtnModalDelete">Save Advisory</button>
@@ -2078,7 +2067,7 @@ function FDAProductDB() {
           {/* Modal 6: View Advisory Detail */}
           {showViewAdvisoryModal && selectedAdvisory && (
             <div className="FdaModalOverlay">
-              <div className="FdaModalContent" onClick={(e) => e.stopPropagation()}>
+              <div className="FdaModalContent FdaProductViewModal" onClick={(e) => e.stopPropagation()}>
                 <button className="FdaDetailClose" onClick={() => setShowViewAdvisoryModal(false)}>
                   <X size={16} />
                 </button>
@@ -2095,47 +2084,49 @@ function FDAProductDB() {
                   </div>
                 </div>
 
-                <div className="FdaDetailGrid">
-                  <div className="FdaDetailItem">
-                    <label>Status</label>
-                    <span className="FdaBadge badge-unregistered" style={{ width: 'fit-content' }}>Unregistered</span>
+                <div className="FdaProductViewBody">
+                  <div className="FdaDetailGrid">
+                    <div className="FdaDetailItem">
+                      <label>Status</label>
+                      <span className="FdaBadge badge-unregistered" style={{ width: 'fit-content' }}>Unregistered</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Advisory Date</label>
+                      <span>{formatDate(selectedAdvisory.advisoryDate)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Source URL</label>
+                      <span>
+                        {selectedAdvisory.sourceUrl ? (
+                          <a href={selectedAdvisory.sourceUrl} target="_blank" rel="noopener noreferrer" className="FdaSourceLink">
+                            {selectedAdvisory.sourceUrl}
+                            <ExternalLink size={12} />
+                          </a>
+                        ) : '—'}
+                      </span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Added By</label>
+                      <span>{selectedAdvisory.addedBy}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Created On</label>
+                      <span>{formatDate(selectedAdvisory.createdAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem">
+                      <label>Last Updated</label>
+                      <span>{formatDate(selectedAdvisory.updatedAt)}</span>
+                    </div>
+                    <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
+                      <label>Last Updated By</label>
+                      <span>{selectedAdvisory.updatedBy}</span>
+                    </div>
                   </div>
-                  <div className="FdaDetailItem">
-                    <label>Advisory Date</label>
-                    <span>{formatDate(selectedAdvisory.advisoryDate)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Source URL</label>
-                    <span>
-                      {selectedAdvisory.sourceUrl ? (
-                        <a href={selectedAdvisory.sourceUrl} target="_blank" rel="noopener noreferrer" className="FdaSourceLink">
-                          {selectedAdvisory.sourceUrl}
-                          <ExternalLink size={12} />
-                        </a>
-                      ) : '—'}
-                    </span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Added By</label>
-                    <span>{selectedAdvisory.addedBy}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Created On</label>
-                    <span>{formatDate(selectedAdvisory.createdAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem">
-                    <label>Last Updated</label>
-                    <span>{formatDate(selectedAdvisory.updatedAt)}</span>
-                  </div>
-                  <div className="FdaDetailItem" style={{ gridColumn: 'span 2' }}>
-                    <label>Last Updated By</label>
-                    <span>{selectedAdvisory.updatedBy}</span>
-                  </div>
-                </div>
 
-                <div className="FdaDetailDesc">
-                  <label>Advisory details</label>
-                  <p>{selectedAdvisory.advisoryDetails || "No details provided."}</p>
+                  <div className="FdaDetailDesc">
+                    <label>Advisory details</label>
+                    <p>{selectedAdvisory.advisoryDetails || "No details provided."}</p>
+                  </div>
                 </div>
 
                 <div className="FdaModalFooter">
@@ -2164,7 +2155,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={advisoryForm.productName}
-                      maxLength={150}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, productName: e.target.value })}
                     />
                     {formErrors.productName && <span className="form-error-msg">{formErrors.productName}</span>}
@@ -2176,7 +2166,6 @@ function FDAProductDB() {
                       rows={5}
                       maxLength={2000}
                       value={advisoryForm.advisoryDetails}
-                      maxLength={2000}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, advisoryDetails: e.target.value })}
                     />
                     {formErrors.advisoryDetails && <span className="form-error-msg">{formErrors.advisoryDetails}</span>}
@@ -2198,7 +2187,6 @@ function FDAProductDB() {
                       type="text"
                       maxLength={500}
                       value={advisoryForm.sourceUrl}
-                      maxLength={500}
                       onChange={(e) => setAdvisoryForm({ ...advisoryForm, sourceUrl: e.target.value })}
                     />
                     {formErrors.sourceUrl && <span className="form-error-msg">{formErrors.sourceUrl}</span>}
@@ -2236,7 +2224,6 @@ function FDAProductDB() {
                       placeholder="FDA-COS-YYYY-XXXXX"
                       maxLength={100}
                       value={conversionDetails.registrationNumber}
-                      maxLength={100}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, registrationNumber: e.target.value })}
                     />
                     {formErrors.registrationNumber && <span className="form-error-msg">{formErrors.registrationNumber}</span>}
@@ -2250,7 +2237,6 @@ function FDAProductDB() {
                       maxLength={150}
                       minLength={2}
                       value={conversionDetails.manufacturer}
-                      maxLength={150}
                       onChange={(e) => setConversionDetails({ ...conversionDetails, manufacturer: e.target.value })}
                     />
                     {formErrors.manufacturer && <span className="form-error-msg">{formErrors.manufacturer}</span>}
