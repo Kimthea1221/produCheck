@@ -36,6 +36,12 @@ class SharedFile(Base):
     # verification request cycle in your test scope:
     # request_id = Column(UUID(as_uuid=True), ForeignKey("verification_requests.request_id", ondelete="SET NULL"), nullable=True)
 
+    request_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("verification_requests.request_id", ondelete="CASCADE"),  # CHANGED: was SET NULL
+        nullable=True,
+    )
+
     file_name = Column(String(255), nullable=False)
     file_path = Column(Text, nullable=False)
     file_size_bytes = Column(BigInteger, nullable=False)

@@ -90,8 +90,15 @@ class Complaint(Base):
         ForeignKey("users.user_id", ondelete="SET NULL"), 
         nullable=True
     )
-    
+
     closed_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    # ADDED: who closed the takedown case, and the closing note (separate from the takedown note)
+    closed_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    closing_notes = Column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
