@@ -59,6 +59,9 @@ from app.desktop.services.verification.lea_verification_lists import (
     list_lea_closed_cases,
 )
 
+# ADDED: shared LEA-only helpers
+from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user
+
 
 # Same two-router-in-one-file pattern as walkin_complaints.py
 draft_submit_router = APIRouter(prefix="/drafts/verification", tags=["Verification Requests"])
@@ -79,6 +82,7 @@ def submit_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return submit_verification_draft(db, draft_id, current_user, request)
 
 
@@ -96,6 +100,7 @@ def create_request_direct(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return create_verification_request_direct(
         db, current_user,
         complaint_id=data.complaint_id,
@@ -120,6 +125,7 @@ def recall_request_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return recall_verification_request(db, request_id, current_user, request)
 
 
@@ -136,6 +142,7 @@ def resend_reminder_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return resend_reminder(db, request_id, current_user)
 
 # Ashanti code ends here
@@ -187,6 +194,8 @@ def list_verification_requests_awaiting_fda(
 
     results = query.order_by(VerificationRequest.requested_at.desc()).all()
 
+    is_lea = is_lea_user(current_user)  # ADDED
+
     return [
         VerificationRequestAwaitingFDAResponse(
             request_id=request.request_id,
@@ -195,7 +204,7 @@ def list_verification_requests_awaiting_fda(
             product_name=request.product_name,
             manufacturer=complaint.manufacturer,
             product_category=complaint.product_category,
-            complainant_name=complainant.full_name if complainant else None,
+            complainant_name=complainant.full_name if (complainant and is_lea) else None,  # CHANGED: citizen name is LEA-only
             source=complaint.source,
             priority=request.priority,
             requested_at=request.requested_at,
@@ -361,6 +370,7 @@ def get_lea_verification_queue_counts_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_verification_queue_counts(db, current_user)
 
 
@@ -376,6 +386,7 @@ def list_lea_fda_response_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_fda_response(db, current_user)
 
 
@@ -392,6 +403,7 @@ def get_lea_fda_response_detail_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_fda_response_detail(db, request_id, current_user)
 
 
@@ -414,6 +426,7 @@ def list_lea_closed_cases_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_closed_cases(
         db, current_user, search, category, reason_closed, date_from, date_to, page, page_size
     )

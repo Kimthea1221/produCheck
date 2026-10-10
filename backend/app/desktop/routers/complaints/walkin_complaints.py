@@ -16,6 +16,10 @@ from app.desktop.services.drafts.draft_submit_service import (
     create_walkin_complaint_direct,
     update_walkin_complaint_direct,
 )
+
+# ADDED: shared LEA-only helper
+from app.desktop.services.account_status.guards import assert_lea_user
+
 from app.models.verification_requests import VerificationRequest
 from app.models.walkin_complainants import WalkinComplainant
 from app.desktop.schemas.complaints.complaints import WalkinComplaintListResponse
@@ -42,6 +46,7 @@ def submit_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: walk-in intake is LEA-only
     new_complaint = submit_walkin_draft(db, draft_id, current_user, request)
     return new_complaint
 
@@ -74,6 +79,7 @@ def create_complaint_direct(
     db: Session = Depends(get_db), 
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     complainant_fields = {
         "full_name": full_name,
         "contact_number": contact_number,
@@ -124,6 +130,7 @@ def list_walkin_complaints(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: this list returns citizen names
     latest_request_subq = (
         db.query(
             VerificationRequest.complaint_id,
@@ -217,6 +224,7 @@ def update_complaint_direct(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     complainant_fields = {
         "full_name": full_name,
         "contact_number": contact_number,
@@ -264,6 +272,7 @@ def delete_walkin_complaint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     complaint = db.query(Complaint).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.region_id == current_user.region_id,

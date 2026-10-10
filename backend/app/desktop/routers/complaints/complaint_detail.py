@@ -11,6 +11,9 @@ from app.database.sessions import get_db
 from app.core.dependencies import get_current_user
 from app.desktop.schemas.complaints.complaints import ComplaintVerificationDetailResponse
 from app.desktop.services.complaints.complaint_detail_service import get_complaint_verification_detail
+# ADDED: shared LEA-only helpers and the Role constants
+from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user
+from app.core.constants import Role
 
 from app.desktop.schemas.complaints.complaints import FdaComplaintListItem
 from app.desktop.services.complaints.fda_reports_service import list_all_complaints_for_fda
@@ -178,7 +181,9 @@ def list_complaints(
         )
         
     results = query.order_by(Complaint.created_at.desc()).all()
-    
+
+    is_lea = is_lea_user(current_user)  # ADDED
+
     return [
         ComplaintListItemResponse(
             complaint_id=c.complaint_id,
@@ -188,7 +193,7 @@ def list_complaints(
             product_category=c.product_category,
             source=c.source,
             status=c.status,
-            complainant_name=wc.full_name if wc else None,
+            complainant_name=wc.full_name if (wc and is_lea) else None,  # CHANGED: citizen name is LEA-only
             created_at=c.created_at,
             notes=c.notes
         )
@@ -225,6 +230,7 @@ def get_complaint_detail_for_verification(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_complaint_verification_detail(db, complaint_id, current_user.region_id)
 
 
@@ -234,6 +240,8 @@ def list_complaints_awaiting_request(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
+    
     #complaint_ids_with_requests = db.query(VerificationRequest.complaint_id).subquery() initial code before adding recall and resend reminder
     complaint_ids_with_requests = db.query(VerificationRequest.complaint_id).filter(
         VerificationRequest.verification_request_status == "pending"
@@ -259,6 +267,8 @@ def get_walkin_complaint_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: before any query, so FDA can't probe which IDs exist
+
     complaint = db.query(Complaint).filter(
     Complaint.complaint_id == complaint_id,
     Complaint.region_id == current_user.region_id,
@@ -332,6 +342,7 @@ def list_initiated_cases_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_initiated_cases(db, current_user)
 
 
@@ -348,6 +359,7 @@ def get_initiated_case_detail_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_initiated_case_detail(db, complaint_id, current_user)
 
 
@@ -366,6 +378,9 @@ def close_case_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    # ADDED: same rule as initiate-takedown, whoever can start a takedown can close it
+    if current_user.role != Role.LEA_PERSONNEL:
+        raise HTTPException(status_code=403, detail="Only LEA personnel can close a case.")
     return close_case(db, complaint_id, current_user, data, http_request)
 #added by darlene --end 
 
