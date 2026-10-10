@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from app.models.shared_files import SharedFile
 from app.desktop.schemas.complaints.complaints import SharedFileResponse, FdaComplaintDetailResponse
 
+# ADDED: shared LEA check, so LEA can still open any complaint
+from app.desktop.services.account_status.guards import is_lea_user
 
 # services/complaints/fda_reports_service.py — one line change
 
@@ -61,6 +63,12 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
     )
     if current_user.role != "superadmin" and current_user.region_id:
         query = query.filter(Complaint.region_id == current_user.region_id)
+    
+    # CHANGED: only walk-in complaints are gated; extension complaints stay exactly as before
+    if not is_lea_user(current_user):
+        query = query.filter(
+            (Complaint.source != "walk_in") | (Complaint.status != "open")
+        )
         
     complaint = query.first()
 

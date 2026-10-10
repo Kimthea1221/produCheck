@@ -1,3 +1,4 @@
+# File: shared_files.py  (the router with prefix /shared-files)
 import os
 from uuid import UUID
 
@@ -8,8 +9,34 @@ from sqlalchemy.orm import Session
 from app.database.sessions import get_db
 from app.core.dependencies import get_current_user
 from app.models.shared_files import SharedFile
+from app.models.complaints import Complaint  # ADDED
+from app.desktop.services.account_status.guards import is_lea_user  # ADDED
 
 router = APIRouter(prefix="/shared-files", tags=["Shared Files"])
+
+
+# ADDED: one access rule shared by download and preview, so they can't drift apart.
+def _get_accessible_file(db: Session, file_id: UUID, current_user) -> SharedFile:
+    file_row = db.query(SharedFile).filter(
+        SharedFile.file_id == file_id,
+        SharedFile.region_id == current_user.region_id,   # region scoping, same as before
+    ).first()
+
+    if not file_row:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    # Only new rule: non-LEA users can't open files on walk-in complaints LEA hasn't sent yet.
+    # Extension files and everything else behave exactly as before.
+    if not is_lea_user(current_user):
+        unsent_walkin = db.query(Complaint.complaint_id).filter(
+            Complaint.complaint_id == file_row.complaint_id,
+            Complaint.source == "walk_in",
+            Complaint.status == "open",
+        ).first()
+        if unsent_walkin is not None:
+            raise HTTPException(status_code=404, detail="File not found.")  # same 404 as missing
+
+    return file_row
 
 
     #
@@ -25,14 +52,7 @@ def download_shared_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    
-    file_row = db.query(SharedFile).filter(
-    SharedFile.file_id == file_id,
-    SharedFile.region_id == current_user.region_id,   # Region scoping to ensure users can only access files in their region
-    ).first()
-
-    if not file_row:
-        raise HTTPException(status_code=404, detail="File not found.")
+    file_row = _get_accessible_file(db, file_id, current_user)  # CHANGED: role-aware access check
 
     if not os.path.exists(file_row.file_path):
         # Row exists but the physical file is missing — a real edge
@@ -64,13 +84,7 @@ def preview_shared_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    file_row = db.query(SharedFile).filter(
-        SharedFile.file_id == file_id,
-        SharedFile.region_id == current_user.region_id,   # same region scoping as download
-    ).first()
-
-    if not file_row:
-        raise HTTPException(status_code=404, detail="File not found.")
+    file_row = _get_accessible_file(db, file_id, current_user)  # CHANGED: role-aware access check
 
     if not os.path.exists(file_row.file_path):
         raise HTTPException(status_code=404, detail="File no longer exists on disk.")
