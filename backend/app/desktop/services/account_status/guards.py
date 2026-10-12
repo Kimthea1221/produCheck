@@ -31,6 +31,19 @@ def assert_lea_user(user: User) -> None:
         )
 
 
+# ADDED: FDA mirror of is_lea_user, for FDA-only read endpoints (lea-follow-up)
+def is_fda_user(user: User) -> bool:
+    return agency_of(user.role) == "FDA"
+
+
+def assert_fda_user(user: User) -> None:
+    if not is_fda_user(user):
+        raise HTTPException(
+            status_code=403,
+            detail="This action is restricted to FDA personnel.",
+        )
+
+
 def assert_same_agency_and_region(db: Session, actor: User, target: User):
     if actor.role == Role.NATIONAL_ADMIN:
         # National Admin has unrestricted reach over other National Admins

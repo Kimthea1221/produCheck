@@ -294,3 +294,45 @@ class LeaClosedCaseListResponse(BaseModel):
     page: int
     page_size: int
 # added by Darlene --end
+
+
+# ADDED: FDA "LEA Response" tab (lea-follow-up). Stage is derived at query time, never stored.
+class LeaFollowUpStage(str, Enum):
+    awaiting_lea = "awaiting_lea"
+    acknowledged = "acknowledged"
+    takedown_initiated = "takedown_initiated"
+    closed = "closed"
+
+
+# Deliberately has NO complainant fields: FDA must never receive them.
+class LeaFollowUpListItem(BaseModel):
+    request_id: UUID
+    case_reference: str
+    product_title: str
+    product_category: str | None
+    manufacturer: str | None
+    source: str
+    product_code: str | None
+    fda_result: LeaFdaResponseResultChoice
+    responded_at: datetime
+    verified_by_name: str | None
+    lea_stage: LeaFollowUpStage
+    last_updated_at: datetime
+    acknowledged_at: datetime | None
+    acknowledged_by_name: str | None
+    takedown_initiated_at: datetime | None
+    takedown_initiated_by_name: str | None
+    field_operation_notes: str | None
+    closed_at: datetime | None
+    closed_by_name: str | None
+    close_reason: str | None
+    closing_notes: str | None
+    reminder_sent_at: datetime | None
+    attached_files: list[SharedFileResponse]   # LEA's original evidence (request_id IS NULL)
+
+
+class LeaFollowUpListResponse(BaseModel):
+    items: list[LeaFollowUpListItem]
+    total: int
+    page: int
+    page_size: int

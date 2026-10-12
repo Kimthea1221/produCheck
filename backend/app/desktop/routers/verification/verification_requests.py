@@ -24,6 +24,9 @@ from app.desktop.schemas.verification.verification import (
     LeaFdaResponseListItem,
     LeaFdaResponseDetailResponse,
     LeaClosedCaseListResponse,
+    LeaFdaResponseResultChoice,
+    LeaFollowUpStage,
+    LeaFollowUpListResponse,
 )
 
 from app.desktop.services.verification.verification_submit_service import (
@@ -45,6 +48,7 @@ from app.desktop.services.verification.fda_verification_lists import (
     list_fda_verification_rejected,
     get_fda_verification_rejected_detail,
     get_fda_verification_queue_counts,
+    list_lea_follow_up,
 )
 
 from app.desktop.services.verification.fda_verification_export import (
@@ -60,7 +64,7 @@ from app.desktop.services.verification.lea_verification_lists import (
 )
 
 # ADDED: shared LEA-only helpers
-from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user
+from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user, assert_fda_user 
 
 
 # Same two-router-in-one-file pattern as walkin_complaints.py
@@ -431,6 +435,28 @@ def list_lea_closed_cases_endpoint(
         db, current_user, search, category, reason_closed, date_from, date_to, page, page_size
     )
     # added by Darlene --end
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /verification-requests/lea-follow-up
+@list_router.get("/lea-follow-up", response_model=LeaFollowUpListResponse)
+def get_lea_follow_up(
+    search: str | None = Query(None),
+    stage: LeaFollowUpStage | None = Query(None),
+    fda_result: LeaFdaResponseResultChoice | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),   
+):
+    assert_fda_user(current_user)   # role check first
+    return list_lea_follow_up(db, current_user, search, stage, fda_result, page, page_size)
+
 
     #
     #
