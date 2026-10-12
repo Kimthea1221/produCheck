@@ -13,6 +13,8 @@ from app.models.verification_requests import VerificationRequest
 from app.models.complaints import Complaint
 from app.models.fda_verification_drafts import FdaVerificationDraft
 from app.core.complaint_status import transition_complaint_status
+
+from app.desktop.services.verification.fda_attachments_service import delete_request_attachments, remove_files_from_disk   # ADDED
 from app.desktop.services.notifications.notification_service import (
     notify_lea_fda_responded,  
     notify_lea_fda_rejected,
@@ -25,13 +27,13 @@ from app.models.users import User
 from app.models.shared_files import SharedFile
 from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import FdaVerificationRequestDetailResponse
+from app.desktop.schemas.complaints.complaints import SharedFileResponse
 from app.desktop.schemas.verification.verification import (
     FdaVerificationSubmitRequest,
     FdaVerificationStatusChoice,
     FdaVerificationRejectRequest,
     FdaVerificationRequestDetailResponse,  # merge with the existing one below, don't duplicate
 )
-from app.desktop.schemas.complaints.complaints import SharedFileResponse
 
 
 
@@ -141,6 +143,9 @@ def submit_fda_verification_response(
         FdaVerificationDraft.verification_request_id == request_id
     ).delete()
 
+    # ADDED: keep only the responding officer's files (the response files LEA will see); delete other officers' leftovers
+    leftover_paths = delete_request_attachments(db, request_id, keep_uploaded_by=current_user_id)
+
 
     # ADDED — notify LEA of the outcome, before commit, same transaction
     notify_lea_fda_responded(db, complaint) #ADDED for notification to LEA personnel that FDA has responded to the verification request
@@ -150,11 +155,12 @@ def submit_fda_verification_response(
     # has been written yet, so verification_requests and complaints
     # never end up out of sync with each other.
     db.commit()
+    remove_files_from_disk(leftover_paths)   # ADDED
     db.refresh(verification_request)
     db.refresh(complaint)
 
     write_audit_log(
-        db,
+        db, 
         user=None,
         user_id_override=current_user_id,
         user_role_override=current_user_role,
@@ -216,10 +222,14 @@ def reject_fda_verification_response(
         FdaVerificationDraft.verification_request_id == request_id
     ).delete()
 
+    # ADDED: a rejection shows no files to LEA, and uploads are pending-only, so every officer's files for this request would be orphaned
+    file_paths = delete_request_attachments(db, request_id)
+
     notify_lea_fda_rejected(db, complaint, verification_request)  # ADDED for notification to LEA personnel that the verification request has been rejected
     notify_fda_peers_rejected(db, complaint, current_user)  # ADDED for notification to FDA personnel in the same region that a colleague has rejected the verification request
 
     db.commit()
+    remove_files_from_disk(file_paths)   # ADDED
     db.refresh(verification_request)
     db.refresh(complaint)
 
