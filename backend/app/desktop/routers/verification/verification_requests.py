@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import date
 import io
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, File, UploadFile, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -62,6 +62,9 @@ from app.desktop.services.verification.lea_verification_lists import (
     get_lea_fda_response_detail,
     list_lea_closed_cases,
 )
+
+from app.desktop.schemas.complaints.complaints import SharedFileResponse   # ADDED
+from app.desktop.services.verification.fda_attachments_service import upload_fda_attachments, delete_fda_attachment   # ADD
 
 # ADDED: shared LEA-only helpers
 from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user, assert_fda_user 
@@ -148,8 +151,40 @@ def resend_reminder_endpoint(
 ):
     assert_lea_user(current_user)  # ADDED
     return resend_reminder(db, request_id, current_user)
-
 # Ashanti code ends here
+
+    #
+    #
+    #
+    #
+    #
+    # POST /verification-requests/{request_id}/fda-attachments
+@direct_request_router.post("/{request_id}/fda-attachments", response_model=list[SharedFileResponse])
+def upload_fda_attachments_endpoint(
+    request_id: UUID,
+    files: list[UploadFile] = File(...),   # multipart field name is "files", as the frontend expects
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return upload_fda_attachments(db, request_id, current_user, files)   # role check is its first line
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # DELETE /verification-requests/{request_id}/fda-attachments/{file_id}
+@direct_request_router.delete("/{request_id}/fda-attachments/{file_id}", status_code=204)
+def delete_fda_attachment_endpoint(
+    request_id: UUID,
+    file_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    delete_fda_attachment(db, request_id, file_id, current_user)
+    return Response(status_code=204)   # no body on success
 
 
 # Third router in this file — listing/browsing, separate from the
