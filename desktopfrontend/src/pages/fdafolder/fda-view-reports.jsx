@@ -104,7 +104,7 @@ const WALKIN_STATUS_MAP = {
 
 const EXTENSION_STATUS_MAP = {
   "under_review": "Under Review",
-  "takedown_requested": "Takedown Requested",
+  "takedown_requested": "Request for Takedown",
   "completed": "Completed",
   "dismissed": "Dismissed",
 };
@@ -1026,7 +1026,7 @@ useEffect(() => {
   // -> "Case Closed" vs "Dismissed"), so a single shared list would let
   // someone pick a label that can never match anything on the other tab.
   const statusesList = activeTab === 'Browser Extension'
-    ? ["All", "Under Review", "Takedown Requested", "Completed", "Dismissed"]
+    ? ["All", "Under Review", "Request for Takedown", "Completed", "Dismissed"]
     : ["All", "Under Review", "Forwarded to LEA", "Operation in Progress", "Takedown Completed", "Case Closed"];
 
   return (
