@@ -29,7 +29,7 @@ import { apiFetch } from "../../utils/apiFetch";
 // personnel can manually set a complaint TO.
 const STATUS_OPTIONS = [
   { value: "under_review", label: "Under Review" },
-  { value: "takedown_requested", label: "Takedown Requested" },
+  { value: "takedown_requested", label: "Request for Takedown" }, //Request for Takedown
   { value: "completed", label: "Completed" },
   { value: "dismissed", label: "Dismissed" },
 ];
@@ -40,7 +40,7 @@ const CASE_FILTER_OPTIONS = [
   { value: "All", label: "All statuses" },
   { value: "open", label: "Open" },
   { value: "under_review", label: "Under Review" },
-  { value: "takedown_requested", label: "Takedown Requested" },
+  { value: "takedown_requested", label: "Request for Takedown" },
   { value: "completed", label: "Completed" },
   { value: "dismissed", label: "Dismissed" },
 ];
@@ -48,7 +48,7 @@ const CASE_FILTER_OPTIONS = [
 const STATUS_LABELS = {
   open: "Open",
   under_review: "Under Review",
-  takedown_requested: "Takedown Requested",
+  takedown_requested: "Request for Takedown",
   completed: "Completed",
   dismissed: "Dismissed",
 };

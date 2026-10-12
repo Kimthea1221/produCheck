@@ -998,3 +998,33 @@ body {
 .btn-confirm-manual:hover {
   background-color: #37455a;
 }
+
+.quick-check-tip strong { font-weight: 700; }
+
+.fda-contact-section {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #E0E0E0;
+  border-radius: 10px;
+  background: #FAFAFA;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #333;
+}
+.fda-contact-title { font-size: 13px; font-weight: 700; color: #1F2937; margin-bottom: 6px; }
+.fda-contact-row { margin-bottom: 4px; }
+.fda-contact-label { display: inline-block; min-width: 56px; font-weight: 700; color: #555; }
+.fda-contact-row a { color: #1F6FEB; text-decoration: underline; }
+.fda-contact-row small { color: #777; }
+.fda-portal-link {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  text-align: center;
+  border-radius: 8px;
+  background: #EF6C00;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.fda-portal-link:hover { opacity: 0.9; }

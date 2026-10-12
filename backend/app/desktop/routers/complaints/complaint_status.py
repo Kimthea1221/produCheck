@@ -32,7 +32,7 @@ user_dependency = Annotated[dict, Depends(get_current_personnel)]
 STATUS_LABELS = {
     "open": "Open",
     "under_review": "Under Review",
-    "takedown_requested": "Takedown Requested",
+    "takedown_requested": "Request for Takedown", #Request for Takedown
     "completed": "Completed",
     "dismissed": "Dismissed",
 }

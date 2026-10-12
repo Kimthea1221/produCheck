@@ -2,8 +2,8 @@
 import { whenSessionReady, isUserLoggedIn, getComplaintStatus } from "../scripts/session.js";
 
 const STAGE_ORDER = ['open', 'under_review', 'takedown_requested'];
-const STAGE_LABELS = { open: 'OPEN', under_review: 'UNDER REVIEW', takedown_requested: 'TAKEDOWN REQUESTED' };
-const STEP_LABELS = ['Open', 'Under Review', 'Takedown Requested'];
+const STAGE_LABELS = { open: 'OPEN', under_review: 'UNDER REVIEW', takedown_requested: 'REQUEST FOR TAKEDOWN' };
+const STEP_LABELS = ['Open', 'Under Review', 'Request for Takedown'];
 
 function renderComplaintCard(complaint) {
   const currentIndex = STAGE_ORDER.indexOf(complaint.stage);

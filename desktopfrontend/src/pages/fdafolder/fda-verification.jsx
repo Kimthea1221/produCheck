@@ -1866,16 +1866,6 @@ function FDAVerification() {
               <span className="FdaVerifStatLabel">Rejected Requests</span>
             </div>
 
-            <div className="FdaVerifStatCard">
-              <div className="FdaVerifStatCardTop">
-                <span className="FdaVerifStatBadge FdaVerifStatBadgeLea">
-                  <Send size={14} />
-                </span>
-              </div>
-              <span className="FdaVerifStatValue">{leaResponseTotal}</span>
-              <span className="FdaVerifStatLabel">LEA Response</span>
-            </div>
-
           </div>
 
           {/* WORKFLOW NAVIGATION TABS - VISUALLY IDENTICAL TO VIEW REPORTS PILL TABS */}

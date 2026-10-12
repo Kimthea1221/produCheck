@@ -425,7 +425,7 @@ function LeaVerificationRequest() {
   // CHANGED (Part 0) — split shared fieldOperationNotes into two independent variables
   //   to prevent notes typed in one tab from bleeding into the other.
   const [fdaTakedownNotes, setFdaTakedownNotes] = useState('');       // FDA Response — Initiate Takedown textarea; always blank per new selection
-  const [initiatedFieldNotes, setInitiatedFieldNotes] = useState(''); // Initiated Cases — progress note textarea; pre-filled from field_operation_notes
+  const [initiatedFieldNotes, setInitiatedFieldNotes] = useState(''); // Initiated Cases — closing note textarea; starts empty
   // BACKEND: maps to notes_to_fda / complaint_statement in verification_requests
   // CHANGED: removed hardcoded default — now starts empty
   const [complaintStatement, setComplaintStatement] = useState('');
@@ -744,8 +744,9 @@ function LeaVerificationRequest() {
   }, [selectedResponseId]);
 
   // ADDED — fetches Initiated Cases right-panel detail whenever selectedInitiatedId changes.
-  //          Pre-fills fieldOperationNotes with the existing note so the officer can review/append.
+  //          The closing box starts empty so the officer can enter a new final status update.
   useEffect(() => {
+    setInitiatedFieldNotes('');
     if (!selectedInitiatedId) return;
     if (!selectedInitiatedCase) {
       setInitiatedDetailLoading(true);
@@ -762,8 +763,8 @@ function LeaVerificationRequest() {
       .then((data) => {
         if (data) {
           setSelectedInitiatedCase(data);
-          // CHANGED (Part 0) — pre-fill initiatedFieldNotes (not the old shared fieldOperationNotes)
-          setInitiatedFieldNotes(data.field_operation_notes || '');
+          // CHANGED — closing box starts empty; takedown note is displayed read-only above
+          setInitiatedFieldNotes('');
         }
       })
       .catch(() => showError('Could not load case details.'))
@@ -1427,8 +1428,9 @@ function LeaVerificationRequest() {
               try {
                 const res = await apiFetch(`/complaints/${id}/close-case`, {
                   method: 'POST',
+                  // CHANGED: close-case body key now matches the column it is stored in (closing_notes)
                   body: JSON.stringify({
-                    field_operation_notes: initiatedFieldNotes.trim() ? initiatedFieldNotes.trim() : null,
+                    closing_notes: initiatedFieldNotes.trim() ? initiatedFieldNotes.trim() : null,
                   }),
                 });
                 if (!res.ok) {
@@ -1950,11 +1952,7 @@ function LeaVerificationRequest() {
                               </div>
                             </div>
 
-                            {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
-                            <LeaComplainantDetails
-                              complaintId={selectedAwaitingFda.complaint_id}
-                              complainantName={selectedAwaitingFda.complainant_name}
-                            />
+                            {/* REMOVED — Complainant Details (Awaiting FDA) */}
                           </>
                         ) : (
                           <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case from the list to view details.</p>
@@ -2167,11 +2165,7 @@ function LeaVerificationRequest() {
                                 </div>
                               </div>
 
-                              {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
-                              <LeaComplainantDetails
-                                complaintId={selectedResponse.complaint_id}
-                                complainantName={selectedResponse.complainant_name}
-                              />
+                              {/* REMOVED — Complainant Details (FDA Response) */}
                             </>
                           ) : (
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case to view details.</p>
@@ -2189,73 +2183,9 @@ function LeaVerificationRequest() {
 
                           return (
                             <>
-                              {/* 1a: Verification Request block */}
-                              {hasVerifReq && (
-                                <div className="VerificationRequestInfo" style={{ marginTop: '16px' }}>
-                                  <h3>Verification Request</h3>
-                                  <div className="VerificationRequestGrid">
-                                    {displayResponse.product_code && (
-                                      <div>
-                                        <label>PRODUCT CODE</label>
-                                        <p>{String(displayResponse.product_code).trim()}</p>
-                                      </div>
-                                    )}
-                                    {displayResponse.priority && (
-                                      <div>
-                                        <label>PRIORITY</label>
-                                        <p>{displayResponse.priority.charAt(0).toUpperCase() + displayResponse.priority.slice(1)}</p>
-                                      </div>
-                                    )}
-                                    {(displayResponse.complaint_statement || displayResponse.notes_to_fda) && (
-                                      <div className="VerificationNotes">
-                                        <label>NOTES TO FDA VERIFIER</label>
-                                        <p style={{ fontWeight: 500, fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-                                          {String(displayResponse.complaint_statement || displayResponse.notes_to_fda).trim()}
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
+                              {/* REMOVED — Verification Request (FDA Response) */}
 
-                              {/* 1b: Evidence Attached at Intake file grid */}
-                              <div className="LeaVerifSectionCard" style={{ marginTop: '16px' }}>
-                                <div className="LeaVerifSectionHeader">
-                                  <Paperclip size={16} className="LeaVerifBlueIcon" />
-                                  <h3>Evidence Attached at Intake</h3>
-                                </div>
-                                <div className="LeaVerifDocsGrid">
-                                  {displayResponse.attached_files && displayResponse.attached_files.length > 0 ? (
-                                    displayResponse.attached_files.map((f, idx) => (
-                                      <div key={f.file_id || idx} className="LeaVerifDocCard">
-                                        <div className="LeaVerifDocIcon">
-                                          {f.mime_type?.startsWith('image/') ? (
-                                            <ImageIcon size={18} />
-                                          ) : (
-                                            <FileText size={18} />
-                                          )}
-                                        </div>
-                                        <div className="LeaVerifDocInfo">
-                                          <p className="LeaVerifDocName">{f.file_name}</p>
-                                          <span className="LeaVerifDocMeta">{f.file_size_display}</span>
-                                        </div>
-                                        <div className="LeaVerifDocActions">
-                                          <button
-                                            type="button"
-                                            className="LeaVerifDocActionBtn"
-                                            title="Inspect Attachment"
-                                            onClick={() => setDocPreviewModal(f)}
-                                          >
-                                            <Eye size={13} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="LeaVerifNoDocsText">No files attached at intake.</p>
-                                  )}
-                                </div>
-                              </div>
+                              {/* REMOVED — Evidence Attached at Intake (FDA Response) */}
 
                               <div className='ConfirmationReturned'>
                                 {selectedResponse.verification_result === 'rejected' ? (
@@ -2573,7 +2503,10 @@ function LeaVerificationRequest() {
                       <div
                         key={item.complaint_id}
                         className={`QueueCard ${selectedInitiatedId === item.complaint_id ? 'ActiveQueueCard' : ''}`}
-                        onClick={() => setSelectedInitiatedId(item.complaint_id)}
+                        onClick={() => {
+                          setSelectedInitiatedId(item.complaint_id);
+                          setInitiatedFieldNotes('');
+                        }}
                       >
                         <div className="QueueCardTopRow">
                           <small style={{ margin: 0 }}>CASE ID: {item.case_reference}</small>
@@ -2635,11 +2568,7 @@ function LeaVerificationRequest() {
                                 </div>
                               </div>
 
-                              {/* CHANGED — passing complainantName prop to LeaComplainantDetails */}
-                              <LeaComplainantDetails
-                                complaintId={selectedInitiatedCase.complaint_id}
-                                complainantName={selectedInitiatedCase.complainant_name}
-                              />
+                              {/* REMOVED — Complainant Details (Initiated Cases) */}
                             </>
                           ) : (
                             <p style={{ color: '#7a8796', fontSize: '13px' }}>Select a case to view details.</p>
@@ -2657,74 +2586,9 @@ function LeaVerificationRequest() {
 
                           return (
                             <>
-                              {/* 2a: Verification Request block */}
-                              {/* 🔌 BACKEND: GET /complaints/initiated/{id} does not return product_code, priority or notes_to_fda yet (it returns attached_files). Mock fills them while the flag is on. */}
-                              {hasVerifReq && (
-                                <div className="VerificationRequestInfo" style={{ marginTop: '16px' }}>
-                                  <h3>Verification Request</h3>
-                                  <div className="VerificationRequestGrid">
-                                    {displayInitiated.product_code && (
-                                      <div>
-                                        <label>PRODUCT CODE</label>
-                                        <p>{String(displayInitiated.product_code).trim()}</p>
-                                      </div>
-                                    )}
-                                    {displayInitiated.priority && (
-                                      <div>
-                                        <label>PRIORITY</label>
-                                        <p>{displayInitiated.priority.charAt(0).toUpperCase() + displayInitiated.priority.slice(1)}</p>
-                                      </div>
-                                    )}
-                                    {(displayInitiated.complaint_statement || displayInitiated.notes_to_fda) && (
-                                      <div className="VerificationNotes">
-                                        <label>NOTES TO FDA VERIFIER</label>
-                                        <p style={{ fontWeight: 500, fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-                                          {String(displayInitiated.complaint_statement || displayInitiated.notes_to_fda).trim()}
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
+                              {/* REMOVED — Verification Request (Initiated Cases) */}
 
-                              {/* 2a: Evidence Attached at Intake file grid */}
-                              <div className="LeaVerifSectionCard" style={{ marginTop: '16px' }}>
-                                <div className="LeaVerifSectionHeader">
-                                  <Paperclip size={16} className="LeaVerifBlueIcon" />
-                                  <h3>Evidence Attached at Intake</h3>
-                                </div>
-                                <div className="LeaVerifDocsGrid">
-                                  {displayInitiated.attached_files && displayInitiated.attached_files.length > 0 ? (
-                                    displayInitiated.attached_files.map((f, idx) => (
-                                      <div key={f.file_id || idx} className="LeaVerifDocCard">
-                                        <div className="LeaVerifDocIcon">
-                                          {f.mime_type?.startsWith('image/') ? (
-                                            <ImageIcon size={18} />
-                                          ) : (
-                                            <FileText size={18} />
-                                          )}
-                                        </div>
-                                        <div className="LeaVerifDocInfo">
-                                          <p className="LeaVerifDocName">{f.file_name}</p>
-                                          <span className="LeaVerifDocMeta">{f.file_size_display}</span>
-                                        </div>
-                                        <div className="LeaVerifDocActions">
-                                          <button
-                                            type="button"
-                                            className="LeaVerifDocActionBtn"
-                                            title="Inspect Attachment"
-                                            onClick={() => setDocPreviewModal(f)}
-                                          >
-                                            <Eye size={13} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="LeaVerifNoDocsText">No files attached at intake.</p>
-                                  )}
-                                </div>
-                              </div>
+                              {/* REMOVED — Evidence Attached at Intake (Initiated Cases) */}
 
                               <div className='ConfirmationReturned'>
                                 {/* 2b: CONFIRMED UNREGISTERED PRODUCT block */}
@@ -2810,14 +2674,19 @@ function LeaVerificationRequest() {
                                 {/* 2c: Existing Field operation status update and Close Case button */}
                                 <div className='ResponseUpdateBox' style={{ marginTop: '16px' }}>
                                   <h6>Field operation status update</h6>
-                                  {/* CHANGED (Part 0) — bound to initiatedFieldNotes, not the old shared fieldOperationNotes */}
                                   {selectedInitiatedCase?.field_operation_notes && (
-                                    <p style={{ fontSize: '12px', color: '#7a8796', marginTop: '-4px', marginBottom: '10px' }}>
-                                      This is the note logged when the takedown was initiated. You may update it with the latest progress before closing this case.
-                                    </p>
+                                    <div className="LeaVerifResultField LeaVerifFullWidthField" style={{ marginBottom: '12px' }}>
+                                      <label className="LeaVerifFieldLabel">Takedown note (logged when the takedown was initiated)</label>
+                                      <p className="LeaVerifFieldValue" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                                        {selectedInitiatedCase.field_operation_notes}
+                                      </p>
+                                    </div>
                                   )}
+                                  <p style={{ fontSize: '12px', color: '#7a8796', marginTop: selectedInitiatedCase?.field_operation_notes ? '0px' : '-4px', marginBottom: '10px' }}>
+                                    Add the final field operation update for this case before closing it.
+                                  </p>
                                   <textarea
-                                    placeholder="Enter notes on field operation progress..."
+                                    placeholder="Enter the final field operation update..."
                                     value={initiatedFieldNotes}
                                     onChange={(e) => setInitiatedFieldNotes(e.target.value)}
                                     maxLength={2000}
