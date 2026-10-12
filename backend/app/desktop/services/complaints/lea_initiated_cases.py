@@ -69,9 +69,8 @@ def get_lea_initiated_case_detail(
     )
 
 
-# "Close Case" — the real transition: takedown_initiated -> completed.
-# Notes are optional here too; if provided, they overwrite the
-# existing field_operation_notes as the final status before closing.
+# "Close Case" — takedown_initiated -> completed. Writes its own columns so the
+# Initiate Takedown record (field_operation_*) is no longer overwritten.
 def close_case(
     db: Session, complaint_id: UUID, current_user, data: LeaCloseCaseRequest, http_request: Request | None = None
 ) -> LeaCloseCaseResponse:
@@ -91,11 +90,11 @@ def close_case(
 
     old_complaint_status = complaint.status
 
-    if data.field_operation_notes is not None:
-        complaint.field_operation_notes = data.field_operation_notes
-
-    complaint.field_operation_logged_at = datetime.now(timezone.utc)
-    complaint.field_operation_logged_by = current_user.user_id
+    # CHANGED: was overwriting field_operation_notes / _logged_at / _logged_by
+    complaint.closed_at = datetime.now(timezone.utc)
+    complaint.closed_by = current_user.user_id
+    if data.closing_notes is not None:
+        complaint.closing_notes = data.closing_notes
 
     transition_complaint_status(complaint, "completed")
 
@@ -131,4 +130,6 @@ def close_case(
         complaint_status=complaint.status,
         field_operation_notes=complaint.field_operation_notes,
         field_operation_logged_at=complaint.field_operation_logged_at,
+        closed_at=complaint.closed_at,            # ADDED
+        closing_notes=complaint.closing_notes,    # ADDED
     )

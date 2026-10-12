@@ -206,7 +206,7 @@ def get_lea_fda_response_detail(
 # ordering use a single "closed_at" concept instead of branching twice.
 def _closed_at_expr():
     return sa_case(
-        (Complaint.status == "completed", Complaint.field_operation_logged_at),
+        (Complaint.status == "completed", Complaint.closed_at),   # CHANGED: was field_operation_logged_at
         else_=VerificationRequest.lea_acknowledged_at,
     )
 
@@ -225,7 +225,7 @@ def list_lea_closed_cases(
     query = (
         db.query(Complaint, VerificationRequest, FieldOpOfficer, AckOfficer)
         .outerjoin(VerificationRequest, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .outerjoin(FieldOpOfficer, Complaint.field_operation_logged_by == FieldOpOfficer.user_id)
+        .outerjoin(FieldOpOfficer, Complaint.closed_by == FieldOpOfficer.user_id)   # CHANGED: was field_operation_logged_by
         .outerjoin(AckOfficer, VerificationRequest.lea_acknowledged_by == AckOfficer.user_id)
         .filter(Complaint.region_id == current_user.region_id)
         .filter(_closed_condition())
@@ -276,10 +276,10 @@ def list_lea_closed_cases(
                     manufacturer=complaint.manufacturer,
                     product_category=complaint.product_category,
                     date_filed=complaint.created_at,
-                    date_closed=complaint.field_operation_logged_at,
-                    closed_by_name=format_officer_display_name(field_op_officer),
+                    date_closed=complaint.closed_at,                                # CHANGED: was field_operation_logged_at
+                    closed_by_name=format_officer_display_name(field_op_officer),   # unchanged, now the closing officer
                     reason_closed="completed",
-                    reason_detail=complaint.field_operation_notes,
+                    reason_detail=complaint.closing_notes,
                 )
             )
         else:

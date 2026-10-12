@@ -149,7 +149,9 @@ class LeaInitiatedCaseDetailResponse(BaseModel):
 
 
 class LeaCloseCaseRequest(BaseModel):
-    field_operation_notes: str | None = Field(None, max_length=2000)
+    # ADDED: an old caller still sending field_operation_notes fails loudly (422) instead of silently losing the note
+    model_config = ConfigDict(extra="forbid")
+    closing_notes: str | None = Field(None, max_length=2000)   # CHANGED: was field_operation_notes
 
 
 class LeaCloseCaseResponse(BaseModel):
@@ -157,6 +159,8 @@ class LeaCloseCaseResponse(BaseModel):
     complaint_status: str
     field_operation_notes: str | None
     field_operation_logged_at: datetime | None
+    closed_at: datetime | None       # ADDED for closing note
+    closing_notes: str | None        # ADDED for closing note
 # added by Darlene --end
 
 #Ashanti code starts here in FDA View Reports:
