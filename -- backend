@@ -1,0 +1,24 @@
+[1mdiff --git a/backend/app/desktop/schemas/complaints/complaints.py b/backend/app/desktop/schemas/complaints/complaints.py[m
+[1mindex c94102a..0b81f25 100644[m
+[1m--- a/backend/app/desktop/schemas/complaints/complaints.py[m
+[1m+++ b/backend/app/desktop/schemas/complaints/complaints.py[m
+[36m@@ -149,7 +149,9 @@[m [mclass LeaInitiatedCaseDetailResponse(BaseModel):[m
+ [m
+ [m
+ class LeaCloseCaseRequest(BaseModel):[m
+[31m-    field_operation_notes: str | None = Field(None, max_length=2000)[m
+[32m+[m[32m    # ADDED: an old caller still sending field_operation_notes fails loudly (422) instead of silently losing the note[m
+[32m+[m[32m    model_config = ConfigDict(extra="forbid")[m
+[32m+[m[32m    closing_notes: str | None = Field(None, max_length=2000)   # CHANGED: was field_operation_notes[m
+ [m
+ [m
+ class LeaCloseCaseResponse(BaseModel):[m
+[36m@@ -157,6 +159,8 @@[m [mclass LeaCloseCaseResponse(BaseModel):[m
+     complaint_status: str[m
+     field_operation_notes: str | None[m
+     field_operation_logged_at: datetime | None[m
+[32m+[m[32m    closed_at: datetime | None       # ADDED for closing note[m
+[32m+[m[32m    closing_notes: str | None        # ADDED for closing note[m
+ # added by Darlene --end[m
+ [m
+ #Ashanti code starts here in FDA View Reports:[m

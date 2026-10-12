@@ -285,8 +285,10 @@ def get_walkin_complaint_detail(
             WalkinComplainant.complainant_id == complaint.complainant_id
         ).first()
 
-    files = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id).all()
-
+    files = db.query(SharedFile).filter(
+            SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only; FDA response files have a request_id
+        ).all()
     # Same precedence as the list endpoint: complaint.status is the
     # source of truth. "open" always means queued/Ready to Send,
     # regardless of any recalled/rejected request sitting in history.

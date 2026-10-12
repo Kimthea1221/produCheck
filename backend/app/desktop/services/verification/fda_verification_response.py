@@ -262,7 +262,8 @@ def get_fda_verification_request_detail(
     requested_by_name = get_display_name_across_agencies(db, verification_request.requested_by)
 
     files = db.query(SharedFile).filter(
-        SharedFile.complaint_id == complaint.complaint_id
+        SharedFile.complaint_id == complaint.complaint_id,
+        SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
     ).all()
 
     return FdaVerificationRequestDetailResponse(

@@ -80,8 +80,11 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
     # Only one of the two is ever populated for a given complaint.
     description = complaint.nature_of_complaint or complaint.consumer_description
 
-    files = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id).all()
-
+    files = db.query(SharedFile).filter(
+            SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
+        ).all()
+      
     return FdaComplaintDetailResponse(
         complaint_id=complaint.complaint_id,
         case_reference=complaint.case_reference,
