@@ -39,6 +39,7 @@ from app.desktop.schemas.complaints.complaints import (
     LeaCloseCaseResponse,
 )
 
+from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_walkin_verification   # ADDED
 from app.desktop.services.complaints.lea_initiated_cases import (
     list_lea_initiated_cases,
     get_lea_initiated_case_detail,
@@ -304,10 +305,10 @@ def get_walkin_complaint_detail(
     # has responded).
     if complaint.status == "open":
         effective_status = "queued"
+    elif complaint.status in ("takedown_initiated", "completed"):
+        effective_status = complaint.status   # CHANGED (A2.3): the takedown stages come from the complaint itself
     else:
-        latest_request = db.query(VerificationRequest).filter(
-            VerificationRequest.complaint_id == complaint_id
-        ).order_by(VerificationRequest.requested_at.desc()).first()
+        latest_request = get_latest_verification_request(db, complaint_id)   # CHANGED: shared helper, same query as before
         effective_status = latest_request.verification_request_status if latest_request else "queued"
 
     return WalkinComplaintDetailResponse(
@@ -329,6 +330,7 @@ def get_walkin_complaint_detail(
         id_type=complainant.id_type if complainant else None,
         address=complainant.address if complainant else None,
         attached_files=[SharedFileResponse.model_validate(f) for f in files],
+        verification=get_walkin_verification(db, complaint),   # ADDED
     )
 #Ashanti code ends here
 

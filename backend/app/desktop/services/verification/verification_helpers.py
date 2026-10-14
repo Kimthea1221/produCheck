@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.user_display import get_display_name_across_agencies
 from app.models.shared_files import SharedFile
 from app.models.verification_requests import VerificationRequest
-from app.desktop.schemas.complaints.complaints import SharedFileResponse
+from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary   # CHANGED
 
 
 # One complaint can have several requests (recall, resend): newest by requested_at wins
@@ -63,3 +63,64 @@ def get_lea_evidence_files(db: Session, complaint_id: UUID) -> list[SharedFileRe
         .all()
     )
     return [SharedFileResponse.model_validate(f) for f in files]
+
+
+# File: backend/app/desktop/services/verification/verification_helpers.py
+# Imports: CHANGE the schema import line
+from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary   # CHANGED
+
+
+# Constant + function: 
+
+_RESULT_BY_STATUS = {
+    "confirmed_registered": "registered",
+    "confirmed_unregistered": "unregistered",
+    "rejected": "rejected",
+}
+
+
+# The `verification` object for the walk-in detail panel. None when no request was ever sent.
+def get_walkin_verification(db: Session, complaint) -> WalkinVerificationSummary | None:
+    vr = get_latest_verification_request(db, complaint.complaint_id)
+    if vr is None:
+        return None
+
+    def name(user_id):
+        return get_display_name_across_agencies(db, user_id) if user_id else None
+
+    status = vr.verification_request_status
+    is_unregistered = status == "confirmed_unregistered"
+
+    # Same closure rule as the Closed Cases list: completed takedown, or an acknowledged registered/rejected response
+    reason_closed = closed_at = closed_by_id = reason_detail = None
+    if complaint.status == "completed":
+        reason_closed, closed_at = "completed", complaint.closed_at
+        closed_by_id, reason_detail = complaint.closed_by, complaint.closing_notes
+    elif vr.lea_acknowledged_at is not None and status in ("confirmed_registered", "rejected"):
+        reason_closed = "registered" if status == "confirmed_registered" else "rejected"
+        closed_at, closed_by_id = vr.lea_acknowledged_at, vr.lea_acknowledged_by
+        reason_detail = vr.response_notes if status == "confirmed_registered" else vr.rejection_reason
+
+    return WalkinVerificationSummary(
+        **get_fda_response_fields(db, vr),
+        request_id=vr.request_id,
+        request_status=status,
+        requested_at=vr.requested_at,
+        requested_by_name=name(vr.requested_by),
+        reminder_sent_at=vr.reminder_sent_at,
+        verification_result=_RESULT_BY_STATUS.get(status),
+        cpr_number=vr.cpr_number,
+        cpr_expiry=vr.cpr_expiry,
+        rejection_reason=vr.rejection_reason,
+        acknowledged_at=vr.lea_acknowledged_at,
+        acknowledged_by_name=name(vr.lea_acknowledged_by),
+        complaint_status=complaint.status,
+        # takedown record exists only on the unregistered path
+        takedown_initiated_at=complaint.field_operation_logged_at if is_unregistered else None,
+        takedown_initiated_by_name=name(complaint.field_operation_logged_by) if is_unregistered else None,
+        field_operation_notes=complaint.field_operation_notes if is_unregistered else None,
+        closed_at=closed_at,
+        closed_by_name=name(closed_by_id),
+        reason_closed=reason_closed,
+        reason_detail=reason_detail,
+    )
