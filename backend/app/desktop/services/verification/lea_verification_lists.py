@@ -19,6 +19,9 @@ from app.desktop.schemas.verification.verification import (
     LeaClosedCaseListResponse,
 )
 
+from app.desktop.services.verification.verification_helpers import get_response_files   # ADDED
+
+
 Responder = aliased(User)
 FieldOpOfficer = aliased(User)
 AckOfficer = aliased(User)
@@ -194,6 +197,10 @@ def get_lea_fda_response_detail(
         # column name ever shifts — matches the same defensive pattern
         # used elsewhere for this field.
         rejection_reason=getattr(vr, "rejection_reason", None),
+        product_code=vr.product_code,                 # ADDED
+        priority=vr.priority,                         # ADDED
+        notes_to_fda=vr.complaint_statement,          # ADDED: LEA's note to FDA lives in complaint_statement
+        response_files=get_response_files(db, vr),    # ADDED: responding officer's files only
     )
 
 # ============================================================

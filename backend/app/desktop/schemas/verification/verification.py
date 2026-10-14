@@ -260,6 +260,12 @@ class LeaFdaResponseDetailResponse(BaseModel):
 
     # rejected
     rejection_reason: str | None
+    # ADDED: FDA Response tab shows the request fields and FDA's own attachments
+    product_code: str | None = None
+    priority: str | None = None
+    notes_to_fda: str | None = None
+    response_files: list[SharedFileResponse] = []
+
 
 # Optional, confirm later if it becomes required.
 class LeaInitiateTakedownRequest(BaseModel):

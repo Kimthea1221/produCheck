@@ -17,6 +17,7 @@ from app.desktop.schemas.complaints.complaints import (
     LeaCloseCaseResponse,
 )
 
+from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_fda_response_fields   # ADDED
 from app.desktop.services.notifications.notification_service import (
     notify_fda_case_closed,
     notify_lea_peers_case_closed,  # ADDED
@@ -56,6 +57,9 @@ def get_lea_initiated_case_detail(
 
     complaint, complainant = result
 
+    # ADDED: the takedown came from the unregistered request, so read the FDA side from that one
+    vr = get_latest_verification_request(db, complaint.complaint_id, "confirmed_unregistered")
+
     return LeaInitiatedCaseDetailResponse(
         complaint_id=complaint.complaint_id,
         case_reference=complaint.case_reference,
@@ -66,6 +70,7 @@ def get_lea_initiated_case_detail(
         logged_at=complaint.created_at,
         source=complaint.source,
         field_operation_notes=complaint.field_operation_notes,
+        **get_fda_response_fields(db, vr),   # ADDED: product_code, priority, notes_to_fda, FDA result fields, response_files
     )
 
 

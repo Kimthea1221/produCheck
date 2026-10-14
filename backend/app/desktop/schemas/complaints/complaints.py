@@ -136,7 +136,19 @@ class LeaInitiatedCaseListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class LeaInitiatedCaseDetailResponse(BaseModel):
+# ADDED: FDA request + response block shared by the LEA Initiated and Closed Cases detail responses
+class LeaFdaResponseSummary(BaseModel):
+    product_code: str | None = None
+    priority: str | None = None
+    notes_to_fda: str | None = None
+    verified_by_name: str | None = None
+    responded_at: datetime | None = None
+    unregistered_reason: str | None = None
+    response_notes: str | None = None
+    response_files: list[SharedFileResponse] = []
+
+
+class LeaInitiatedCaseDetailResponse(LeaFdaResponseSummary):   # CHANGED: was (BaseModel)
     complaint_id: UUID
     case_reference: str
     product_title: str
