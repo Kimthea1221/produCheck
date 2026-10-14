@@ -6,7 +6,8 @@ from enum import Enum
 
 from app.desktop.schemas.drafts.drafts import Priority
 from app.desktop.schemas.common import NonEmptyStr
-from app.desktop.schemas.complaints.complaints import SharedFileResponse
+from app.desktop.schemas.complaints.complaints import SharedFileResponse, LeaFdaResponseSummary   # CHANGED: added LeaFdaResponseSummary
+
 
 
 
@@ -342,3 +343,20 @@ class LeaFollowUpListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ADDED: full final record for the Closed Cases modal. Date/closed-by/closing note stay on the list row.
+class LeaClosedCaseDetailResponse(LeaFdaResponseSummary):
+    verification_result: LeaFdaResponseResultChoice | None = None
+    requested_by_name: str | None = None
+    requested_at: datetime | None = None
+    cpr_number: str | None = None
+    cpr_expiry: date | None = None
+    rejection_reason: str | None = None
+    rejected_by_name: str | None = None
+    lea_acknowledged_at: datetime | None = None
+    acknowledged_by_name: str | None = None
+    takedown_initiated_at: datetime | None = None
+    takedown_initiated_by_name: str | None = None
+    field_operation_notes: str | None = None
+    attached_files: list[SharedFileResponse] = []

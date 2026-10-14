@@ -52,3 +52,14 @@ def get_fda_response_fields(db: Session, verification_request) -> dict:
         "response_notes": vr.response_notes,
         "response_files": get_response_files(db, vr),
     }
+
+
+# LEA's original evidence on a complaint (request_id NULL), as opposed to FDA's response files
+def get_lea_evidence_files(db: Session, complaint_id: UUID) -> list[SharedFileResponse]:
+    files = (
+        db.query(SharedFile)
+        .filter(SharedFile.complaint_id == complaint_id, SharedFile.request_id.is_(None))
+        .order_by(SharedFile.uploaded_at.asc())
+        .all()
+    )
+    return [SharedFileResponse.model_validate(f) for f in files]

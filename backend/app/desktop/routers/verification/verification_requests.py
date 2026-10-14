@@ -27,6 +27,7 @@ from app.desktop.schemas.verification.verification import (
     LeaFdaResponseResultChoice,
     LeaFollowUpStage,
     LeaFollowUpListResponse,
+    LeaClosedCaseDetailResponse
 )
 
 from app.desktop.services.verification.verification_submit_service import (
@@ -61,6 +62,7 @@ from app.desktop.services.verification.lea_verification_lists import (
     list_lea_fda_response,
     get_lea_fda_response_detail,
     list_lea_closed_cases,
+    get_lea_closed_case_detail
 )
 
 from app.desktop.schemas.complaints.complaints import SharedFileResponse   # ADDED
@@ -469,6 +471,23 @@ def list_lea_closed_cases_endpoint(
     return list_lea_closed_cases(
         db, current_user, search, category, reason_closed, date_from, date_to, page, page_size
     )
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /verification-requests/closed-cases/{complaint_id}
+@list_router.get("/closed-cases/{complaint_id}", response_model=LeaClosedCaseDetailResponse)
+def get_lea_closed_case_detail_endpoint(
+    complaint_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    assert_lea_user(current_user)   # role check first
+    return get_lea_closed_case_detail(db, complaint_id, current_user)
     # added by Darlene --end
 
 

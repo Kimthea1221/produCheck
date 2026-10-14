@@ -17,10 +17,15 @@ from app.desktop.schemas.verification.verification import (
     LeaFdaResponseDetailResponse,
     LeaClosedCaseListItem,
     LeaClosedCaseListResponse,
+    LeaClosedCaseDetailResponse
 )
 
-from app.desktop.services.verification.verification_helpers import get_response_files   # ADDED
-
+from app.desktop.services.verification.verification_helpers import (   # CHANGED
+    get_response_files,
+    get_latest_verification_request,
+    get_fda_response_fields,
+    get_lea_evidence_files,
+)
 
 Responder = aliased(User)
 FieldOpOfficer = aliased(User)
@@ -307,4 +312,72 @@ def list_lea_closed_cases(
             )
 
     return LeaClosedCaseListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+
+# Function: get_lea_closed_case_detail 
+def get_lea_closed_case_detail(db: Session, complaint_id: UUID, current_user) -> LeaClosedCaseDetailResponse:
+    complaint = (
+        db.query(Complaint)
+        .filter(
+            Complaint.complaint_id == complaint_id,
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: walk-in only, extension complaints never reach LEA
+        )
+        .first()
+    )
+    if complaint is None:
+        raise HTTPException(status_code=404, detail="Closed case not found.")
+
+    # Same rule as _closed_condition: which request closed this case?
+    if complaint.status == "completed":
+        vr = get_latest_verification_request(db, complaint.complaint_id, "confirmed_unregistered")
+    elif complaint.status == "dismissed":
+        vr = (
+            db.query(VerificationRequest)
+            .filter(
+                VerificationRequest.complaint_id == complaint.complaint_id,
+                VerificationRequest.verification_request_status.in_(["confirmed_registered", "rejected"]),
+                VerificationRequest.lea_acknowledged_at.isnot(None),
+            )
+            .order_by(VerificationRequest.requested_at.desc())
+            .first()
+        )
+        if vr is None:
+            raise HTTPException(status_code=404, detail="Closed case not found.")
+    else:
+        raise HTTPException(status_code=404, detail="Closed case not found.")
+
+    fda_fields = get_fda_response_fields(db, vr)   # {} when a completed case has no request on file
+
+    request_fields = {}
+    if vr is not None:
+        request_fields = {
+            "verification_result": _result_choice(vr.verification_request_status),
+            "requested_by_name": get_display_name_across_agencies(db, vr.requested_by),
+            "requested_at": vr.requested_at,
+            "cpr_number": vr.cpr_number,
+            "cpr_expiry": vr.cpr_expiry,
+            "rejection_reason": vr.rejection_reason,
+            # the modal reads rejected_by_name for rejected cases; it is the same person as verified_by_name
+            "rejected_by_name": fda_fields.get("verified_by_name") if vr.verification_request_status == "rejected" else None,
+            "lea_acknowledged_at": vr.lea_acknowledged_at,
+            "acknowledged_by_name": get_display_name_across_agencies(db, vr.lea_acknowledged_by) if vr.lea_acknowledged_by else None,
+        }
+
+    # Takedown record exists only on the unregistered path (completed cases)
+    takedown_fields = {}
+    if complaint.status == "completed":
+        takedown_fields = {
+            "takedown_initiated_at": complaint.field_operation_logged_at,
+            "takedown_initiated_by_name": get_display_name_across_agencies(db, complaint.field_operation_logged_by) if complaint.field_operation_logged_by else None,
+            "field_operation_notes": complaint.field_operation_notes,
+        }
+
+    return LeaClosedCaseDetailResponse(
+        **fda_fields,
+        **request_fields,
+        **takedown_fields,
+        attached_files=get_lea_evidence_files(db, complaint.complaint_id),
+    )
     # added by Darlene --end
