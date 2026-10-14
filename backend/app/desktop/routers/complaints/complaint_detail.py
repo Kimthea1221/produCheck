@@ -166,6 +166,10 @@ def list_complaints(
         Complaint.region_id == current_user.region_id,
         Complaint.deleted_at.is_(None)
     )
+
+    is_lea = is_lea_user(current_user)   # CHANGED: moved up from below
+    if is_lea:
+        query = query.filter(Complaint.source == "walk_in")   # ADDED: LEA never sees extension complaints, whatever ?source= says
     
     if status:
         query = query.filter(Complaint.status.in_(status))
@@ -181,8 +185,6 @@ def list_complaints(
         )
         
     results = query.order_by(Complaint.created_at.desc()).all()
-
-    is_lea = is_lea_user(current_user)  # ADDED
 
     return [
         ComplaintListItemResponse(
