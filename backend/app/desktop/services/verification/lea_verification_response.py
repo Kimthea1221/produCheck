@@ -32,6 +32,7 @@ def _get_fda_response_in_region(db: Session, request_id: UUID, current_user):
         .filter(
             VerificationRequest.request_id == request_id,
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: extension complaints never reach LEA
         )
         .first()
     )
