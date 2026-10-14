@@ -74,6 +74,7 @@ def check_and_send_sla_reminders(db: Session, current_user) -> None:
             VerificationRequest.verification_request_status == "pending",
             VerificationRequest.priority != "standard",
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: SLA reminders only apply to walk-in verification requests
         )
         .all()
     )

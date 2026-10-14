@@ -14,6 +14,7 @@ from app.desktop.schemas.drafts.drafts import (
 )
 from app.desktop.schemas.complaints.complaints import VerificationRequestDraftDetailResponse
 from app.desktop.services.complaints.complaint_detail_service import get_complaint_verification_detail
+from app.desktop.services.account_status.guards import assert_lea_user   # ADDED
 
 from app.core.dependencies import get_current_user
 
@@ -26,6 +27,18 @@ router = APIRouter(prefix="/drafts/verification", tags=["Verification Request Dr
 # the UI. Same pattern as walk-in's REQUIRED_TEXT_FIELDS, just a
 # shorter list since this draft type has far fewer fields overall.
 REQUIRED_FIELDS = ["priority", "notes_to_fda"]
+
+
+# ADDED HELPER: a draft may only point at a walk-in complaint in the officer's own region
+def _assert_walkin_complaint_in_region(db: Session, complaint_id: UUID, current_user) -> None:
+    exists = db.query(Complaint.complaint_id).filter(
+        Complaint.complaint_id == complaint_id,
+        Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",
+        Complaint.deleted_at.is_(None),
+    ).first()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="Complaint not found.")
 
 
 def _determine_draft_status(data: VerificationRequestDraftSave) -> DraftStatus:
@@ -49,6 +62,9 @@ def save_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)   # ADDED
+    _assert_walkin_complaint_in_region(db, data.complaint_id, current_user)   # ADDED: was saving any complaint_id
+
     status = _determine_draft_status(data)  
 
     new_draft = VerificationRequestDraft(
@@ -76,6 +92,8 @@ def get_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)   # ADDED
+
     draft = db.query(VerificationRequestDraft).filter(
         VerificationRequestDraft.draft_id == draft_id,
         VerificationRequestDraft.saved_by == current_user.user_id,
@@ -114,6 +132,9 @@ def update_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)   # ADDED
+    _assert_walkin_complaint_in_region(db, data.complaint_id, current_user)   # ADDED: PUT also overwrites complaint_id
+
     draft = db.query(VerificationRequestDraft).filter(
         VerificationRequestDraft.draft_id == draft_id,
         VerificationRequestDraft.saved_by == current_user.user_id,
@@ -148,6 +169,8 @@ def delete_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)   # ADDED
+
     draft = db.query(VerificationRequestDraft).filter(
         VerificationRequestDraft.draft_id == draft_id,
         VerificationRequestDraft.saved_by == current_user.user_id,
@@ -176,6 +199,8 @@ def list_verification_drafts(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)   # ADDED
+    
     # Joined to Complaint from the start, since search AND sort both
     # potentially need product_title — which only exists on the
     # joined table, not on VerificationRequestDraft itself
