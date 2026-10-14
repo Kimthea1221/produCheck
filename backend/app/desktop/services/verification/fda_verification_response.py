@@ -101,6 +101,9 @@ def submit_fda_verification_response(
             )
         new_verification_status = "confirmed_registered"
         new_complaint_status = "dismissed"
+        # ADDED: a registered record carries no unregistered reason
+        cpr_number, cpr_expiry, unregistered_reason = data.cpr_number, data.cpr_expiry, None
+
     else:
         if not data.unregistered_reason or not data.unregistered_reason.strip():
             raise HTTPException(
@@ -120,12 +123,14 @@ def submit_fda_verification_response(
                 )
         new_verification_status = "confirmed_unregistered"
         new_complaint_status = "takedown_requested"
+        # ADDED: an unregistered record carries no CPR details
+        cpr_number, cpr_expiry, unregistered_reason = None, None, data.unregistered_reason
 
     verification_request.verification_request_status = new_verification_status
-    verification_request.cpr_number = data.cpr_number
-    verification_request.cpr_expiry = data.cpr_expiry
+    verification_request.cpr_number = cpr_number               # was data.cpr_number
+    verification_request.cpr_expiry = cpr_expiry               # was data.cpr_expiry
     verification_request.response_notes = data.response_notes
-    verification_request.unregistered_reason = data.unregistered_reason
+    verification_request.unregistered_reason = unregistered_reason   # was data.unregistered_reason
     verification_request.responded_by = current_user.user_id
     verification_request.responded_at = datetime.now(timezone.utc)
 
