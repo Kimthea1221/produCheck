@@ -44,16 +44,19 @@ def _result_choice(verification_request_status: str) -> str:
 # registered/rejected cases already terminal on the complaint but not
 # yet clicked-through by LEA (lea_acknowledged_at still null).
 def _fda_response_condition():
-    return or_(
-        and_(
-            VerificationRequest.verification_request_status == "confirmed_unregistered",
-            Complaint.status == "takedown_requested",
-        ),
-        and_(
-            VerificationRequest.verification_request_status.in_(
-                ["confirmed_registered", "rejected"]
+    return and_(
+        Complaint.source == "walk_in",   # ADDED: LEA never handles extension complaints
+        or_(
+            and_(
+                VerificationRequest.verification_request_status == "confirmed_unregistered",
+                Complaint.status == "takedown_requested",
             ),
-            VerificationRequest.lea_acknowledged_at.is_(None),
+            and_(
+                VerificationRequest.verification_request_status.in_(
+                    ["confirmed_registered", "rejected"]
+                ),
+                VerificationRequest.lea_acknowledged_at.is_(None),
+            ),
         ),
     )
 
@@ -62,14 +65,17 @@ def _fda_response_condition():
 # (always terminal) or dismissed-and-acknowledged (registered/rejected
 # that LEA has clicked through).
 def _closed_condition():
-    return or_(
-        Complaint.status == "completed",
-        and_(
-            Complaint.status == "dismissed",
-            VerificationRequest.verification_request_status.in_(
-                ["confirmed_registered", "rejected"]
+    return and_(
+        Complaint.source == "walk_in",   # ADDED: extension complaints FDA marked completed no longer appear here
+        or_(
+            Complaint.status == "completed",
+            and_(
+                Complaint.status == "dismissed",
+                VerificationRequest.verification_request_status.in_(
+                    ["confirmed_registered", "rejected"]
+                ),
+                VerificationRequest.lea_acknowledged_at.isnot(None),
             ),
-            VerificationRequest.lea_acknowledged_at.isnot(None),
         ),
     )
 # added by Darlene --end
@@ -90,7 +96,11 @@ def get_lea_verification_queue_counts(db: Session, current_user) -> LeaVerificat
 
     initiated_count = (
         db.query(Complaint)
-        .filter(Complaint.region_id == current_user.region_id, Complaint.status == "takedown_initiated")
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
+            Complaint.status == "takedown_initiated",
+        )
         .count()
     )
 
@@ -99,7 +109,7 @@ def get_lea_verification_queue_counts(db: Session, current_user) -> LeaVerificat
     # already clicked through).
     dismissed_count = joined.filter(_closed_condition()).count()
 
-    completed_count = joined.filter(Complaint.status == "completed").count()
+    completed_count = joined.filter(Complaint.source == "walk_in", Complaint.status == "completed").count()   # CHANGED: added source
 
     return LeaVerificationQueueCounts(
         fda_response_count=fda_response_count,

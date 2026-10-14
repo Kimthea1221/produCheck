@@ -29,7 +29,11 @@ from app.desktop.services.notifications.notification_service import (
 def list_lea_initiated_cases(db: Session, current_user) -> list[LeaInitiatedCaseListItem]:
     complaints = (
         db.query(Complaint)
-        .filter(Complaint.region_id == current_user.region_id, Complaint.status == "takedown_initiated")
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
+            Complaint.status == "takedown_initiated",
+        )
         .order_by(Complaint.field_operation_logged_at.desc())
         .all()
     )
@@ -48,6 +52,7 @@ def get_lea_initiated_case_detail(
         .filter(
             Complaint.complaint_id == complaint_id,
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status == "takedown_initiated",
         )
         .first()
@@ -84,6 +89,7 @@ def close_case(
         .filter(
             Complaint.complaint_id == complaint_id,
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: an extension complaint gets the same 404
         )
         .first()
     )
