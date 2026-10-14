@@ -25,16 +25,24 @@ def _get_accessible_file(db: Session, file_id: UUID, current_user) -> SharedFile
     if not file_row:
         raise HTTPException(status_code=404, detail="File not found.")
 
-    # Only new rule: non-LEA users can't open files on walk-in complaints LEA hasn't sent yet.
-    # Extension files and everything else behave exactly as before.
-    if not is_lea_user(current_user):
+    if is_lea_user(current_user):
+        # ADDED: LEA only handles walk-in complaints, so extension files are not theirs to open
+        walkin_file = db.query(Complaint.complaint_id).filter(
+            Complaint.complaint_id == file_row.complaint_id,
+            Complaint.source == "walk_in",
+        ).first()
+        if walkin_file is None:
+            raise HTTPException(status_code=404, detail="File not found.")   # same 404 as missing
+    else:
+        # Non-LEA users can't open files on walk-in complaints LEA hasn't sent yet.
+        # Extension files and everything else behave exactly as before.
         unsent_walkin = db.query(Complaint.complaint_id).filter(
             Complaint.complaint_id == file_row.complaint_id,
             Complaint.source == "walk_in",
             Complaint.status == "open",
         ).first()
         if unsent_walkin is not None:
-            raise HTTPException(status_code=404, detail="File not found.")  # same 404 as missing
+            raise HTTPException(status_code=404, detail="File not found.")
 
     return file_row
 

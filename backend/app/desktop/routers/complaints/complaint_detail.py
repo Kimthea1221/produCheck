@@ -77,6 +77,8 @@ def get_dashboard_trends(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    assert_lea_user(current_user)   # ADDED
+
     now = datetime.now(timezone.utc)
     start_of_year = datetime(now.year, 1, 1, tzinfo=timezone.utc)
     
@@ -96,6 +98,7 @@ def get_dashboard_trends(
     # 2. Forwarded trend (requests sent this year)
     requests = db.query(VerificationRequest).join(Complaint).filter(
         Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",   # ADDED
         VerificationRequest.requested_at >= start_of_year
     ).all()
     
@@ -123,6 +126,7 @@ def get_dashboard_trends(
         
         ops_count = db.query(Complaint).filter(
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status.in_(["takedown_requested", "takedown_initiated", "completed"]),
             Complaint.created_at >= month_start,
             Complaint.created_at < next_month_start,
@@ -131,6 +135,7 @@ def get_dashboard_trends(
         
         takedowns_count = db.query(Complaint).filter(
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status == "dismissed",
             Complaint.created_at >= month_start,
             Complaint.created_at < next_month_start,

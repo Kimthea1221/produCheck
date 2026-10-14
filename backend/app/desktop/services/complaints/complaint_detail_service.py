@@ -25,6 +25,7 @@ def get_complaint_verification_detail(db: Session, complaint_id: UUID, region_id
     ).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.region_id == region_id,
+        Complaint.source == "walk_in",   # ADDED: LEA verification flow is walk-in only
         Complaint.deleted_at.is_(None),  #Add
     ).first()
 
