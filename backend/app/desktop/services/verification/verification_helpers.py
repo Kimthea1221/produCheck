@@ -124,3 +124,13 @@ def get_walkin_verification(db: Session, complaint) -> WalkinVerificationSummary
         reason_closed=reason_closed,
         reason_detail=reason_detail,
     )
+
+
+# The status LEA sees on a walk-in row: the complaint's own takedown stages win,
+# otherwise the latest verification request decides. Used by the walk-in list and detail.
+def get_walkin_effective_status(complaint, latest_request) -> str:
+    if complaint.status == "open":
+        return "queued"
+    if complaint.status in ("takedown_initiated", "completed"):
+        return complaint.status
+    return latest_request.verification_request_status if latest_request else "queued"

@@ -20,6 +20,9 @@ from app.desktop.services.drafts.draft_submit_service import (
 # ADDED: shared LEA-only helper
 from app.desktop.services.account_status.guards import assert_lea_user
 
+
+from app.desktop.services.verification.verification_helpers import get_walkin_effective_status   # ADDED
+
 from app.models.verification_requests import VerificationRequest
 from app.models.walkin_complainants import WalkinComplainant
 from app.desktop.schemas.complaints.complaints import WalkinComplaintListResponse
@@ -172,12 +175,7 @@ def list_walkin_complaints(
 
     results = []
     for complaint, complainant, vr in rows.order_by(Complaint.created_at.desc()).all():
-        if complaint.status == "open":
-            effective_status = "queued"
-        elif vr:
-            effective_status = vr.verification_request_status
-        else:
-            effective_status = "queued"
+        effective_status = get_walkin_effective_status(complaint, vr)   # CHANGED (A2.3): takedown stages included
 
         if status is not None and effective_status != status:
             continue

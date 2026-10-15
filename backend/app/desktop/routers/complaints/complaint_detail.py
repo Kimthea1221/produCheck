@@ -38,8 +38,7 @@ from app.desktop.schemas.complaints.complaints import (
     LeaCloseCaseRequest,
     LeaCloseCaseResponse,
 )
-
-from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_walkin_verification   # ADDED
+from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_walkin_verification, get_walkin_effective_status   # CHANGED
 from app.desktop.services.complaints.lea_initiated_cases import (
     list_lea_initiated_cases,
     get_lea_initiated_case_detail,
@@ -303,13 +302,8 @@ def get_walkin_complaint_detail(
     # Only fall back to the latest request's status when the complaint
     # itself is not open (i.e. a request is genuinely active or FDA
     # has responded).
-    if complaint.status == "open":
-        effective_status = "queued"
-    elif complaint.status in ("takedown_initiated", "completed"):
-        effective_status = complaint.status   # CHANGED (A2.3): the takedown stages come from the complaint itself
-    else:
-        latest_request = get_latest_verification_request(db, complaint_id)   # CHANGED: shared helper, same query as before
-        effective_status = latest_request.verification_request_status if latest_request else "queued"
+    latest_request = get_latest_verification_request(db, complaint_id)
+    effective_status = get_walkin_effective_status(complaint, latest_request)   # CHANGED: shared with the walk-in list
 
     return WalkinComplaintDetailResponse(
         complaint_id=complaint.complaint_id,
