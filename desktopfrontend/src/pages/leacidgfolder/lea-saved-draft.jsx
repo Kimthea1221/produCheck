@@ -198,7 +198,8 @@ function LeaDraftViewModal({ draft, onClose, onContinueEditing }) {
     };
   }, [draft.draft_id, draft.draft_type]);
 
-  // Attachment preview effect (verification drafts only, shared-files endpoint)
+  // Attachment preview effect — serves both walk-in draft and verification draft types;
+  // walk-in attachments carry preview_url/download_url, verification drafts fall back to shared-files
   useEffect(() => {
     if (!previewFile) {
       setPreviewUrl(null);
@@ -225,7 +226,7 @@ function LeaDraftViewModal({ draft, onClose, onContinueEditing }) {
       let cancelled = false;
       setDocxLoading(true);
       setDocxError(false);
-      apiFetch(`/shared-files/${previewFile.file_id}/preview`)
+      apiFetch(previewFile.preview_url ?? `/shared-files/${previewFile.file_id}/preview`)
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.arrayBuffer();
@@ -250,7 +251,7 @@ function LeaDraftViewModal({ draft, onClose, onContinueEditing }) {
     setPreviewLoading(true);
     setPreviewError(false);
 
-    apiFetch(`/shared-files/${previewFile.file_id}/preview`)
+    apiFetch(previewFile.preview_url ?? `/shared-files/${previewFile.file_id}/preview`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
@@ -422,6 +423,45 @@ function LeaDraftViewModal({ draft, onClose, onContinueEditing }) {
                             <span className="LeaVerifDocMeta">
                               {att.file_size_display || (att.file_size_bytes ? formatFileSize(att.file_size_bytes) : '')}
                             </span>
+                          </div>
+                          {/* ADDED: walk-in draft attachments use owner-only routes */}
+                          <div className="LeaVerifDocActions">
+                            <button
+                              type="button"
+                              className="LeaVerifDocActionBtn"
+                              title="Preview Attachment"
+                              onClick={() => setPreviewFile({
+                                ...att,
+                                file_id: att.attachment_id,
+                                preview_url: `/drafts/walkin/${draft.draft_id}/attachments/${att.attachment_id}/preview`,
+                                download_url: `/drafts/walkin/${draft.draft_id}/attachments/${att.attachment_id}/download`,
+                              })}
+                            >
+                              <Eye size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              className="LeaVerifDocActionBtn"
+                              title="Download Attachment"
+                              onClick={() => {
+                                apiFetch(`/drafts/walkin/${draft.draft_id}/attachments/${att.attachment_id}/download`)
+                                  .then((res) => {
+                                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                    return res.blob();
+                                  })
+                                  .then((blob) => {
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = att.file_name;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                  })
+                                  .catch((err) => console.error('Download failed:', err));
+                              }}
+                            >
+                              <Download size={13} />
+                            </button>
                           </div>
                         </div>
                       );
@@ -692,7 +732,7 @@ function LeaDraftViewModal({ draft, onClose, onContinueEditing }) {
                 onClick={() => {
                   const fileId = previewFile.file_id;
                   if (!fileId) return;
-                  apiFetch(`/shared-files/${fileId}/download`)
+                  apiFetch(previewFile.download_url ?? `/shared-files/${fileId}/download`)
                     .then((res) => {
                       if (!res.ok) throw new Error(`HTTP ${res.status}`);
                       return res.blob();

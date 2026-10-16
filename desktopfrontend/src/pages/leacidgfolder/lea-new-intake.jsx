@@ -52,6 +52,8 @@ function LeaNewIntake() {
           (data.attached_files ?? []).map((f) => ({
             attachment_id: f.file_id,
             file_name: f.file_name,
+            mime_type: f.mime_type,
+            file_size_display: f.file_size_display,
           }))
         )
       })
@@ -147,24 +149,7 @@ function LeaNewIntake() {
   const [touched, setTouched] = useState({})
   const [submitError, setSubmitError] = useState('')
 
-  // Helper to check if at least one field or file has a value
-  const hasAtLeastOneField = () => {
-    if (fullName && fullName.trim()) return true
-    if (contactNumber && contactNumber.trim()) return true
-    if (email && email.trim()) return true
-    if (idType && idType.trim()) return true
-    if (address && address.trim()) return true
-    if (productName && productName.trim()) return true
-    if (manufacturer && manufacturer.trim()) return true
-    if (productCategory && productCategory.trim()) return true
-    if (placeOfPurchase && placeOfPurchase.trim()) return true
-    if (dateOfPurchase && dateOfPurchase.trim()) return true
-    if (amountPaid !== '' && amountPaid !== null && amountPaid !== undefined && String(amountPaid).trim() !== '') return true
-    if (natureOfComplaint && natureOfComplaint.trim()) return true
-    if (files && files.length > 0) return true
-    if (existingAttachments && existingAttachments.length > 0) return true
-    return false
-  }
+
 
   // Helper to get current value for a given field name
   const getFieldValue = (field) => {
@@ -341,6 +326,9 @@ function LeaNewIntake() {
       }
     })
 
+    if (!productName || !productName.trim()) newErrors.productName = 'Product Name is required.'
+    if (files.length + existingAttachments.length === 0) newErrors.attachments = 'At least one attachment is required.'
+
     setTouched(newTouched)
     setErrors(newErrors)
 
@@ -423,10 +411,9 @@ function LeaNewIntake() {
       .finally(() => setLoading(false))
   }, [editingDraftId])
 
-  // 🔌 BACKEND: enforce the same limits (10 files, 25 MB each, PDF/JPG/PNG) on the server
   const MAX_FILES_TOTAL = 10
   const MAX_FILE_SIZE = 25 * 1024 * 1024
-  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png']
+  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.docx']
   const ALLOWED_MIME_TYPES = [
     'application/pdf',
     'image/jpeg',
@@ -434,6 +421,8 @@ function LeaNewIntake() {
     'image/pjpeg',
     'image/png',
     'image/x-png',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ]
 
   const isAllowedFileType = (file) => {
@@ -475,7 +464,7 @@ function LeaNewIntake() {
       if (!file.size || file.size === 0) {
         skipMessages.push(`${file.name} is empty and was not added.`)
       } else if (!isAllowedFileType(file)) {
-        skipMessages.push(`${file.name} is not an allowed file type (PDF, JPG, PNG only).`)
+        skipMessages.push(`${file.name} is not an allowed file type (PDF, JPG, PNG, DOCX only).`)
       } else if (file.size > MAX_FILE_SIZE) {
         skipMessages.push(`${file.name} is larger than 25 MB and was not added.`)
       } else {
@@ -531,6 +520,41 @@ function LeaNewIntake() {
     }
   }
 
+  // ADDED: saved draft files and submitted-complaint files live behind different routes
+  const getExistingAttachmentUrl = (attachment, kind) =>
+    editingDraftId
+      ? `/drafts/walkin/${editingDraftId}/attachments/${attachment.attachment_id}/${kind}`
+      : `/shared-files/${attachment.attachment_id}/${kind}`   // kind: 'preview' | 'download'
+
+  // ADDED: fetch the saved file as a Blob and reuse the existing preview modal (images, PDF, DOCX via mammoth)
+  const handlePreviewExisting = async (attachment) => {
+    try {
+      const res = await apiFetch(getExistingAttachmentUrl(attachment, 'preview'))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      setPreviewFile(new File([blob], attachment.file_name, { type: attachment.mime_type || blob.type }))
+    } catch {
+      showToast('Could not open this file.')
+    }
+  }
+
+  // ADDED: download through the same authenticated route
+  const handleDownloadExisting = async (attachment) => {
+    try {
+      const res = await apiFetch(getExistingAttachmentUrl(attachment, 'download'))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.file_name
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      showToast('Could not download this file.')
+    }
+  }
+
   const [isDragActive, setIsDragActive] = useState(false)
 
   const handleDrop = (e) => {
@@ -579,8 +603,6 @@ function LeaNewIntake() {
     return formData
   }
 
-  // 🔌 BACKEND: these fields are optional on the form now. This message appears only while
-  // the backend still requires them. Remove it when the backend accepts missing values.
   const FIELD_LABELS = {
     product_name: 'Product Name',
     manufacturer: 'Manufacturer/Seller',
@@ -702,11 +724,6 @@ function LeaNewIntake() {
   const handleLogComplaint = async (e) => {
     e.preventDefault()
 
-    if (!hasAtLeastOneField()) {
-      showToast('Fill in at least one field or attach a file before logging this complaint.')
-      return
-    }
-
     if (!validateForm()) {
       showToast('Please fix the validation errors before submitting.')
       return
@@ -798,13 +815,13 @@ function LeaNewIntake() {
           <div className='FormForWalkin'>
             <form onSubmit={handleLogComplaint} noValidate>
               <p style={{ margin: '0 0 -8px 0', fontSize: '13px', color: '#6b7280' }}>
-                All fields are optional, but at least one field or file is needed to log a complaint.
+                All fields are optional, but product name and file attachment are needed to log a complaint.
               </p>
               <div className='FormSection'>
                 <h3>COMPLAINANT DETAILS</h3>
                 <div className='col'>
                   <div>
-                    <label htmlFor="fullName">Full Name (OPTIONAL)</label>
+                    <label htmlFor="fullName">Full Name</label>
                     <input
                       id="fullName"
                       type="text"
@@ -822,7 +839,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="contactNumber">Contact (OPTIONAL)</label>
+                    <label htmlFor="contactNumber">Contact</label>
                     <input
                       id="contactNumber"
                       type="text"
@@ -842,7 +859,7 @@ function LeaNewIntake() {
                 </div>
                 <div className='col'>
                   <div>
-                    <label htmlFor="email">Email (OPTIONAL)</label>
+                    <label htmlFor="email">Email</label>
                     <input
                       id="email"
                       type="text"
@@ -861,7 +878,7 @@ function LeaNewIntake() {
                   </div>
 
                   <div>
-                    <label htmlFor="idType">ID Presented (OPTIONAL)</label>
+                    <label htmlFor="idType">ID Presented</label>
                     <select
                       id="idType"
                       value={idType}
@@ -879,7 +896,7 @@ function LeaNewIntake() {
                   </div>
                 </div>
 
-                <label htmlFor="address">Address (OPTIONAL)</label>
+                <label htmlFor="address">Address</label>
                 <input
                   id="address"
                   type="text"
@@ -897,7 +914,7 @@ function LeaNewIntake() {
                 <h3>REPORTED PRODUCT</h3>
                 <div className='col'>
                   <div>
-                    <label htmlFor="productName">Product Name (OPTIONAL)</label>
+                    <label htmlFor="productName">Product Name<span style={{ color: '#ef4444' }}>*</span></label>
                     <input
                       id="productName"
                       type="text"
@@ -916,7 +933,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="manufacturer">Manufacturer/Seller (OPTIONAL)</label>
+                    <label htmlFor="manufacturer">Manufacturer/Seller</label>
                     <input
                       id="manufacturer"
                       type="text"
@@ -938,7 +955,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="productCategory">Category (OPTIONAL)</label>
+                    <label htmlFor="productCategory">Category</label>
                     <select
                       id="productCategory"
                       value={productCategory}
@@ -959,7 +976,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="placeOfPurchase">Place of Purchase (OPTIONAL)</label>
+                    <label htmlFor="placeOfPurchase">Place of Purchase</label>
                     <input
                       id="placeOfPurchase"
                       type="text"
@@ -981,7 +998,7 @@ function LeaNewIntake() {
 
                 <div className='col'>
                   <div>
-                    <label htmlFor="dateOfPurchase">Date of Purchase (OPTIONAL)</label>
+                    <label htmlFor="dateOfPurchase">Date of Purchase</label>
                     <input
                       id="dateOfPurchase"
                       type="date"
@@ -997,7 +1014,7 @@ function LeaNewIntake() {
                     )}
                   </div>
                   <div>
-                    <label htmlFor="amountPaid">Amount Paid (OPTIONAL)</label>
+                    <label htmlFor="amountPaid">Amount Paid</label>
                     <input
                       id="amountPaid"
                       type="text" // CHANGED — was "number"; type=number can't be fully locked down (see onChange)
@@ -1025,7 +1042,7 @@ function LeaNewIntake() {
 
               <div className='FormSection'>
                 <h3>Complainant Statement</h3>
-                <label htmlFor="natureOfComplaint">Nature Of Complaint (OPTIONAL)</label>
+                <label htmlFor="natureOfComplaint">Nature Of Complaint</label>
                 <textarea
                   id="natureOfComplaint"
                   rows='5'
@@ -1045,7 +1062,7 @@ function LeaNewIntake() {
               </div>
 
               <div className='FormSectionAttach'>
-                <h3>Evidence & Attachment</h3>
+                <h3>Evidence &amp; Attachment <span style={{ color: '#ef4444' }}>*</span></h3>
                 <p>Upload all the photos, receipts, ID Copy, and any supporting documents.</p>
                 <div className='UploadArea'>
                   <input
@@ -1067,7 +1084,7 @@ function LeaNewIntake() {
                     <div className="UploadContent">
                       <span className="UploadIcon">☁</span>
                       <h4>Drop files or click to upload</h4>
-                      <p> PDF, JPG, PNG · Max 25 MB each</p>
+                      <p> PDF, JPG, PNG, DOCX · Max 25 MB each</p>
                     </div>
                   </label>
 
@@ -1094,9 +1111,25 @@ function LeaNewIntake() {
                             </div>
                             <div className="LeaVerifDocInfo">
                               <p className="LeaVerifDocName" title={attachment.file_name}>{attachment.file_name}</p>
-                              <span className="LeaVerifDocMeta">{attachment.file_size_display || (attachment.file_size ? formatFileSize(attachment.file_size) : '')}</span>
+                              <span className="LeaVerifDocMeta">{attachment.file_size_display || (attachment.file_size_bytes ? formatFileSize(attachment.file_size_bytes) : '')}</span>
                             </div>
                             <div className="LeaVerifDocActions" style={{ display: 'flex', gap: '4px' }}>
+                              <button
+                                type="button"
+                                className="LeaVerifDocActionBtn"
+                                title="Preview File"
+                                onClick={() => handlePreviewExisting(attachment)}
+                              >
+                                <Eye size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                className="LeaVerifDocActionBtn"
+                                title="Download File"
+                                onClick={() => handleDownloadExisting(attachment)}
+                              >
+                                <Download size={13} />
+                              </button>
                               <button
                                 type="button"
                                 className="LeaVerifDocActionBtn"
