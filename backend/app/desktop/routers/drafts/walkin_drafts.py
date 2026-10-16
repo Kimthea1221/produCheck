@@ -5,6 +5,9 @@ from uuid import uuid4, UUID
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import ValidationError  # ADD to imports at the top of the file, if not already present
+import mimetypes                                                        # ADDED
+from fastapi.responses import FileResponse                              # ADDED
+
 
 from app.database.sessions import get_db
 from app.models.walkin_intake_drafts import WalkinIntakeDraft
@@ -17,6 +20,8 @@ from app.desktop.schemas.drafts.drafts import (
     DraftStatus,
     SortOption,
 )
+
+from app.desktop.services.account_status.guards import assert_lea_user  # ADDED
 from app.core.dependencies import get_current_user
 
 
@@ -31,15 +36,10 @@ MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB, matching the UI's stated limit
 MAX_FILES_PER_DRAFT = 10   # ADDED — same cap as the direct-submit path, kept in sync
 
 
-# Fields the officer's form requires (see Image 4/5) — everything
-# EXCEPT full_name, contact_number, id_type, email, address,
-# amount_paid, which are allowed to stay blank. At least one
-# attached file is also required, but that's checked separately
+# At least one attached file is also required, but that's checked separately
 # below since files aren't part of WalkinIntakeDraftSave's fields.
-REQUIRED_TEXT_FIELDS = [
-    "product_name", "manufacturer", "product_category",
-    "place_of_purchase", "date_of_purchase", "nature_of_complaint",
-]
+# Only the product name is required (plus at least one attached file, checked below).
+REQUIRED_TEXT_FIELDS = ["product_name"]   # CHANGED: was all six fields
 
 
 def _determine_draft_status(data: WalkinIntakeDraftSave, has_files: bool) -> DraftStatus:
@@ -47,7 +47,8 @@ def _determine_draft_status(data: WalkinIntakeDraftSave, has_files: bool) -> Dra
     # is the same as writing data.product_name — using the string name lets
     # us loop through all 6 fields instead of writing 6 separate if-checks.
     for field_name in REQUIRED_TEXT_FIELDS:
-        if getattr(data, field_name) is None:   
+        value = getattr(data, field_name)
+        if value is None or (isinstance(value, str) and not value.strip()):   # CHANGED: a blank box counts as missing
             return DraftStatus.incomplete
     # All required text fields are filled in, but no file has been
     # attached yet — still not a complete draft.               
@@ -149,6 +150,7 @@ def save_walkin_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)
 
     # ADDED — reject an oversized batch before creating the draft row
     # at all, so we never end up with a draft that's already invalid
@@ -223,6 +225,8 @@ def get_walkin_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)
+
     draft = db.query(WalkinIntakeDraft).filter(
         WalkinIntakeDraft.draft_id == draft_id,
         # Privacy rule from the original spec — drafts are scoped by
@@ -284,6 +288,8 @@ def update_walkin_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)
+
     draft = db.query(WalkinIntakeDraft).filter(
         WalkinIntakeDraft.draft_id == draft_id,        # 1
         WalkinIntakeDraft.saved_by == current_user.user_id,         # 2
@@ -383,6 +389,8 @@ def delete_walkin_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)
+
     # Same ownership-scoped fetch pattern as get_walkin_draft and
     # update_walkin_draft — reused a third time now
     draft = db.query(WalkinIntakeDraft).filter(
@@ -430,6 +438,8 @@ def list_walkin_drafts(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)
+    
     query = db.query(WalkinIntakeDraft).filter(
         WalkinIntakeDraft.saved_by == current_user.user_id
     )
@@ -450,4 +460,79 @@ def list_walkin_drafts(
         query = query.order_by(WalkinIntakeDraft.product_name.asc())
 
     return query.all()
+
+
+# File: backend/app/desktop/routers/drafts/walkin_drafts.py
+# Imports: add these three lines
+import mimetypes                                                        # ADDED
+from fastapi.responses import FileResponse                              # ADDED
+from app.desktop.services.account_status.guards import assert_lea_user  # ADDED
+
+
+
+# ADDED: one access rule for preview and download. Looked up by id, never by a client-supplied path.
+def _get_own_draft_attachment(db: Session, draft_id: UUID, attachment_id: UUID, current_user) -> DraftAttachment:
+    attachment = (
+        db.query(DraftAttachment)
+        .join(WalkinIntakeDraft, WalkinIntakeDraft.draft_id == DraftAttachment.walkin_draft_id)
+        .filter(
+            DraftAttachment.attachment_id == attachment_id,
+            DraftAttachment.walkin_draft_id == draft_id,
+            WalkinIntakeDraft.saved_by == current_user.user_id,       # ownership: drafts are private to the officer
+            WalkinIntakeDraft.region_id == current_user.region_id,    # region
+        )
+        .first()
+    )
+    if attachment is None:
+        raise HTTPException(status_code=404, detail="Attachment not found.")   # same 404 for "missing" and "not yours"
+    if not os.path.exists(attachment.file_path):
+        raise HTTPException(status_code=404, detail="File no longer exists on disk.")
+    return attachment
+
+
+def _serve_draft_attachment(attachment: DraftAttachment, inline: bool) -> FileResponse:
+    media_type = mimetypes.guess_type(attachment.file_name)[0] or "application/octet-stream"   # from the name, not the client's claim
+    return FileResponse(
+        path=attachment.file_path,
+        filename=attachment.file_name,
+        media_type=media_type,
+        content_disposition_type="inline" if inline else "attachment",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /drafts/walkin/{draft_id}/attachments/{attachment_id}/preview
+@router.get("/{draft_id}/attachments/{attachment_id}/preview")
+def preview_draft_attachment(
+    draft_id: UUID,
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    assert_lea_user(current_user)
+    return _serve_draft_attachment(_get_own_draft_attachment(db, draft_id, attachment_id, current_user), inline=True)
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /drafts/walkin/{draft_id}/attachments/{attachment_id}/download
+@router.get("/{draft_id}/attachments/{attachment_id}/download")
+def download_draft_attachment(
+    draft_id: UUID,
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    assert_lea_user(current_user)
+    return _serve_draft_attachment(_get_own_draft_attachment(db, draft_id, attachment_id, current_user), inline=False)
 
