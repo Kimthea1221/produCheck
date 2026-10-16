@@ -20,6 +20,7 @@ import {
 } from "../utils/validation.js";
 
 document.addEventListener('DOMContentLoaded', () => {
+  const GOOGLE_LOGIN_ENABLED = false;
   const emailField = document.getElementById('email-field');
   const otpField = document.getElementById('otp-field');
   const otpDigitInputs = Array.from(document.querySelectorAll('#otp-field .otp-digit-input'));
@@ -191,12 +192,19 @@ document.addEventListener('DOMContentLoaded', () => {
       forgotLink.hidden = mode === 'signup';
     }
 
-    // hide sign in with google on sign up page
-    if (currentMode === 'signup') {
-      googleLoginBtn.style.display = "none";
-    } else if (currentMode === 'signin') {
-      googleLoginBtn.style.display = "block";
+    // temporary hide the sign in with google
+    const GOOGLE_LOGIN_ENABLED = false;
+    if (googleLoginBtn) {
+      googleLoginBtn.style.display =
+        GOOGLE_LOGIN_ENABLED && currentMode === 'signin' ? 'flex' : 'none';
     }
+    
+    // hide sign in with google on sign up page
+    // if (currentMode === 'signup') {
+    //   googleLoginBtn.style.display = "none";
+    // } else if (currentMode === 'signin') {
+    //   googleLoginBtn.style.display = "block";
+    // }
 
     clearErrors();
 
@@ -1039,33 +1047,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // sign in with google (connected to the backend)
-  googleLoginBtn.addEventListener("click", () => {
-    chrome.identity.getAuthToken({ interactive: true }, async (token) => {
-      if (chrome.runtime.lastError || !token) {
-        setError(googleError, "Google sign-in failed. Please try again.");
-        return;
-      }
-
-      googleLogin(token, (success, error, email, errObj) => {
-        if (success) {
-          window.location.href = 'report-complaint.html';
+  if (googleLoginBtn && GOOGLE_LOGIN_ENABLED) {
+    googleLoginBtn.addEventListener("click", () => {
+      chrome.identity.getAuthToken({ interactive: true }, async (token) => {
+        if (chrome.runtime.lastError || !token) {
+          setError(googleError, "Google sign-in failed. Please try again.");
           return;
-        } 
-        
-        if (handleRateLimitError(errObj, null, googleError)) return;
-
-        if (error && error.toLowerCase().includes('verify')) {
-          if (googleError){
-            googleError.innerHTML ='Please verify your email before signing in. ' + 
-              '<a href="#" id="verify-now-link" style="color:#1F2937; font-weight:700; text-decoration:underline; cursor:pointer;">Verify now</a>';
-          }
-          
-          reVerifyEmail(email, googleError);
-        } else {
-          setError(googleError, error || "Google sign-in failed. Please try again.")
         }
+
+        googleLogin(token, (success, error, email, errObj) => {
+          if (success) {
+            window.location.href = 'report-complaint.html';
+            return;
+          } 
+          
+          if (handleRateLimitError(errObj, null, googleError)) return;
+
+          if (error && error.toLowerCase().includes('verify')) {
+            if (googleError){
+              googleError.innerHTML ='Please verify your email before signing in. ' + 
+                '<a href="#" id="verify-now-link" style="color:#1F2937; font-weight:700; text-decoration:underline; cursor:pointer;">Verify now</a>';
+            }
+            
+            reVerifyEmail(email, googleError);
+          } else {
+            setError(googleError, error || "Google sign-in failed. Please try again.")
+          }
+        });
       });
     });
-  });
+  }
   
 });

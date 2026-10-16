@@ -78,8 +78,6 @@ Thumbs.db
 backend/nlp/assets/
 backend/nlp/datasets/
 
-#backend/nlp/finetuned_sbert/
-backend/nlp/
 
 backend/nlp/finetuned_sbert.zip
 backend/nlp/finetuned_sbert.zip:Zone.Identifier
@@ -90,5 +88,3 @@ docker-compose.override.yml
 backend/db.env
 
 desktopfrontend/release/
-
-backend/app/extension/routers/retrieval.py

@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = data.productStatus;
         currentVerificationResult = status || 'unregistered';
 
-        if (status === 'unregistered' || status === 'registered' || status === 'suspicious') {
+        if (status === 'unregistered' || status === 'registered') {
           populateDetectedProduct(data.productTitle, data.productUrl);
           // Guests see the sign-in-required version of this view instead of a fillable form
           showReportView(isGuest ? 'report-form-view-guest' : 'report-form-view');

@@ -89,6 +89,11 @@ from app.core.extension_limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+#LLM/OCR
+from app.extension.routers import screenshot
+from dotenv import load_dotenv
+load_dotenv()
+
 app = FastAPI()
 # Base.metadata.create_all(bind=engine) wag na iuuncomment this line, since we are using alembic for migrations
 
@@ -168,9 +173,11 @@ app.include_router(password_reset_request_router)
 #         "User": consumer
 #     }
 
-#app.include_router(retrieval_router)
+# app.include_router(retrieval_router)
 
 app.include_router(verification.router)
 app.include_router(marketplace_detection_router)
 
 app.include_router(complaint_status.router)
+
+app.include_router(screenshot.router)

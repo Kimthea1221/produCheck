@@ -906,3 +906,33 @@
 #everifymo-modal .rf-result .btn-primary:hover{ background:#374151; }
 #everifymo-modal .rf-result .btn-error{ background:#B91C1C; }
 #everifymo-modal .rf-result .btn-error:hover{ background:#991B1B; }
+
+#everifymo-modal .quick-check-tip strong { font-weight: 700; }
+
+#everifymo-modal .fda-contact-section {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #E0E0E0;
+  border-radius: 10px;
+  background: #FAFAFA;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #333;
+}
+#everifymo-modal .fda-contact-title { font-size: 13px; font-weight: 700; color: #1F2937; margin-bottom: 6px; }
+#everifymo-modal .fda-contact-row { margin-bottom: 4px; }
+#everifymo-modal .fda-contact-label { display: inline-block; min-width: 56px; font-weight: 700; color: #555; }
+#everifymo-modal .fda-contact-row a { color: #1F6FEB !important; text-decoration: underline; }
+#everifymo-modal .fda-contact-row small { color: #777; }
+#everifymo-modal .fda-portal-link {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  text-align: center;
+  border-radius: 8px;
+  background: #EF6C00;
+  color: #fff !important;
+  font-weight: 700;
+  text-decoration: none !important;
+}
+#everifymo-modal .fda-portal-link:hover { opacity: 0.9; }

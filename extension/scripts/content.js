@@ -2,6 +2,8 @@
 console.log('FDA Checker content script loaded');
 console.log("Hello World from content.js")
 
+chrome.runtime.sendMessage({ action: 'pageVisited', url: location.href });
+
 const verifyBtn = document.createElement("button");
 verifyBtn.textContent = "Check Product";
 verifyBtn.style.position = "fixed";
@@ -14,47 +16,63 @@ verifyBtn.style.border = "1px solid #256428";
 verifyBtn.style.fontWeight = "bold";
 verifyBtn.style.borderRadius = "15px";
 verifyBtn.style.cursor = "pointer";
+verifyBtn.style.top = "24px";
+verifyBtn.style.right = "24px";
 document.body.appendChild(verifyBtn);
 
-let debounceTimer;
-let pendingSelection = '';
-
 let verifyButtonEnabled = true; // default
+let lastStoreName = '';
+
+// checking if its in the product page
+function isProductPage() {
+
+    const currentUrl = location.href;
+
+    if ((currentUrl.includes("shopee.ph") && currentUrl.includes("-i.")) || currentUrl.includes("shopee.ph/product")) {
+        console.log("Product page of shopee");
+        return true;
+    }    
+
+    if (currentUrl.includes("lazada.com.ph/products/") && currentUrl.includes(".html")){
+        console.log("Product page of lazada");
+        return true;
+    } 
+
+    if (currentUrl.includes("facebook.com/marketplace/item/")) {
+        console.log("Product page of facebook");
+        return true;  
+    } 
+
+    if (currentUrl.includes("shop.tiktok.com/ph/pdp")) {
+        console.log("Product page of tiktok");
+        return true;
+    }   
+
+    return false;
+}
+
+function updateButton() {
+  verifyBtn.style.display = (verifyButtonEnabled && isProductPage()) ? "block" : "none";
+}
+
+let lastUrl = location.href;
+setInterval(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    updateButton();
+  }
+}, 500);
 
 chrome.storage.local.get(['verifyButtonEnabled'], (result) => {
   verifyButtonEnabled = result.verifyButtonEnabled !== false;
+  updateButton();   // new
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.verifyButtonEnabled) {
     verifyButtonEnabled = changes.verifyButtonEnabled.newValue;
-    if (!verifyButtonEnabled) verifyBtn.style.display = "none";
+    updateButton();   // replaces the old display = "none" line
   }
-});
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "closeEverifyModal" && modal) {
-    modal.style.display = "none";
-  }
-});
-
-document.addEventListener("mouseup", () => {
-    clearTimeout(debounceTimer);
- 
-    debounceTimer = setTimeout(() => {
-        const selectedText = window.getSelection().toString();
- 
-        if (selectedText.length > 0 && verifyButtonEnabled) {
-            pendingSelection = selectedText;
-            const range = window.getSelection().getRangeAt(0).getBoundingClientRect();
- 
-            verifyBtn.style.left = range.left + "px";
-            verifyBtn.style.top = (range.bottom + 8) + "px";
-            verifyBtn.style.display = "block";
-        } else {
-            verifyBtn.style.display = "none";
-        }
-    }, 100);
 });
 
 function platform(url) {
@@ -221,28 +239,34 @@ function createModal() {
             <img src="${chrome.runtime.getURL('assets/images/suspicious_icon.png')}" alt="warning_icon" />
           </div>
           <div class="not-found-copy">
-            <div class="not-found-title">Product Not Found!</div>
+            <div class="not-found-title">Suspicious Product!</div>
             <div class="not-found-product">Product: <span id="product-name-suspicious"></span></div>
           </div>
         </div>
  
         <div class="further-checking-section">
-          <div class="further-checking-title">Further Checking Required</div>
-          <div class="further-checking-text">Product not found in our database and
-            may not be a cosmetic item the system checks. Registration status
-            can't be guaranteed — manual verification is recommended.</div>
+          <div class="further-checking-title">We Couldn't Verify This Product</div>
+          <div class="further-checking-text">We couldn't match this listing to a product in our database. This does not mean the product is unregistered or unsafe — our database may not cover every FDA-notified product, the listing title may differ from the registered name, or the item may not be a cosmetic product. Please confirm its status on the FDA Verification Portal.</div>
         </div>
 
         <div class="quick-check-guide">
-          <div class="quick-check-title">Quick Check Guide</div>
-          <div class="quick-check-tip">Look for an FDA CPR (Certificate of Product Registration) number printed on the back label imagery.</div>
-          <div class="quick-check-tip">Verify if the manufacturer, country of origin, and complete ingredients list are clearly stated in the product description.</div>
-          <div class="quick-check-tip">Be cautious if the price is unrealistically low compared to official brand flagship stores.</div>
+          <div class="quick-check-title">How to Check It Yourself</div>
+          <div class="quick-check-tip"><strong>On the FDA portal:</strong> search the product's exact name and brand. FDA notifies cosmetics instead of registering them, so look for a Notification Number in the result.</div>
+          <div class="quick-check-tip"><strong>On the online listing:</strong> check that the seller states the manufacturer or importer, the country of origin, and the full ingredients list. You can also ask the seller for the product's FDA Notification Number and search it on the portal.</div>
+          <div class="quick-check-tip"><strong>On the price:</strong> be cautious if it is far lower than the same product in the brand's official store.</div>
+          <div class="quick-check-tip"><strong>Once it arrives:</strong> check the label for the manufacturer or importer's name and address, the ingredients, the batch number, and the expiry date. Don't use the product if any of these are missing or unclear.</div>
+        </div>
+
+        <div class="fda-contact-section">
+          <div class="fda-contact-title">Questions? Contact the FDA</div>
+          <div class="fda-contact-row"><span class="fda-contact-label">Hotline</span>(02) 8857-1900 <small>(cosmetics: local 8113)</small></div>
+          <div class="fda-contact-row"><span class="fda-contact-label">Email</span><a href="mailto:info@fda.gov.ph">info@fda.gov.ph</a></div>
+          <div class="fda-contact-row"><span class="fda-contact-label">Region III</span><a href="mailto:rfoiii@fda.gov.ph">rfoiii@fda.gov.ph</a> <small>(San Fernando, Pampanga)</small></div>
+          <a class="fda-portal-link" href="https://verification.fda.gov.ph" target="_blank" rel="noopener noreferrer">Open the FDA Verification Portal</a>
         </div>
  
         <!-- report and close btn for suspicious product -->
         <div class="action-buttons-orange action-buttons">
-            <button class="btn-report-orange btn-report" type="button">Report</button>
             <button class="btn-skip-orange btn-skip" type="button">Close</button>
         </div>
       </div>
@@ -261,7 +285,7 @@ function createModal() {
  
         <div class="top-matches-red">
           <div class="top-matches-title-red">Top Matches</div>
-          <div class="top-matches-subtitle-red">Closest UNREGISTERED products to the detected listing.</div>
+          <div class="top-matches-subtitle-red">Closest REGISTERED products to the detected listing.</div>
           <div class="match-legend-red">
             <div class="legend-item-red">
               <span class="legend-dot-red dot-best-red"></span>
@@ -488,7 +512,7 @@ function createModal() {
         if (productName) productName.value = lastProductTitle;
         if (url) url.value = sanitizeUrl(lastProductUrl);
        
-        modal.querySelector('#rf-store-name').value = '';
+        modal.querySelector('#rf-store-name').value = lastStoreName;
         modal.querySelector('#rf-description').value = '';
 
         RF_FIELDS.forEach((f) => {
@@ -629,28 +653,43 @@ function populateMatches(stateId, results) {
   });
 }
 
-verifyBtn.addEventListener("click", () => {
-  lastProductTitle = pendingSelection.trim().slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+verifyBtn.addEventListener("click", async () => {
   lastProductUrl = location.href;
+
+  // hide our own UI so it doesn't appear in the screenshot
   verifyBtn.style.display = "none";
- 
-  createModal();
-  showState('state-loading');
- 
-  chrome.runtime.sendMessage({
-    action: "extractedTitle",
-    title: lastProductTitle,
-    platform: platform(location.href),
-    url: location.href
+  if (modal) modal.style.display = "none";
+
+  document.getElementById("debug-shot")?.remove();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  chrome.runtime.sendMessage({ 
+    action: "captureScreenshot",
+    url: location.href,
+    platform: platform(location.href)
   }, (response) => {
-    console.log("Response from background:", response);
- 
-    const verdict = response?.data?.verdict || 'no_match';
-    const status = verdict === 'no_match' ? 'suspicious' : verdict;
-    lastVerificationStatus = status;
-    const results = response?.data?.top5_registered || [];
-    
-    renderResult(status, lastProductTitle, results);
+    updateButton();
+    createModal();
+    showState('state-loading');
+
+    if (!response?.success) {
+      console.error("Capture failed:", response?.error);
+      return;
+    }
+
+    lastProductTitle = (response.title || '').slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+    lastStoreName = response.store || '';
+
+    chrome.runtime.sendMessage({
+      action: "extractedTitle",
+      title: lastProductTitle,
+      platform: platform(location.href),
+      url: location.href
+    }, (res) => {
+      const verdict = res?.data?.verdict || 'no_match';
+      const status = verdict === 'no_match' ? 'suspicious' : verdict;
+      lastVerificationStatus = status;
+      renderResult(status, lastProductTitle, res?.data?.top5_registered || []);
+    });
   });
 });
-
