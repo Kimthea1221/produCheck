@@ -242,7 +242,6 @@ class LeaFdaResponseDetailResponse(BaseModel):
     case_reference: str
     product_title: str
     manufacturer: str | None
-    complainant_name: str | None
     product_category: str | None
     logged_at: datetime
     source: str

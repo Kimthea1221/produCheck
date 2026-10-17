@@ -9,7 +9,6 @@ from sqlalchemy import or_, and_, case as sa_case, cast, Date
 from app.models.complaints import Complaint
 from app.models.verification_requests import VerificationRequest
 from app.models.users import User
-from app.models.walkin_complainants import WalkinComplainant
 from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import (
     LeaVerificationQueueCounts,
@@ -153,21 +152,19 @@ def list_lea_fda_response(db: Session, current_user) -> list[LeaFdaResponseListI
 
 
 # Right panel detail. One joined query pulls the responding officer's
-# name and complainant name so no follow-up queries are needed.
+# name so no follow-up queries are needed.
 # Scoped by the same tab condition as the list — an already-
 # acknowledged case 404s here, same as it disappears from the list.
 def get_lea_fda_response_detail(
     db: Session, request_id: UUID, current_user
 ) -> LeaFdaResponseDetailResponse:
     result = (
-        db.query(VerificationRequest, Complaint, Responder, WalkinComplainant)
+        db.query(VerificationRequest, Complaint, Responder)
         .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
         # outerjoin, not join — responded_by can be null if somehow
         # queried before FDA actually responded (shouldn't happen given
-        # the condition filter below, but stay defensive), and
-        # complainant_id on Complaint is nullable by design.
+        # the condition filter below, but stay defensive).
         .outerjoin(Responder, VerificationRequest.responded_by == Responder.user_id)
-        .outerjoin(WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id)
         .filter(Complaint.region_id == current_user.region_id)
         .filter(VerificationRequest.request_id == request_id)
         .filter(_fda_response_condition())
@@ -177,7 +174,7 @@ def get_lea_fda_response_detail(
     if result is None:
         raise HTTPException(status_code=404, detail="FDA response record not found.")
 
-    vr, complaint, responder, complainant = result
+    vr, complaint, responder = result
 
     return LeaFdaResponseDetailResponse(
         request_id=vr.request_id,
@@ -185,7 +182,6 @@ def get_lea_fda_response_detail(
         case_reference=complaint.case_reference,
         product_title=complaint.product_title,
         manufacturer=complaint.manufacturer,
-        complainant_name=complainant.full_name if complainant else None,
         product_category=complaint.product_category,
         logged_at=complaint.created_at,
         source=complaint.source,

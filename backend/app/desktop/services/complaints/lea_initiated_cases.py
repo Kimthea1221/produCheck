@@ -3,10 +3,9 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, Request
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 
 from app.models.complaints import Complaint
-from app.models.walkin_complainants import WalkinComplainant
 from app.core.complaint_status import transition_complaint_status
 from app.core.audit import write_audit_log, get_user_region_code
 from app.core.constants import AuditAction
@@ -40,15 +39,12 @@ def list_lea_initiated_cases(db: Session, current_user) -> list[LeaInitiatedCase
     return [LeaInitiatedCaseListItem.model_validate(c) for c in complaints]
 
 
-# Right panel detail — joins in the complainant name, same as the
-# FDA Response detail. No VerificationRequest join needed here; this
-# tab only cares about the Complaint's own state.
+# Right panel detail
 def get_lea_initiated_case_detail(
     db: Session, complaint_id: UUID, current_user
 ) -> LeaInitiatedCaseDetailResponse:
     result = (
-        db.query(Complaint, WalkinComplainant)
-        .outerjoin(WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id)
+        db.query(Complaint)
         .filter(
             Complaint.complaint_id == complaint_id,
             Complaint.region_id == current_user.region_id,
@@ -60,7 +56,7 @@ def get_lea_initiated_case_detail(
     if result is None:
         raise HTTPException(status_code=404, detail="Initiated case not found.")
 
-    complaint, complainant = result
+    complaint = result
 
     # ADDED: the takedown came from the unregistered request, so read the FDA side from that one
     vr = get_latest_verification_request(db, complaint.complaint_id, "confirmed_unregistered")
@@ -70,7 +66,6 @@ def get_lea_initiated_case_detail(
         case_reference=complaint.case_reference,
         product_title=complaint.product_title,
         manufacturer=complaint.manufacturer,
-        complainant_name=complainant.full_name if complainant else None,
         product_category=complaint.product_category,
         logged_at=complaint.created_at,
         source=complaint.source,
