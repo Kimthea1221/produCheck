@@ -1,0 +1,251 @@
+<!-- extension/partials/terms.html -->
+<!-- ONE shared copy of the Terms of Use and Privacy Notice.
+     Loaded by pages/about.html (and later by the first-use agreement page),
+     so the text only has to be edited in this one file.
+     Yellow "[TO CONFIRM: ...]" spots are still waiting for the groupmates' answers.
+     Remove every yellow spot before sending the extension to respondents. -->
+<div class="terms-content">
+
+  <p class="terms-updated">Last updated: October 17, 2026</p>
+
+  <p>
+    Thank you for trying ProduCheck! This page explains, in plain words, what ProduCheck is,
+    what information it uses, and what you can expect from us. Please read it before you use the extension.
+  </p>
+
+  <h3>1. What ProduCheck is</h3>
+  <p>
+    ProduCheck is a thesis prototype made by a group of students at Pampanga State University.
+    It helps online shoppers see whether a cosmetic product on Shopee, Lazada, TikTok Shop, or
+    Facebook Marketplace appears in a list of FDA products. It is a student project. It is not an
+    official service of the FDA or any other government agency.
+  </p>
+
+  <h3>2. Please read this first: results and complaints are not official</h3>
+  <ul>
+    <li>Results are only a guide. They are not an official FDA decision about any product or seller.</li>
+    <li>
+      Complaints sent through ProduCheck are not official reports. ProduCheck results and complaints
+      cannot be used as evidence in court, or as a real report to the FDA or any other agency.
+    </li>
+    <li>
+      If you want to make an official report, please contact the FDA directly:
+      hotline (02) 8857-1900 (cosmetics: local 8113), email
+      <a href="mailto:info@fda.gov.ph">info@fda.gov.ph</a>, Region III office
+      <a href="mailto:rfoiii@fda.gov.ph">rfoiii@fda.gov.ph</a> (San Fernando, Pampanga), or the
+      <a href="https://verification.fda.gov.ph" target="_blank" rel="noopener noreferrer">FDA Verification Portal</a>.
+    </li>
+    <li>
+      Our product list comes from information the FDA released to us through a Freedom of Information request
+      <span class="terms-confirm">[TO CONFIRM: the date or release of the list]</span>.
+      It may be incomplete or out of date, ProduCheck matches products by name, and the AI that reads the
+      picture can misread a title, so ProduCheck can make mistakes.
+    </li>
+  </ul>
+
+  <h3>3. What the results mean</h3>
+  <ul>
+    <li>
+      <strong>Registered:</strong> ProduCheck found a close match in its FDA product list. This does not
+      guarantee that the product is safe or genuine.
+    </li>
+    <li>
+      <strong>Unregistered:</strong>
+      <span class="terms-confirm">[TO CONFIRM: plain-words meaning of "Unregistered" in our system]</span>
+      This does not prove that a product is fake or unsafe.
+    </li>
+    <li>
+      <strong>Suspicious:</strong> ProduCheck could not match the listing to a product in its list. This does
+      not mean the product is unregistered or unsafe. Our list may not cover every FDA-notified product, the
+      listing title may differ from the registered name, or the item may not be a cosmetic product. Please
+      check it on the FDA Verification Portal.
+    </li>
+  </ul>
+
+  <h3>4. Why we collect information</h3>
+  <p>
+    We collect and use information only for educational purposes, specifically for our thesis: testing how well
+    ProduCheck works and writing about the results. We will not use your information for anything that could
+    cause you harm. We will not sell it or use it for advertising.
+  </p>
+
+  <h3>5. What ProduCheck uses, and when</h3>
+
+  <p><strong>When you click Check Product</strong></p>
+  <ul>
+    <li>Nothing is captured or sent until you click Check Product (or type a product name and confirm it).</li>
+    <li>
+      ProduCheck takes a picture of the part of the shopping page you can see in your current browser tab.
+      It does not capture your whole screen, your other tabs, or other apps. It hides its own button and
+      pop-up first.
+    </li>
+    <li>
+      Anything visible in that part of the page can end up in the picture, for example your shop account name
+      if the page shows it.
+    </li>
+    <li>
+      The picture, the page address, and the shop name (such as Shopee or Lazada) are sent to our server.
+      Our server passes the picture to an outside AI service (Anthropic's Claude), which reads the product
+      title and store name from it. The AI only reads the text. It does not decide the result. Our own system
+      compares the title with our FDA product list.
+    </li>
+    <li>
+      Our server does not save the picture. It only holds it in memory while the title is being read
+      <span class="terms-confirm">[TO CONFIRM: nothing saves or logs the picture]</span>.
+      ProduCheck does not keep the picture on your device either.
+    </li>
+    <li>
+      The outside AI service follows its own data-handling rules, and we cannot control how long it keeps the
+      information it receives.
+    </li>
+  </ul>
+
+  <p><strong>If you type a product name instead</strong></p>
+  <ul>
+    <li>The name you type is sent to our server to be compared with our FDA product list.</li>
+  </ul>
+
+  <p><strong>If you use ProduCheck without an account (as a guest)</strong></p>
+  <ul>
+    <li>
+      You can check products as a guest.
+      <span class="terms-confirm">[TO CONFIRM: are guest checks saved on our server? What is saved?]</span>
+    </li>
+  </ul>
+
+  <p><strong>If you create an account</strong></p>
+  <ul>
+    <li>
+      We keep your email address, your username, and your password. We email you a one-time code to confirm
+      your email
+      <span class="terms-confirm">[TO CONFIRM: which service sends these emails]</span>.
+      Your password is stored in scrambled (hashed) form.
+    </li>
+    <li>
+      While you are signed in, we save the products you check and their results, so you can see your
+      verification history.
+    </li>
+  </ul>
+
+  <p><strong>If you send a complaint</strong></p>
+  <ul>
+    <li>You need an account to send one.</li>
+    <li>
+      We keep the product name, the link, the store name, the description you write, the screenshot if you
+      attach one, and the result ProduCheck showed. It is saved to your account so you can follow its status.
+    </li>
+    <li>
+      Only the FDA sees complaints sent from the extension. The FDA asks the PNP-CIDG for help only when an
+      online store or product must be taken down. The CIDG does not see complaints sent from the extension.
+    </li>
+    <li>We cannot promise that a complaint will be reviewed, answered, or lead to any action.</li>
+    <li>
+      Complaints stay on file even if you later delete your account, so please do not put personal details,
+      such as your phone number or home address, in the description or in a screenshot you attach.
+    </li>
+  </ul>
+
+  <p><strong>What ProduCheck remembers on your device</strong></p>
+  <ul>
+    <li>
+      ProduCheck saves a few things in your Chrome browser, not on our server: the address of each product page
+      you checked (without the part after the "?") and its result, the last product you checked, whether the
+      Check Product button is switched on, that you agreed to these Terms, and your sign-in details if you are
+      signed in.
+    </li>
+    <li>
+      This is how the revisit reminder works. When you open a page on a supported shop, ProduCheck compares its
+      address with this saved list on your device. Nothing is sent to us for this. If you open a product page
+      again that was Unregistered or Suspicious when you checked it, Chrome shows a reminder of your earlier
+      result. The reminder does not check the product again. Click Check Product again to get the latest result.
+    </li>
+    <li>ProduCheck does not keep a list of the pages you browse. It only remembers products you chose to check.</li>
+    <li>This information stays on your device until you remove the extension from Chrome.</li>
+  </ul>
+
+  <p>
+    Our server may also record technical details, such as the time of a request or your IP address
+    <span class="terms-confirm">[TO CONFIRM: does the server keep these? For how long?]</span>.
+  </p>
+
+  <h3>6. Who can see your information</h3>
+  <ul>
+    <li>Complaints: only the FDA, as explained above.</li>
+    <li>
+      Our thesis team and adviser may see the information stored by the system for the study
+      <span class="terms-confirm">[TO CONFIRM: who has access to the database]</span>.
+    </li>
+    <li>
+      An outside AI service reads the picture you send with Check Product, as explained above. The service
+      that sends our one-time code emails also handles your email address
+      <span class="terms-confirm">[TO CONFIRM: name the email service, or remove this sentence if our own server sends them]</span>.
+    </li>
+    <li>
+      Our thesis paper may report results from the study, for example how many products were checked or how
+      often each result appeared. It will not include your name, email, or other personal details.
+    </li>
+  </ul>
+
+  <h3>7. How long we keep your information</h3>
+  <p>
+    All user data we collect will be deleted after we submit the final thesis paper. We may keep it until then
+    because we may still need it for revisions after the final defense. The members of our research team will
+    do the deleting
+    <span class="terms-confirm">[TO CONFIRM: does this include saved complaint screenshots and any backups? Will the extension and server be taken offline afterwards?]</span>.
+  </p>
+
+  <h3>8. Keeping your information safe</h3>
+  <p>
+    We take reasonable steps to protect your information, and it travels over a secure (https) connection. No
+    system is perfectly secure, so we cannot guarantee complete protection.
+  </p>
+
+  <h3>9. Deleting your account</h3>
+  <ul>
+    <li>
+      To delete your account: sign in, open the profile button at the top of any ProduCheck page, choose
+      Delete Account, enter your password, and confirm. This cannot be undone.
+    </li>
+    <li>
+      Your email, username, and password are removed from our system. Your verification history and the
+      complaints you already sent stay on file, but they are no longer connected to your email or username.
+    </li>
+    <li>The information saved on your device stays until you remove the extension from Chrome.</li>
+  </ul>
+
+  <h3>10. Your choices</h3>
+  <ul>
+    <li>
+      You are asked to agree to these Terms the first time you use ProduCheck, whether or not you have an
+      account. Until you agree, ProduCheck stays switched off. If you choose "No, thanks", nothing is checked,
+      captured, or sent. Your choice is saved on your device.
+    </li>
+    <li>You can stop using ProduCheck at any time by removing the extension from Chrome.</li>
+    <li>
+      You can ask us to show you, correct, or delete your information by emailing us (see Contact below)
+      <span class="terms-confirm">[TO CONFIRM WITH ADVISER: whether to mention the Data Privacy Act of 2012 here]</span>.
+    </li>
+  </ul>
+
+  <h3>11. Using ProduCheck</h3>
+  <p>
+    ProduCheck is provided "as is" for our study. We did our best, but we cannot promise that its results are
+    always correct or that it will always be available. Please use your own judgement, and check the FDA
+    Verification Portal when you are unsure. Please do not send false or misleading complaints. Because
+    ProduCheck is a prototype, we cannot take responsibility for losses that come from relying only on its
+    results. Nothing here takes away any right you have under the law.
+  </p>
+
+  <h3>12. Changes to these Terms</h3>
+  <p>
+    If we change these Terms, we will update the date above and ask you to agree again before you continue
+    using ProduCheck.
+  </p>
+
+  <h3>13. Contact</h3>
+  <p>
+    Questions about these Terms or your information? Email us at
+    <span class="terms-confirm">[TO CONFIRM: privacy contact email]</span>.
+  </p>
+
+</div>

@@ -21,6 +21,7 @@ verifyBtn.style.right = "24px";
 document.body.appendChild(verifyBtn);
 
 let verifyButtonEnabled = true; // default
+let termsAgreed = false;        // stays false until the person agrees to the Terms
 let lastStoreName = '';
 
 // checking if its in the product page
@@ -52,7 +53,7 @@ function isProductPage() {
 }
 
 function updateButton() {
-  verifyBtn.style.display = (verifyButtonEnabled && isProductPage()) ? "block" : "none";
+  verifyBtn.style.display = (termsAgreed && verifyButtonEnabled && isProductPage()) ? "block" : "none";
 }
 
 let lastUrl = location.href;
@@ -63,16 +64,23 @@ setInterval(() => {
   }
 }, 500);
 
-chrome.storage.local.get(['verifyButtonEnabled'], (result) => {
+chrome.storage.local.get(['verifyButtonEnabled', 'termsAgreed'], (result) => {
   verifyButtonEnabled = result.verifyButtonEnabled !== false;
+  termsAgreed = result.termsAgreed === true;
   updateButton();   // new
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.verifyButtonEnabled) {
+  if (area !== 'local') return;
+  if (changes.verifyButtonEnabled) {
     verifyButtonEnabled = changes.verifyButtonEnabled.newValue;
-    updateButton();   // replaces the old display = "none" line
   }
+  if (changes.termsAgreed) {
+    termsAgreed = changes.termsAgreed.newValue === true;
+    // if agreement was switched off, close any open result box
+    if (!termsAgreed && modal) modal.style.display = 'none';
+  }
+  updateButton();
 });
 
 function platform(url) {

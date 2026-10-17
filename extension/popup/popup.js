@@ -40,7 +40,10 @@ document.addEventListener("DOMContentLoaded", () => {
       productStatus: 'home'
     });
 
-    showState('home');
+    // Until the person agrees to the Terms, only show the agreement message
+    chrome.storage.local.get(['termsAgreed'], (r) => {
+      showState(r.termsAgreed === true ? 'home' : 'agreement');
+    });
 
     //babalikan 3
     // chrome.storage.local.get(
@@ -118,6 +121,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnSigninHeader) {
       btnSigninHeader.addEventListener('click', () => {
         chrome.tabs.create({ url: chrome.runtime.getURL('pages/auth.html') });
+      });
+    }
+
+    const btnReviewTerms = document.getElementById('btn-review-terms');
+    if (btnReviewTerms) {
+      btnReviewTerms.addEventListener('click', () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('pages/welcome.html') });
       });
     }
 
@@ -307,7 +317,7 @@ function renderResult(status, productTitle, results = []) {
 // }
 
 function showState(state) {
-  const states = ['idle', 'registered', 'suspicious', 'unregistered', 'home', 'scanning', 'manual-input'];
+  const states = ['idle', 'registered', 'suspicious', 'unregistered', 'home', 'scanning', 'manual-input', 'agreement'];
   states.forEach(s => {
     const el = document.getElementById(`state-${s}`);
     if (el) el.classList.add('hidden');
