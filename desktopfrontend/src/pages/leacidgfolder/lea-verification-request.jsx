@@ -90,144 +90,7 @@ function getReasonClosedClass(reason) {
   return 'ReasonRejected';
 }
 
-const USE_LEA_PROCESS_MOCK = true; // ⚠️ REMOVE THIS
-
-const MOCK_INTAKE_FILES = [
-  {
-    file_id: 'mock-intake-doc-1',
-    file_name: 'Packaging_Front_Back_Evidence.jpg',
-    mime_type: 'image/jpeg',
-    file_size_display: '1.2 MB',
-    isMock: true,
-  },
-  {
-    file_id: 'mock-intake-doc-2',
-    file_name: 'Official_Receipt_Purchase_Proof.pdf',
-    mime_type: 'application/pdf',
-    file_size_display: '420 KB',
-    isMock: true,
-  },
-];
-
-const MOCK_RESPONSE_FILES = [
-  {
-    file_id: 'mock-fda-response-1',
-    file_name: 'FDA_Laboratory_Verification_Report.pdf',
-    mime_type: 'application/pdf',
-    file_size_display: '312 KB',
-    isMock: true,
-  },
-  {
-    file_id: 'mock-fda-response-2',
-    file_name: 'FDA_Post_Marketing_Surveillance_Notice.pdf',
-    mime_type: 'application/pdf',
-    file_size_display: '185 KB',
-    isMock: true,
-  },
-];
-
-function getMergedResponseData(realData) {
-  if (!realData) return null;
-  if (!USE_LEA_PROCESS_MOCK) return realData;
-
-  return {
-    ...realData,
-    product_code: realData.product_code ?? 'NN-100000847291',
-    priority: realData.priority ?? 'standard',
-    notes_to_fda: realData.notes_to_fda ?? realData.complaint_statement ?? 'Cosmetic product reported for lack of mandatory FDA CPR / notification markings on retail packaging.',
-    attached_files: realData.attached_files ?? MOCK_INTAKE_FILES,
-    // 🔌 BACKEND: expected field - response_files (list of SharedFileResponse), FDA's own upload when responding, kept separate from attached_files (the intake evidence).
-    response_files: realData.response_files ?? MOCK_RESPONSE_FILES,
-  };
-}
-
-function getMergedInitiatedData(realData) {
-  if (!realData) return null;
-  if (!USE_LEA_PROCESS_MOCK) return realData;
-
-  return {
-    ...realData,
-    // 🔌 BACKEND: GET /complaints/initiated/{id} does not return product_code, priority or notes_to_fda yet (it returns attached_files). Mock fills them while the flag is on.
-    product_code: realData.product_code ?? 'BARCODE-480901238491',
-    priority: realData.priority ?? 'urgent',
-    notes_to_fda: realData.notes_to_fda ?? realData.complaint_statement ?? 'Product advertised as fast-acting whitening lotion without FDA notification. Suspected unregistered chemical formulation.',
-    attached_files: realData.attached_files ?? MOCK_INTAKE_FILES,
-    verified_by_name: realData.verified_by_name ?? realData.verifier_name ?? 'Officer Teresa Ramos, FDA-CCHH',
-    responded_at: realData.responded_at ?? '2026-04-02T16:30:00Z',
-    unregistered_reason: realData.unregistered_reason ?? 'Product has no valid Certificate of Product Registration (CPR) or Notification of Cosmetic Product on FDA database.',
-    response_notes: realData.response_notes ?? realData.notes ?? 'FDA Advisory recommends immediate seizure of stocks and issuance of Cease and Desist order to unauthorized retailers.',
-    // 🔌 BACKEND: expected field - response_files (list of SharedFileResponse)
-    response_files: realData.response_files ?? MOCK_RESPONSE_FILES,
-  };
-}
-
-// 🔌 BACKEND: needs a closed-case detail endpoint returning the verification request, FDA response, response_files, takedown_initiated_at/by, field_operation_notes, closed_at/by.
-function getMergedClosedModalData(realData, detailData) {
-  if (!realData) return null;
-  const merged = { ...realData, ...(detailData || {}) };
-  if (!USE_LEA_PROCESS_MOCK) return merged;
-
-  const reason = realData.reason_closed;
-
-  let mockSpecific = {};
-  if (reason === 'registered') {
-    mockSpecific = {
-      product_code: merged.product_code ?? 'NN-100000928371',
-      priority: merged.priority ?? 'standard',
-      requested_by_name: merged.requested_by_name ?? merged.requested_by ?? 'Agent R. Santos, CIDG',
-      requested_at: merged.requested_at ?? '2026-04-10T08:30:00Z',
-      notes_to_fda: merged.notes_to_fda ?? merged.complaint_statement ?? 'Verification of product notification for Philippine market distribution.',
-      attached_files: merged.attached_files ?? MOCK_INTAKE_FILES,
-      verifier_name: merged.verifier_name ?? merged.verified_by_name ?? 'Analyst Maria Clara Cruz, FDA-CCHH',
-      responded_at: merged.responded_at ?? '2026-04-12T14:15:00Z',
-      cpr_number: merged.cpr_number ?? 'NN-100000928371',
-      cpr_expiry: merged.cpr_expiry ?? '2028-11-20',
-      response_notes: merged.response_notes ?? merged.notes ?? 'Product found validly registered and compliant under ASEAN Cosmetic Directive.',
-      response_files: merged.response_files ?? MOCK_RESPONSE_FILES,
-      lea_acknowledged_at: merged.lea_acknowledged_at ?? '2026-04-13T09:00:00Z',
-      acknowledged_by_name: merged.acknowledged_by_name ?? merged.closed_by_name ?? 'Agent R. Santos, CIDG',
-    };
-  } else if (reason === 'rejected') {
-    mockSpecific = {
-      product_code: merged.product_code ?? 'NN-100000412850',
-      priority: merged.priority ?? 'high',
-      requested_by_name: merged.requested_by_name ?? merged.requested_by ?? 'Agent J. Bautista, CIDG',
-      requested_at: merged.requested_at ?? '2026-04-05T10:00:00Z',
-      notes_to_fda: merged.notes_to_fda ?? merged.complaint_statement ?? 'Urgent complaint filed regarding suspected adulteration with hydroquinone.',
-      attached_files: merged.attached_files ?? MOCK_INTAKE_FILES,
-      verifier_name: merged.verifier_name ?? merged.rejected_by_name ?? 'Evaluator Juan Mercado, FDA-CCHH',
-      responded_at: merged.responded_at ?? '2026-04-06T11:45:00Z',
-      rejection_reason: merged.rejection_reason ?? 'Insufficient sample information: Batch/lot number not provided in submission evidence. Please re-submit with clear photos of manufacturing stamp.',
-      response_files: null,
-      lea_acknowledged_at: merged.lea_acknowledged_at ?? '2026-04-07T13:20:00Z',
-      acknowledged_by_name: merged.acknowledged_by_name ?? merged.closed_by_name ?? 'Agent J. Bautista, CIDG',
-    };
-  } else {
-    mockSpecific = {
-      product_code: merged.product_code ?? 'BARCODE-480901238491',
-      priority: merged.priority ?? 'urgent',
-      requested_by_name: merged.requested_by_name ?? merged.requested_by ?? 'Agent E. Dela Cruz, CIDG',
-      requested_at: merged.requested_at ?? '2026-04-01T09:15:00Z',
-      notes_to_fda: merged.notes_to_fda ?? merged.complaint_statement ?? 'Suspected counterfeit whitening serum marketed online without FDA authorization.',
-      attached_files: merged.attached_files ?? MOCK_INTAKE_FILES,
-      verifier_name: merged.verifier_name ?? merged.verified_by_name ?? 'Officer Teresa Ramos, FDA-CCHH',
-      responded_at: merged.responded_at ?? '2026-04-02T16:30:00Z',
-      unregistered_reason: merged.unregistered_reason ?? 'Product has no valid Certificate of Product Registration (CPR) or Notification of Cosmetic Product on FDA database.',
-      response_notes: merged.response_notes ?? merged.notes ?? 'FDA Advisory No. 2026-048 recommends immediate seizure of stocks and issuance of Cease and Desist order to unauthorized retailers.',
-      response_files: merged.response_files ?? MOCK_RESPONSE_FILES,
-      lea_acknowledged_at: merged.lea_acknowledged_at ?? '2026-04-03T10:00:00Z',
-      acknowledged_by_name: merged.acknowledged_by_name ?? 'Agent E. Dela Cruz, CIDG',
-      takedown_initiated_at: merged.takedown_initiated_at ?? '2026-04-03T11:30:00Z',
-      takedown_initiated_by_name: merged.takedown_initiated_by_name ?? 'Agent E. Dela Cruz, CIDG',
-      field_operation_notes: merged.field_operation_notes ?? 'Joint operation executed with local CIDG field unit at warehouse facility in Tondo, Manila. Confiscated 250 units of unregistered cosmetics. Administrative summons served.',
-    };
-  }
-
-  return {
-    ...merged,
-    ...mockSpecific,
-  };
-}
+// Helpers above; mock data/flag removed — all panels now read real backend data directly.
 
 // Frontend queue pagination helper — matches the existing project .Pagination / .BtnPage design
 function QueuePagination({ currentPage, totalPages, onPageChange }) {
@@ -916,7 +779,8 @@ function LeaVerificationRequest() {
     };
   }, [docPreviewModal]);
 
-  // Fetch closed case detail when modal opens for registered/rejected cases if request_id is present
+  // Fetch closed case detail when modal opens — for all three outcomes (registered, rejected, completed)
+  // Uses GET /verification-requests/closed-cases/{complaint_id} (viewCaseModalData.complaint_id).
   useEffect(() => {
     if (!viewCaseModalData) {
       setClosedModalDetail(null);
@@ -925,34 +789,35 @@ function LeaVerificationRequest() {
       return;
     }
 
-    if (viewCaseModalData.request_id && (viewCaseModalData.reason_closed === 'registered' || viewCaseModalData.reason_closed === 'rejected')) {
-      let isCurrent = true;
-      setClosedModalLoading(true);
-      setClosedModalError(false);
-      apiFetch(`/verification-requests/fda-response/${viewCaseModalData.request_id}`)
-        .then(async (res) => {
-          if (!isCurrent) return;
-          if (!res.ok) {
-            setClosedModalError(true);
-            return;
-          }
-          const json = await res.json();
-          if (isCurrent) setClosedModalDetail(json);
-        })
-        .catch(() => {
-          if (isCurrent) setClosedModalError(true);
-        })
-        .finally(() => {
-          if (isCurrent) setClosedModalLoading(false);
-        });
-      return () => {
-        isCurrent = false;
-      };
-    } else {
+    if (!viewCaseModalData.complaint_id) {
       setClosedModalDetail(null);
       setClosedModalLoading(false);
       setClosedModalError(false);
+      return;
     }
+
+    let isCurrent = true;
+    setClosedModalLoading(true);
+    setClosedModalError(false);
+    apiFetch(`/verification-requests/closed-cases/${viewCaseModalData.complaint_id}`)
+      .then(async (res) => {
+        if (!isCurrent) return;
+        if (!res.ok) {
+          setClosedModalError(true);
+          return;
+        }
+        const json = await res.json();
+        if (isCurrent) setClosedModalDetail(json);
+      })
+      .catch(() => {
+        if (isCurrent) setClosedModalError(true);
+      })
+      .finally(() => {
+        if (isCurrent) setClosedModalLoading(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
   }, [viewCaseModalData]);
 
   // ADDED — POST/PUT /drafts/verification/
@@ -2173,12 +2038,10 @@ function LeaVerificationRequest() {
                         </div>
 
                         {selectedResponse && (() => {
-                          const displayResponse = getMergedResponseData(selectedResponse);
                           const hasVerifReq = Boolean(
-                            displayResponse?.product_code ||
-                            displayResponse?.priority ||
-                            displayResponse?.complaint_statement ||
-                            displayResponse?.notes_to_fda
+                            selectedResponse?.product_code ||
+                            selectedResponse?.priority ||
+                            selectedResponse?.notes_to_fda
                           );
 
                           return (
@@ -2202,7 +2065,7 @@ function LeaVerificationRequest() {
                                       <div className="LeaVerifRejectionFieldsGrid">
                                         <div className="LeaVerifResultField">
                                           <label className="LeaVerifFieldLabel">Rejected By</label>
-                                          <p className="LeaVerifFieldValue">{selectedResponse.verifier_name || '—'}</p>
+                                          <p className="LeaVerifFieldValue">{selectedResponse.rejected_by_name || '—'}</p>
                                         </div>
 
                                         <div className="LeaVerifResultField">
@@ -2245,7 +2108,7 @@ function LeaVerificationRequest() {
                                       <div className="LeaVerifResultFieldsGrid">
                                         <div className="LeaVerifResultField">
                                           <label className="LeaVerifFieldLabel">Verified By</label>
-                                          <p className="LeaVerifFieldValue">{selectedResponse.verifier_name || '—'}</p>
+                                          <p className="LeaVerifFieldValue">{selectedResponse.verified_by_name || '—'}</p>
                                         </div>
 
                                         <div className="LeaVerifResultField">
@@ -2278,8 +2141,8 @@ function LeaVerificationRequest() {
                                         <h3>FDA Response Documents</h3>
                                       </div>
                                       <div className="LeaVerifDocsGrid">
-                                        {displayResponse.response_files && displayResponse.response_files.length > 0 ? (
-                                          displayResponse.response_files.map((f, idx) => (
+                                        {selectedResponse.response_files && selectedResponse.response_files.length > 0 ? (
+                                          selectedResponse.response_files.map((f, idx) => (
                                             <div key={f.file_id || idx} className="LeaVerifDocCard">
                                               <div className="LeaVerifDocIcon">
                                                 {f.mime_type?.startsWith('image/') ? (
@@ -2339,7 +2202,7 @@ function LeaVerificationRequest() {
                                       <div className="LeaVerifResultFieldsGrid">
                                         <div className="LeaVerifResultField">
                                           <label className="LeaVerifFieldLabel">Verified By</label>
-                                          <p className="LeaVerifFieldValue">{selectedResponse.verifier_name || '—'}</p>
+                                          <p className="LeaVerifFieldValue">{selectedResponse.verified_by_name || '—'}</p>
                                         </div>
 
                                         <div className="LeaVerifResultField">
@@ -2367,8 +2230,8 @@ function LeaVerificationRequest() {
                                         <h3>FDA Response Documents</h3>
                                       </div>
                                       <div className="LeaVerifDocsGrid">
-                                        {displayResponse.response_files && displayResponse.response_files.length > 0 ? (
-                                          displayResponse.response_files.map((f, idx) => (
+                                        {selectedResponse.response_files && selectedResponse.response_files.length > 0 ? (
+                                          selectedResponse.response_files.map((f, idx) => (
                                             <div key={f.file_id || idx} className="LeaVerifDocCard">
                                               <div className="LeaVerifDocIcon">
                                                 {f.mime_type?.startsWith('image/') ? (
@@ -2576,12 +2439,10 @@ function LeaVerificationRequest() {
                         </div>
 
                         {selectedInitiatedCase && (() => {
-                          const displayInitiated = getMergedInitiatedData(selectedInitiatedCase);
                           const hasVerifReq = Boolean(
-                            displayInitiated?.product_code ||
-                            displayInitiated?.priority ||
-                            displayInitiated?.complaint_statement ||
-                            displayInitiated?.notes_to_fda
+                            selectedInitiatedCase?.product_code ||
+                            selectedInitiatedCase?.priority ||
+                            selectedInitiatedCase?.notes_to_fda
                           );
 
                           return (
@@ -2601,46 +2462,45 @@ function LeaVerificationRequest() {
                                   </div>
 
                                   <div className="LeaVerifResultFieldsGrid">
-                                    {(displayInitiated.verified_by_name || displayInitiated.verifier_name) && (
+                                    {selectedInitiatedCase.verified_by_name && (
                                       <div className="LeaVerifResultField">
                                         <label className="LeaVerifFieldLabel">Verified By</label>
-                                        <p className="LeaVerifFieldValue">{displayInitiated.verified_by_name || displayInitiated.verifier_name || '—'}</p>
+                                        <p className="LeaVerifFieldValue">{selectedInitiatedCase.verified_by_name || '—'}</p>
                                       </div>
                                     )}
 
-                                    {displayInitiated.responded_at && (
+                                    {selectedInitiatedCase.responded_at && (
                                       <div className="LeaVerifResultField">
                                         <label className="LeaVerifFieldLabel">Date Returned / Responded</label>
-                                        <p className="LeaVerifFieldValue">{formatDateTime(displayInitiated.responded_at)}</p>
+                                        <p className="LeaVerifFieldValue">{formatDateTime(selectedInitiatedCase.responded_at)}</p>
                                       </div>
                                     )}
 
-                                    {displayInitiated.unregistered_reason && (
+                                    {selectedInitiatedCase.unregistered_reason && (
                                       <div className="LeaVerifResultField LeaVerifFullWidthField">
                                         <label className="LeaVerifFieldLabel">Reason Product is Not Registered</label>
-                                        <p className="LeaVerifFieldValue">{displayInitiated.unregistered_reason || '—'}</p>
+                                        <p className="LeaVerifFieldValue">{selectedInitiatedCase.unregistered_reason || '—'}</p>
                                       </div>
                                     )}
 
-                                    {(displayInitiated.response_notes || displayInitiated.notes) && (
+                                    {selectedInitiatedCase.response_notes && (
                                       <div className="LeaVerifResultField LeaVerifFullWidthField">
                                         <label className="LeaVerifFieldLabel">Advisory &amp; Enforcement Recommendations for LEA</label>
-                                        <p className="LeaVerifFieldValue">{displayInitiated.response_notes || displayInitiated.notes || '—'}</p>
+                                        <p className="LeaVerifFieldValue">{selectedInitiatedCase.response_notes || '—'}</p>
                                       </div>
                                     )}
                                   </div>
                                 </div>
 
-                                {/* 2b: FDA Response Documents mock block */}
-                                {/* 🔌 BACKEND: expected field - response_files (list of SharedFileResponse) */}
+                                {/* 2b: FDA Response Documents block */}
                                 <div className="LeaVerifSectionCard" style={{ marginTop: '16px' }}>
                                   <div className="LeaVerifSectionHeader">
                                     <Paperclip size={16} className="LeaVerifBlueIcon" />
                                     <h3>FDA Response Documents</h3>
                                   </div>
                                   <div className="LeaVerifDocsGrid">
-                                    {displayInitiated.response_files && displayInitiated.response_files.length > 0 ? (
-                                      displayInitiated.response_files.map((f, idx) => (
+                                    {selectedInitiatedCase.response_files && selectedInitiatedCase.response_files.length > 0 ? (
+                                      selectedInitiatedCase.response_files.map((f, idx) => (
                                         <div key={f.file_id || idx} className="LeaVerifDocCard">
                                           <div className="LeaVerifDocIcon">
                                             {f.mime_type?.startsWith('image/') ? (
@@ -2935,9 +2795,14 @@ function LeaVerificationRequest() {
                              reason_detail replaces the hardcoded ternary strings */}
       {/* NOTE: Read-only modal displaying full case details for closed cases */}
       {viewCaseModalData && (() => {
-        // 🔌 BACKEND: needs a closed-case detail endpoint returning the verification request, FDA
-        // response, response_files, takedown_initiated_at/by, field_operation_notes, closed_at/by.
-        const modalData = getMergedClosedModalData(viewCaseModalData, closedModalDetail);
+        // Safe merge: spread detail over list-row, but never let a null/undefined detail value
+        // overwrite a non-null value already on the list row.
+        const safeDetail = closedModalDetail
+          ? Object.fromEntries(
+              Object.entries(closedModalDetail).filter(([, v]) => v != null)
+            )
+          : {};
+        const modalData = { ...viewCaseModalData, ...safeDetail };
         const outcome = modalData?.verification_result || (
           modalData?.reason_closed === 'completed' ? 'unregistered' : modalData?.reason_closed
         );
@@ -2952,11 +2817,7 @@ function LeaVerificationRequest() {
         );
         const hasIntakeFiles = Boolean(modalData?.attached_files && modalData.attached_files.length > 0);
         const hasFdaBanner = Boolean(outcome);
-        const hasResponseFiles = Boolean(
-          (outcome === 'registered' || outcome === 'unregistered') &&
-          modalData?.response_files &&
-          modalData.response_files.length > 0
-        );
+        const showResponseDocs = outcome === 'registered' || outcome === 'unregistered';
         const hasLeaActions = Boolean(
           modalData?.acknowledged_by_name ||
           modalData?.lea_acknowledged_at ||
@@ -3035,10 +2896,10 @@ function LeaVerificationRequest() {
                           <p>{modalData.priority.charAt(0).toUpperCase() + modalData.priority.slice(1)}</p>
                         </div>
                       )}
-                      {(modalData.requested_by_name || modalData.requested_by) && (
+                      {modalData.requested_by_name && (
                         <div>
                           <label>REQUESTED BY</label>
-                          <p>{modalData.requested_by_name || modalData.requested_by}</p>
+                          <p>{modalData.requested_by_name}</p>
                         </div>
                       )}
                       {modalData.requested_at && (
@@ -3047,11 +2908,11 @@ function LeaVerificationRequest() {
                           <p>{formatDateTime(modalData.requested_at)}</p>
                         </div>
                       )}
-                      {(modalData.complaint_statement || modalData.notes_to_fda) && (
+                      {modalData.notes_to_fda && (
                         <div className="VerificationNotes">
                           <label>NOTES TO FDA VERIFIER</label>
                           <p style={{ fontWeight: 500, fontSize: '13px', lineHeight: '1.5', wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-                            {String(modalData.complaint_statement || modalData.notes_to_fda).trim()}
+                            {String(modalData.notes_to_fda).trim()}
                           </p>
                         </div>
                       )}
@@ -3107,10 +2968,10 @@ function LeaVerificationRequest() {
                         </div>
                       </div>
                       <div className="LeaVerifResultFieldsGrid">
-                        {(modalData.verifier_name || modalData.verified_by_name) && (
+                        {modalData.verified_by_name && (
                           <div className="LeaVerifResultField">
                             <label className="LeaVerifFieldLabel">Verified By</label>
-                            <p className="LeaVerifFieldValue">{modalData.verifier_name || modalData.verified_by_name}</p>
+                            <p className="LeaVerifFieldValue">{modalData.verified_by_name}</p>
                           </div>
                         )}
                         {modalData.responded_at && (
@@ -3131,10 +2992,10 @@ function LeaVerificationRequest() {
                             <p className="LeaVerifFieldValue">{String(modalData.cpr_expiry)}</p>
                           </div>
                         )}
-                        {(modalData.response_notes || modalData.notes) && (
+                        {modalData.response_notes && (
                           <div className="LeaVerifResultField LeaVerifFullWidthField">
                             <label className="LeaVerifFieldLabel">Official FDA Verification Remarks</label>
-                            <p className="LeaVerifFieldValue">{modalData.response_notes || modalData.notes}</p>
+                            <p className="LeaVerifFieldValue">{modalData.response_notes}</p>
                           </div>
                         )}
                       </div>
@@ -3148,10 +3009,10 @@ function LeaVerificationRequest() {
                         </div>
                       </div>
                       <div className="LeaVerifRejectionFieldsGrid">
-                        {(modalData.verifier_name || modalData.rejected_by_name) && (
+                        {modalData.rejected_by_name && (
                           <div className="LeaVerifResultField">
                             <label className="LeaVerifFieldLabel">Rejected By</label>
-                            <p className="LeaVerifFieldValue">{modalData.verifier_name || modalData.rejected_by_name}</p>
+                            <p className="LeaVerifFieldValue">{modalData.rejected_by_name}</p>
                           </div>
                         )}
                         {modalData.responded_at && (
@@ -3177,10 +3038,10 @@ function LeaVerificationRequest() {
                         </div>
                       </div>
                       <div className="LeaVerifResultFieldsGrid">
-                        {(modalData.verifier_name || modalData.verified_by_name) && (
+                        {modalData.verified_by_name && (
                           <div className="LeaVerifResultField">
                             <label className="LeaVerifFieldLabel">Verified By</label>
-                            <p className="LeaVerifFieldValue">{modalData.verifier_name || modalData.verified_by_name}</p>
+                            <p className="LeaVerifFieldValue">{modalData.verified_by_name}</p>
                           </div>
                         )}
                         {modalData.responded_at && (
@@ -3195,10 +3056,10 @@ function LeaVerificationRequest() {
                             <p className="LeaVerifFieldValue">{modalData.unregistered_reason}</p>
                           </div>
                         )}
-                        {(modalData.response_notes || modalData.notes) && (
+                        {modalData.response_notes && (
                           <div className="LeaVerifResultField LeaVerifFullWidthField">
                             <label className="LeaVerifFieldLabel">Advisory &amp; Enforcement Recommendations for LEA</label>
-                            <p className="LeaVerifFieldValue">{modalData.response_notes || modalData.notes}</p>
+                            <p className="LeaVerifFieldValue">{modalData.response_notes}</p>
                           </div>
                         )}
                       </div>
@@ -3206,16 +3067,15 @@ function LeaVerificationRequest() {
                   )
                 )}
 
-                {/* 4. FDA Response Documents (registered and unregistered only, mock, separate heading) */}
-                {/* 🔌 BACKEND: expected field - response_files */}
-                {hasResponseFiles && (
+                {/* 4. FDA Response Documents (registered and unregistered only, separate heading) */}
+                {showResponseDocs && (
                   <div className="LeaVerifSectionCard" style={{ margin: 0 }}>
                     <div className="LeaVerifSectionHeader">
                       <Paperclip size={16} className="LeaVerifBlueIcon" />
                       <h3>FDA Response Documents</h3>
                     </div>
                     <div className="LeaVerifDocsGrid">
-                      {modalData.response_files.map((f, idx) => (
+                      {modalData.response_files?.length > 0 ? modalData.response_files.map((f, idx) => (
                         <div key={f.file_id || idx} className="LeaVerifDocCard">
                           <div className="LeaVerifDocIcon">
                             {f.mime_type?.startsWith('image/') ? (
@@ -3239,7 +3099,9 @@ function LeaVerificationRequest() {
                             </button>
                           </div>
                         </div>
-                      ))}
+                      )) : (
+                        <p className="LeaVerifNoDocsText">No FDA response documents uploaded.</p>
+                      )}
                     </div>
                   </div>
                 )}
