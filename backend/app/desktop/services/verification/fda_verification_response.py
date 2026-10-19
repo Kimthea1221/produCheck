@@ -15,6 +15,7 @@ from app.models.fda_verification_drafts import FdaVerificationDraft
 from app.core.complaint_status import transition_complaint_status
 
 from app.desktop.services.verification.fda_attachments_service import delete_request_attachments, remove_files_from_disk   # ADDED
+from app.desktop.services.verification.verification_helpers import get_request_and_complaint_in_region   # CHANGED: shared with the drafts router
 from app.desktop.services.notifications.notification_service import (
     notify_lea_fda_responded,  
     notify_lea_fda_rejected,
@@ -23,9 +24,9 @@ from app.desktop.services.notifications.notification_service import (
 
 )
 
-from app.models.users import User
+
 from app.models.shared_files import SharedFile
-from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
+from app.core.user_display import get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import FdaVerificationRequestDetailResponse
 from app.desktop.schemas.complaints.complaints import SharedFileResponse
 from app.desktop.schemas.verification.verification import (
@@ -34,29 +35,6 @@ from app.desktop.schemas.verification.verification import (
     FdaVerificationRejectRequest,
     FdaVerificationRequestDetailResponse,  # merge with the existing one below, don't duplicate
 )
-
-
-
-
-# Shared by both submit and reject below — loads a VerificationRequest
-# together with its parent Complaint, but ONLY if that complaint
-# belongs to the current officer's region. Returns 404 either way if
-# the request truly doesn't exist OR if it exists in a different
-# region — an officer outside the region should never be able to
-# tell the difference.
-def _get_request_and_complaint_in_region(db: Session, request_id: UUID, current_user):
-    result = (
-        db.query(VerificationRequest, Complaint)
-        .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .filter(
-            VerificationRequest.request_id == request_id,
-            Complaint.region_id == current_user.region_id,
-        )
-        .first()
-    )
-    if result is None:
-        raise HTTPException(status_code=404, detail="Verification request not found.")
-    return result
 
 
 # The "Submit Verification" button — FDA officer has decided the
@@ -72,7 +50,7 @@ def submit_fda_verification_response(
     data: FdaVerificationSubmitRequest,
     request: Request = None,
 ) -> tuple[VerificationRequest, Complaint]:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
 
     # Defense in depth — the frontend shouldn't let an officer resubmit
     # an already-decided request, but the backend must never rely on
@@ -200,7 +178,7 @@ def reject_fda_verification_response(
     data: FdaVerificationRejectRequest,
     request: Request = None,
 ) -> tuple[VerificationRequest, Complaint]:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
 
     if verification_request.verification_request_status != "pending":
         raise HTTPException(
@@ -268,11 +246,7 @@ def get_fda_verification_request_detail(
     request_id: UUID,
     current_user,
 ) -> FdaVerificationRequestDetailResponse:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
-
-    requesting_officer = db.query(User).filter(
-        User.user_id == verification_request.requested_by
-    ).first()
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
     
     requested_by_name = get_display_name_across_agencies(db, verification_request.requested_by)
 

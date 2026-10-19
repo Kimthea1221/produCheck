@@ -48,7 +48,10 @@ def _base_query(db: Session, current_user):
         .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
         .outerjoin(Requester, VerificationRequest.requested_by == Requester.user_id)
         .outerjoin(Responder, VerificationRequest.responded_by == Responder.user_id)
-        .filter(Complaint.region_id == current_user.region_id)
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: covers completed/rejected lists and their details
+        )
     )
 
 
@@ -230,7 +233,10 @@ def get_fda_verification_queue_counts(db: Session, current_user) -> FdaVerificat
     base = (
         db.query(VerificationRequest)
         .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .filter(Complaint.region_id == current_user.region_id)
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: counts match the walk-in-only lists
+        )
     )
 
     return FdaVerificationQueueCounts(

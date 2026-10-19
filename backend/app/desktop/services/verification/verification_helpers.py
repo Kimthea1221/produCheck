@@ -2,11 +2,15 @@
 # Functions: get_latest_verification_request, get_response_files, get_fda_response_fields
 
 from uuid import UUID
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.user_display import get_display_name_across_agencies
 from app.models.shared_files import SharedFile
 from app.models.verification_requests import VerificationRequest
+from app.models.verification_requests import VerificationRequest
+from app.models.complaints import Complaint
+
 from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary   # CHANGED
 
 
@@ -134,3 +138,21 @@ def get_walkin_effective_status(complaint, latest_request) -> str:
     if complaint.status in ("takedown_initiated", "completed"):
         return complaint.status
     return latest_request.verification_request_status if latest_request else "queued"
+
+
+# ADDED: shared by the FDA submit/reject/detail service and the FDA drafts router, so the
+# region + walk-in rule lives in one place. Same 404 whether missing, other region or extension.
+def get_request_and_complaint_in_region(db: Session, request_id: UUID, current_user):
+    result = (
+        db.query(VerificationRequest, Complaint)
+        .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
+        .filter(
+            VerificationRequest.request_id == request_id,
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",
+        )
+        .first()
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Verification request not found.")
+    return result

@@ -216,6 +216,7 @@ def list_verification_requests_awaiting_fda(
     ).filter(
         VerificationRequest.verification_request_status == "pending",
         Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",   # ADDED: the queue is walk-in only; extension complaints use the status-update page
     )
 
     if search is not None:

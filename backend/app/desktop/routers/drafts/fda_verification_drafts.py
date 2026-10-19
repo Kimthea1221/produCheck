@@ -26,12 +26,20 @@ from app.desktop.schemas.drafts.drafts import (
 )
 from app.core.dependencies import get_current_user
 from app.core.user_display import format_officer_display_name, get_display_name_across_agencies   # CHANGED: added cross-agency lookup
+from app.core.constants import Role   # ADDED
 
 from app.desktop.services.verification.fda_attachments_service import delete_request_attachments, remove_files_from_disk   # ADDED
+from app.desktop.services.verification.verification_helpers import get_request_and_complaint_in_region   # CHANGED: shared with the drafts router
 
 
 
 router = APIRouter(prefix="/drafts/fda-verification", tags=["FDA Verification Drafts"])
+
+
+# ADDED: only FDA personnel work on FDA drafts; without this any region user could create one
+def _assert_fda_personnel(current_user) -> None:
+    if current_user.role != Role.FDA_PERSONNEL:
+        raise HTTPException(status_code=403, detail="Only FDA personnel can manage verification drafts.")
 
 
 # Deciding incomplete vs draft is much simpler here than on the LEA
@@ -43,28 +51,6 @@ def _determine_draft_status(data: FdaVerificationDraftSave) -> DraftStatus:
     if data.draft_verification_status is None:
         return DraftStatus.incomplete
     return DraftStatus.draft
-
-
-# Shared by the POST (create/update) and GET (detail) endpoints — both
-# need to load the parent VerificationRequest + Complaint together to
-# confirm the request is real AND belongs to this officer's region.
-# Returns (verification_request, complaint) as a tuple, or raises 404.
-def _get_request_and_complaint_in_region(db: Session, verification_request_id: UUID, current_user):
-    result = (
-        db.query(VerificationRequest, Complaint)
-        .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .filter(
-            VerificationRequest.request_id == verification_request_id,
-            # Region check happens here, not as a separate query — an
-            # officer outside this region should see the exact same
-            # 404 as if the request didn't exist at all.
-            Complaint.region_id == current_user.region_id,
-        )
-        .first()
-    )
-    if result is None:
-        raise HTTPException(status_code=404, detail="Verification request not found.")
-    return result
 
 
     #
@@ -86,10 +72,12 @@ def save_fda_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    _assert_fda_personnel(current_user)
+
     # Confirms the request is real and in-region BEFORE touching the
     # drafts table at all — no point creating a draft against a
     # request this officer shouldn't even be able to see.
-    verification_request, complaint = _get_request_and_complaint_in_region(db, verification_request_id, current_user)
+    verification_request, complaint = get_request_and_complaint_in_region(db, verification_request_id, current_user)
 
     # Drafts only make sense while a request is still awaiting a
     # decision — once it's been responded to, saving a draft against
@@ -150,6 +138,7 @@ def get_fda_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    _assert_fda_personnel(current_user)
     draft = db.query(FdaVerificationDraft).filter(
         FdaVerificationDraft.draft_id == draft_id,
         # Ownership check — same vague-404 reasoning as the LEA
@@ -211,6 +200,8 @@ def delete_fda_verification_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    _assert_fda_personnel(current_user)
+
     draft = db.query(FdaVerificationDraft).filter(
         FdaVerificationDraft.draft_id == draft_id,
         FdaVerificationDraft.saved_by == current_user.user_id,
@@ -259,6 +250,8 @@ def list_fda_verification_drafts(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    _assert_fda_personnel(current_user)
+
     query = (
         db.query(FdaVerificationDraft, VerificationRequest, Complaint)
         .join(VerificationRequest, FdaVerificationDraft.verification_request_id == VerificationRequest.request_id)
