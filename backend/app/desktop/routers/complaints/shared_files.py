@@ -1,16 +1,20 @@
 # File: shared_files.py  (the router with prefix /shared-files)
 import os
+import mimetypes   # ADDED: derive the preview type from the file name
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+
 from app.database.sessions import get_db
 from app.core.dependencies import get_current_user
 from app.models.shared_files import SharedFile
 from app.models.complaints import Complaint  # ADDED
+from app.models.verification_requests import VerificationRequest  # ADDED
 from app.desktop.services.account_status.guards import is_lea_user  # ADDED
+
 
 router = APIRouter(prefix="/shared-files", tags=["Shared Files"])
 
@@ -33,6 +37,16 @@ def _get_accessible_file(db: Session, file_id: UUID, current_user) -> SharedFile
         ).first()
         if walkin_file is None:
             raise HTTPException(status_code=404, detail="File not found.")   # same 404 as missing
+        # ADDED: an FDA officer's attachment opens for LEA only once that officer has
+        # responded, the same files get_response_files shows
+        if file_row.request_id is not None:
+            answered = db.query(VerificationRequest.request_id).filter(
+                VerificationRequest.request_id == file_row.request_id,
+                VerificationRequest.responded_at.isnot(None),
+                VerificationRequest.responded_by == file_row.uploaded_by,
+            ).first()
+            if answered is None:
+                raise HTTPException(status_code=404, detail="File not found.")   # same 404 as missing
     else:
         # Non-LEA users can't open files on walk-in complaints LEA hasn't sent yet.
         # Extension files and everything else behave exactly as before.
@@ -100,9 +114,13 @@ def preview_shared_file(
     # Identical to download, except content_disposition_type="inline" —
     # this is what tells the browser to render the file (for our
     # <img>/<iframe> preview) instead of forcing a save-as download.
+    # CHANGED: type comes from the file name, not the uploader's claim; nosniff stops
+    # the browser guessing HTML out of a mislabeled file
+    media_type = mimetypes.guess_type(file_row.file_name)[0] or "application/octet-stream"
     return FileResponse(
         path=file_row.file_path,
         filename=file_row.file_name,
-        media_type=file_row.mime_type,
+        media_type=media_type,
         content_disposition_type="inline",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
