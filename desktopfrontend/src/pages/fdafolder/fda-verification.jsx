@@ -55,15 +55,6 @@ import mammoth from 'mammoth'; // CHANGED — added for .docx preview in Queue a
 // Verification Queue (Pending) -> Rejected -> Rejected Requests
 // ============================================================================
 
-// ============================================================================
-// 🔌 BACKEND: set to false once GET /verification-requests/lea-follow-up exists
-// ============================================================================
-const USE_LEA_RESPONSE_MOCK = true;
-
-// 🔌 BACKEND: set UPLOAD to true once POST /verification-requests/{request_id}/fda-attachments exists.
-const FDA_ATTACHMENTS_UI_ENABLED = true;
-const FDA_ATTACHMENTS_UPLOAD_ENABLED = false;
-
 // ADDED — FDA evidence attachment limits (matching LEA)
 const FDA_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 const FDA_MAX_FILES = 10;
@@ -76,351 +67,6 @@ const formatFdaFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
-
-// ⚠️ REMOVE THIS — Mock dataset for LEA Response tracking until backend endpoint is available.
-// Covers: awaiting_lea, acknowledged, takedown_initiated, closed, registered+acknowledged, and rejected+acknowledged.
-const MOCK_LEA_RESPONSE_RECORDS = [
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0301",
-    // 🔌 BACKEND: expected field
-    product_title: "Glow Skin Rejuvenating Facial Toner 60ml",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Brilliant Skin Essentials Inc.",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: "LOT-2025-BR-991",
-    // 🔌 BACKEND: expected field
-    fda_result: "unregistered",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-09-28T09:30:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Maria Santos, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "awaiting_lea",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-09-28T09:30:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: null,
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: null,
-    // 🔌 BACKEND: expected field
-    field_operation_notes: null,
-    // 🔌 BACKEND: expected field
-    closed_at: null,
-    // 🔌 BACKEND: expected field
-    closed_by_name: null,
-    // 🔌 BACKEND: expected field
-    close_reason: null,
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: null,
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: "2026-10-01T14:15:00Z",
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-01",
-        file_name: "toner_bottle_sample.jpg",
-        mime_type: "image/jpeg",
-        file_size_display: "1.4 MB",
-      },
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-02",
-        file_name: "walkin_sworn_complaint.pdf",
-        mime_type: "application/pdf",
-        file_size_display: "520.8 KB",
-      },
-    ],
-  },
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0284",
-    // 🔌 BACKEND: expected field
-    product_title: "Rosmar Kagayaku Bleaching Whipped Soap 100g",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Rosmar Skin Essentials",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: "NN-100000849201",
-    // 🔌 BACKEND: expected field
-    fda_result: "registered",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-09-25T11:00:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Arlene Cruz, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "acknowledged",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-09-26T08:45:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: "2026-09-26T08:45:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: null,
-    // 🔌 BACKEND: expected field
-    field_operation_notes: null,
-    // 🔌 BACKEND: expected field
-    closed_at: null,
-    // 🔌 BACKEND: expected field
-    closed_by_name: null,
-    // 🔌 BACKEND: expected field
-    close_reason: null,
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: null,
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: null,
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [],
-  },
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0268",
-    // 🔌 BACKEND: expected field
-    product_title: "Dr. Alvin Kojic Acid Dipalmitate Soap 135g",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Dr. Alvin Health and Beauty",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: "DA-LOT-7742",
-    // 🔌 BACKEND: expected field
-    fda_result: "unregistered",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-09-20T14:10:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Maria Santos, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "takedown_initiated",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-09-22T16:20:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: "2026-09-21T09:15:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: "Maj. Arthur Morales, CIDG",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: "2026-09-22T16:20:00Z",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: "Maj. Arthur Morales, CIDG",
-    // 🔌 BACKEND: expected field
-    field_operation_notes: "Joint surveillance scheduled with Divisoria retail enforcement unit.\nCounterfeit batch verified at stall #41. Takedown notice served.",
-    // 🔌 BACKEND: expected field
-    closed_at: null,
-    // 🔌 BACKEND: expected field
-    closed_by_name: null,
-    // 🔌 BACKEND: expected field
-    close_reason: null,
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: null,
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: null,
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-03",
-        file_name: "divisoria_stall_evidence.jpg",
-        mime_type: "image/jpeg",
-        file_size_display: "2.1 MB",
-      },
-    ],
-  },
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0240",
-    // 🔌 BACKEND: expected field
-    product_title: "Kojie San Skin Lightening Classic Soap 65g",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Beauty Elements Ventures Inc.",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: "KS-BATCH-9931",
-    // 🔌 BACKEND: expected field
-    fda_result: "unregistered",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-09-12T10:00:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Arlene Cruz, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "closed",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-09-18T15:30:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: "2026-09-13T11:20:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: "2026-09-14T13:00:00Z",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: "Maj. Arthur Morales, CIDG",
-    // 🔌 BACKEND: expected field
-    field_operation_notes: "Physical seizure scheduled at Quiapo market stall. Warrant served on merchant.",
-    // 🔌 BACKEND: expected field
-    closed_at: "2026-09-18T15:30:00Z",
-    // 🔌 BACKEND: expected field
-    closed_by_name: "Col. Renato Mendoza, CIDG",
-    // 🔌 BACKEND: expected field
-    close_reason: "Completed",
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: "140 counterfeit bars confiscated and logged into CIDG evidence locker.\nSeller issued citation and online storefront takedown notice successfully executed.",
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: null,
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-04",
-        file_name: "confiscation_inventory.pdf",
-        mime_type: "application/pdf",
-        file_size_display: "340.5 KB",
-      },
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-05",
-        file_name: "storefront_takedown_receipt.pdf",
-        mime_type: "application/pdf",
-        file_size_display: "185.0 KB",
-      },
-    ],
-  },
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9a0b",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0222",
-    // 🔌 BACKEND: expected field
-    product_title: "Fair & White Gold Ultimate Radiance Serum 30ml",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Labo Derma Paris (Imported)",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: null,
-    // 🔌 BACKEND: expected field
-    fda_result: "rejected",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-09-08T16:45:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Maria Santos, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "acknowledged",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-09-09T10:15:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: "2026-09-09T10:15:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: "Capt. Danilo Reyes, CIDG",
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: null,
-    // 🔌 BACKEND: expected field
-    field_operation_notes: null,
-    // 🔌 BACKEND: expected field
-    closed_at: null,
-    // 🔌 BACKEND: expected field
-    closed_by_name: null,
-    // 🔌 BACKEND: expected field
-    close_reason: null,
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: null,
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: null,
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [],
-  },
-  {
-    // 🔌 BACKEND: expected field
-    request_id: "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f9a0b1c",
-    // 🔌 BACKEND: expected field
-    case_reference: "VR-2026-0210",
-    // 🔌 BACKEND: expected field
-    product_title: "Belo SunExpert Whitening Sunscreen SPF 50 50ml",
-    // 🔌 BACKEND: expected field
-    product_category: "Cosmetics",
-    // 🔌 BACKEND: expected field
-    manufacturer: "Intelligent Skin Care, Inc. (Belo)",
-    // 🔌 BACKEND: expected field
-    source: "walk_in",
-    // 🔌 BACKEND: expected field
-    product_code: "NN-100000918234",
-    // 🔌 BACKEND: expected field
-    fda_result: "registered",
-    // 🔌 BACKEND: expected field
-    responded_at: "2026-10-02T13:40:00Z",
-    // 🔌 BACKEND: expected field
-    verified_by_name: "Arlene Cruz, RPh",
-    // 🔌 BACKEND: expected field
-    lea_stage: "awaiting_lea",
-    // 🔌 BACKEND: expected field
-    last_updated_at: "2026-10-02T13:40:00Z",
-    // 🔌 BACKEND: expected field
-    acknowledged_at: null,
-    // 🔌 BACKEND: expected field
-    acknowledged_by_name: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_at: null,
-    // 🔌 BACKEND: expected field
-    takedown_initiated_by_name: null,
-    // 🔌 BACKEND: expected field
-    field_operation_notes: null,
-    // 🔌 BACKEND: expected field
-    closed_at: null,
-    // 🔌 BACKEND: expected field
-    closed_by_name: null,
-    // 🔌 BACKEND: expected field
-    close_reason: null,
-    // 🔌 BACKEND: expected field - closing field operation update, needed because Close Case currently overwrites field_operation_notes
-    closing_notes: null,
-    // 🔌 BACKEND: expected field
-    reminder_sent_at: null,
-    // 🔌 BACKEND: expected field - attached_files (list of SharedFileResponse), same shape
-    // as GET /verification-requests/completed/{id}
-    attached_files: [
-      // ⚠️ REMOVE THIS
-      {
-        file_id: "mock-lea-file-06",
-        file_name: "sunscreen_label_scan.jpg",
-        mime_type: "image/jpeg",
-        file_size_display: "890.1 KB",
-      },
-    ],
-  },
-];
 
 function FDAVerification() {
   const proc = useProcessing(); // ADDED — processing overlay state
@@ -439,9 +85,9 @@ function FDAVerification() {
   const [fdaRejectedList, setFdaRejectedList] = useState([]);
 
   // LEA Response tracking state
-  const [leaResponseList, setLeaResponseList] = useState(USE_LEA_RESPONSE_MOCK ? MOCK_LEA_RESPONSE_RECORDS : []);
+  const [leaResponseList, setLeaResponseList] = useState([]);
   const [leaResponseLoading, setLeaResponseLoading] = useState(false);
-  const [leaResponseTotal, setLeaResponseTotal] = useState(USE_LEA_RESPONSE_MOCK ? MOCK_LEA_RESPONSE_RECORDS.length : 0);
+  const [leaResponseTotal, setLeaResponseTotal] = useState(0);
   const [leaSearch, setLeaSearch] = useState('');
   const [leaStageFilter, setLeaStageFilter] = useState('');
   const [leaResultFilter, setLeaResultFilter] = useState('');
@@ -543,6 +189,8 @@ function FDAVerification() {
 
   // ADDED — FDA verification evidence attachment states
   const [fdaAttachedFiles, setFdaAttachedFiles] = useState([]);
+  // ADDED — files already saved on the server for this officer and request (from POST /fda-attachments or the draft's attached_files)
+  const [fdaSavedFiles, setFdaSavedFiles] = useState([]);
   const [fdaFileError, setFdaFileError] = useState('');
   const [isFdaDragActive, setIsFdaDragActive] = useState(false);
 
@@ -598,6 +246,16 @@ function FDAVerification() {
       return;
     }
 
+    // Resolves to the blob to preview: the picked File itself for a not-yet-uploaded file,
+    // otherwise the saved file fetched from /shared-files/{file_id}/preview.
+    const getPreviewBlob = (doc) => {
+      if (doc.localFile) return Promise.resolve(doc.localFile);
+      return apiFetch(`/shared-files/${doc.file_id}/preview`).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      });
+    };
+
     // CHANGED — derive type from mime_type with file-extension fallback (Amendment 1)
     const mime = fdaDocPreviewModal.mime_type || '';
     const name = fdaDocPreviewModal.file_name || '';
@@ -617,11 +275,8 @@ function FDAVerification() {
       let cancelled = false;
       setDocxLoading(true);
       setDocxError(false);
-      apiFetch(`/shared-files/${fdaDocPreviewModal.file_id}/preview`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.arrayBuffer();
-        })
+      getPreviewBlob(fdaDocPreviewModal)
+        .then((blob) => blob.arrayBuffer())
         .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
         .then((result) => {
           if (!cancelled) setDocxHtml(result.value);
@@ -642,11 +297,7 @@ function FDAVerification() {
     setFdaDocPreviewLoading(true);
     setFdaDocPreviewError(false);
 
-    apiFetch(`/shared-files/${fdaDocPreviewModal.file_id}/preview`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
+    getPreviewBlob(fdaDocPreviewModal)
       .then((blob) => {
         objectUrl = URL.createObjectURL(blob);
         setFdaDocPreviewUrl(objectUrl);
@@ -709,6 +360,7 @@ function FDAVerification() {
       setFdaOfficialRemarks('');
       setFdaAdvisoryRemarks('');
       setFdaUnregisteredReason('');
+      setFdaSavedFiles([]);
       // CHANGED — reset formBaselineRef to blank in no draft branch (Fix 2 Amendment 2)
       formBaselineRef.current = {
         status: '',
@@ -809,32 +461,18 @@ function FDAVerification() {
   }, [fdaRejectedList, rejectedSearch, rejectedCategory, rejectedDateFrom, rejectedDateTo]); */
   const filteredRejected = fdaRejectedList;
 
-  // Filtered and sorted dataset for LEA Response tracking table
-  // Default sort: most recently updated first (last_updated_at descending)
+  // LEA Response tracking table: search, stage, result filters and pagination are applied by the
+  // server (GET /verification-requests/lea-follow-up), so the current page is only sorted here
+  // (most recently updated first; harmless if the API already returns that order).
   const filteredLeaResponse = useMemo(() => {
-    let list = [...leaResponseList];
-    const q = leaSearch.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (item) =>
-          (item.case_reference || '').toLowerCase().includes(q) ||
-          (item.product_title || '').toLowerCase().includes(q) ||
-          (item.manufacturer || '').toLowerCase().includes(q)
-      );
-    }
-    if (leaStageFilter) {
-      list = list.filter((item) => item.lea_stage === leaStageFilter);
-    }
-    if (leaResultFilter) {
-      list = list.filter((item) => (item.fda_result || '').toLowerCase() === leaResultFilter.toLowerCase());
-    }
+    const list = [...leaResponseList];
     list.sort((a, b) => {
       const timeA = a.last_updated_at ? new Date(a.last_updated_at).getTime() : 0;
       const timeB = b.last_updated_at ? new Date(b.last_updated_at).getTime() : 0;
       return timeB - timeA;
     });
     return list;
-  }, [leaResponseList, leaSearch, leaStageFilter, leaResultFilter]);
+  }, [leaResponseList]);
 
   // Active item in Verification Queue
   const currentItem = selectedQueueItem;
@@ -882,6 +520,7 @@ function FDAVerification() {
         setFdaCprExpiry(cprExp);
         setFdaUnregisteredReason(unregReason);
         setFdaVerificationStatus(formattedStatus);
+        setFdaSavedFiles(data.attached_files ?? []);
 
         // CHANGED — update baseline ref with loaded draft values (Fix 2 Amendment 2)
         formBaselineRef.current = {
@@ -905,6 +544,7 @@ function FDAVerification() {
         setFdaOfficialRemarks('');
         setFdaAdvisoryRemarks('');
         setFdaUnregisteredReason('');
+        setFdaSavedFiles([]);
         // CHANGED — reset formBaselineRef to blank on load error (Fix 2 Amendment 2)
         formBaselineRef.current = {
           status: '',
@@ -956,9 +596,11 @@ function FDAVerification() {
       validFiles.push(file);
     }
 
-    if (fdaAttachedFiles.length + validFiles.length > FDA_MAX_FILES) {
+    // Saved (server) files count toward the 10-file limit together with the newly picked ones.
+    const existingCount = fdaSavedFiles.length + fdaAttachedFiles.length;
+    if (existingCount + validFiles.length > FDA_MAX_FILES) {
       errorMsg = 'You can attach a maximum of 10 files.';
-      const availableSlots = Math.max(0, FDA_MAX_FILES - fdaAttachedFiles.length);
+      const availableSlots = Math.max(0, FDA_MAX_FILES - existingCount);
       const capped = validFiles.slice(0, availableSlots);
       setFdaAttachedFiles((prev) => [...prev, ...capped]);
     } else {
@@ -1004,6 +646,55 @@ function FDAVerification() {
     setFdaFileError('');
   };
 
+  // ADDED — uploads newly picked files to POST /verification-requests/{id}/fda-attachments.
+  // The endpoint is all-or-nothing. Returns true when there was nothing to upload or the upload succeeded;
+  // on failure shows the backend detail and returns false. Network errors propagate to the caller's try/catch.
+  const uploadNewFiles = async (requestId) => {
+    if (fdaAttachedFiles.length === 0) return true;
+
+    const formData = new FormData();
+    fdaAttachedFiles.forEach((file) => formData.append('files', file));
+
+    const res = await apiFetch(`/verification-requests/${requestId}/fda-attachments`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      const detail = errData?.detail;
+      triggerAlert(typeof detail === 'string' ? detail : 'Failed to upload attachments.', 'danger');
+      return false;
+    }
+
+    const uploaded = await res.json().catch(() => []);
+    setFdaSavedFiles((prev) => [...prev, ...(Array.isArray(uploaded) ? uploaded : [])]);
+    setFdaAttachedFiles([]);
+    setFdaFileError('');
+    return true;
+  };
+
+  // ADDED — removes one of the officer's own saved files (DELETE returns 204 with no body).
+  const handleRemoveSavedFile = async (file) => {
+    if (!currentItem) return;
+    try {
+      const res = await apiFetch(
+        `/verification-requests/${currentItem.request_id}/fda-attachments/${file.file_id}`,
+        { method: 'DELETE' }
+      );
+      if (res.status === 204 || res.ok) {
+        setFdaSavedFiles((prev) => prev.filter((f) => f.file_id !== file.file_id));
+        setFdaFileError('');
+        return;
+      }
+      const errData = await res.json().catch(() => null);
+      const detail = errData?.detail;
+      triggerAlert(typeof detail === 'string' ? detail : 'Failed to remove the file.', 'danger');
+    } catch (err) {
+      triggerAlert('Network error occurred while removing the file.', 'danger');
+    }
+  };
+
   // CHANGED — card selection switch logic with state resets and draft loading (Fix 1 & 2)
   const applySelection = (item, skipTabCheck = false) => {
     setFdaIsRejecting(false); // CHANGED — preserve setFdaIsRejecting(false) (Fix 2 Amendment 3)
@@ -1017,6 +708,7 @@ function FDAVerification() {
       setFdaOfficialRemarks('');
       setFdaAdvisoryRemarks('');
       setFdaUnregisteredReason('');
+      setFdaSavedFiles([]);
       setFdaAttachedFiles([]); // ADDED — reset attached files on card selection switch
       setFdaFileError(''); // ADDED — reset file error on card switch
       formBaselineRef.current = {
@@ -1251,15 +943,8 @@ function FDAVerification() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rejectedSearch, rejectedCategory, rejectedDateFrom, rejectedDateTo, rejectedPage, dataRefreshTrigger]);
 
-  // 🔌 BACKEND: Fetch function for GET /verification-requests/lea-follow-up (list)
-  // Reuses apiFetch with loading and error handling.
-  // When USE_LEA_RESPONSE_MOCK is true, uses mock records instead of calling backend.
+  // Fetches GET /verification-requests/lea-follow-up (list). Filtering, sorting and pagination happen on the server.
   useEffect(() => {
-    if (USE_LEA_RESPONSE_MOCK) {
-      setLeaResponseList(MOCK_LEA_RESPONSE_RECORDS);
-      setLeaResponseTotal(MOCK_LEA_RESPONSE_RECORDS.length);
-      return;
-    }
 
     const doFetch = () => {
       if (leaResponseList.length === 0) {
@@ -1418,6 +1103,10 @@ function FDAVerification() {
         },
         async () => {
           try {
+            // Upload newly picked files first; do not save the draft if the upload fails.
+            const uploaded = await uploadNewFiles(currentItem.request_id);
+            if (!uploaded) return false;
+
             const payload = {
               draft_verification_status: fdaVerificationStatus.toLowerCase() || null,
               draft_cpr_number: fdaCprNumber.trim() || null,
@@ -1500,23 +1189,9 @@ function FDAVerification() {
         },
         async () => {
           try {
-            // CHANGED — upload attachments first if upload feature flag is active and files exist
-            if (FDA_ATTACHMENTS_UPLOAD_ENABLED && fdaAttachedFiles.length > 0) {
-              const formData = new FormData();
-              fdaAttachedFiles.forEach((file) => formData.append('files', file));
-
-              const uploadRes = await apiFetch(`/verification-requests/${currentItem.request_id}/fda-attachments`, {
-                method: 'POST',
-                body: formData,
-              });
-
-              if (!uploadRes.ok) {
-                const uploadErrData = await uploadRes.json().catch(() => null);
-                const uploadErrMsg = uploadErrData?.detail || 'Failed to upload attachments.';
-                triggerAlert(uploadErrMsg, 'danger');
-                return false;
-              }
-            }
+            // Upload newly picked files before the response is submitted.
+            const uploaded = await uploadNewFiles(currentItem.request_id);
+            if (!uploaded) return false;
 
             const payload = {
               verification_status: fdaVerificationStatus.toLowerCase(),
@@ -1569,6 +1244,7 @@ function FDAVerification() {
         setFdaOfficialRemarks('');
         setFdaAdvisoryRemarks('');
         setFdaUnregisteredReason('');
+        setFdaSavedFiles([]);
         setFdaAttachedFiles([]); // ADDED — reset attached files on submit success
         setFdaFileError(''); // ADDED — reset file error on submit success
         // CHANGED — reset formBaselineRef to blank on submit success (Fix 2 Amendment 1)
@@ -1648,6 +1324,7 @@ function FDAVerification() {
         setFdaOfficialRemarks('');
         setFdaAdvisoryRemarks('');
         setFdaUnregisteredReason('');
+        setFdaSavedFiles([]);
         setFdaAttachedFiles([]); // ADDED — reset attached files on reject success
         setFdaFileError(''); // ADDED — reset file error on reject success
         // CHANGED — reset formBaselineRef to blank on reject success (Fix 2 Amendment 1)
@@ -1711,6 +1388,40 @@ function FDAVerification() {
   const getLatestNotePreview = (item) => {
     return item?.closing_notes || item?.field_operation_notes || item?.close_reason || null;
   };
+
+  // ADDED — renders read-only file cards (same markup as the evidence cards); Eye opens the shared preview modal.
+  const renderRecordFileCards = (files, emptyText) => (
+    <div className="FdaVerifDocsGrid">
+      {files && files.length > 0 ? (
+        files.map((file) => {
+          const isImage = file.mime_type?.startsWith('image/') ||
+            /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || '');
+          return (
+            <div key={file.file_id} className="FdaVerifDocCard">
+              <div className="FdaVerifDocIcon">
+                {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+              </div>
+              <div className="FdaVerifDocInfo">
+                <p className="FdaVerifDocName" title={file.file_name}>{file.file_name}</p>
+                <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+              </div>
+              <div className="FdaVerifDocActions">
+                <button
+                  className="FdaVerifDocActionBtn"
+                  title="Inspect Attachment"
+                  onClick={() => setFdaDocPreviewModal(file)}
+                >
+                  <Eye size={13} />
+                </button>
+              </div>
+            </div>
+          );
+        })
+      ) : (
+        <p className="FdaVerifNoDocsText">{emptyText}</p>
+      )}
+    </div>
+  );
 
   const getLeaStageLabel = (stage, fdaResult) => {
     const normResult = (fdaResult || '').toLowerCase();
@@ -2468,8 +2179,7 @@ function FDAVerification() {
                             )}
 
                             {/* CHANGED — FDA Evidence Attachment Section */}
-                            {FDA_ATTACHMENTS_UI_ENABLED &&
-                              (fdaVerificationStatus === 'Registered' || fdaVerificationStatus === 'Unregistered') &&
+                            {(fdaVerificationStatus === 'Registered' || fdaVerificationStatus === 'Unregistered') &&
                               !fdaIsRejecting && (
                                 <div className="FdaVerifFormGroup">
                                   <label className="FdaVerifFormLabel">
@@ -2500,8 +2210,6 @@ function FDAVerification() {
                                       </div>
                                     </label>
 
-                                    <span className="FdaVerifUploadNote">Attachments are not saved in drafts.</span>
-
                                     {fdaFileError && (
                                       <span className="FdaVerifUploadError">
                                         <AlertCircle size={12} /> {fdaFileError}
@@ -2525,6 +2233,19 @@ function FDAVerification() {
                                                 <button
                                                   type="button"
                                                   className="FdaVerifDocActionBtn"
+                                                  title="Inspect Attachment"
+                                                  onClick={() => setFdaDocPreviewModal({
+                                                    file_name: file.name,
+                                                    mime_type: file.type,
+                                                    file_size_display: formatFdaFileSize(file.size),
+                                                    localFile: file,
+                                                  })}
+                                                >
+                                                  <Eye size={13} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="FdaVerifDocActionBtn"
                                                   title="Remove File"
                                                   onClick={() => handleRemoveFdaFile(index)}
                                                 >
@@ -2537,15 +2258,46 @@ function FDAVerification() {
                                       </div>
                                     )}
 
-                                    {/* TEMP — remove once the backend endpoint exists. */}
-                                    {!FDA_ATTACHMENTS_UPLOAD_ENABLED && fdaAttachedFiles.length > 0 && (
-                                      <span className="FdaVerifUploadNotice">
-                                        Attachments are not sent yet. Backend upload is coming.
-                                      </span>
+                                    {/* Files already saved on the server for this request (this officer's own) */}
+                                    {fdaSavedFiles.length > 0 && (
+                                      <div className="FdaVerifDocsGrid">
+                                        {fdaSavedFiles.map((file) => {
+                                          const isImage = file.mime_type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || '');
+                                          return (
+                                            <div key={file.file_id} className="FdaVerifDocCard">
+                                              <div className="FdaVerifDocIcon">
+                                                {isImage ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                              </div>
+                                              <div className="FdaVerifDocInfo">
+                                                <p className="FdaVerifDocName" title={file.file_name}>{file.file_name}</p>
+                                                <span className="FdaVerifDocMeta">{file.file_size_display}</span>
+                                              </div>
+                                              <div className="FdaVerifDocActions">
+                                                <button
+                                                  type="button"
+                                                  className="FdaVerifDocActionBtn"
+                                                  title="Inspect Attachment"
+                                                  onClick={() => setFdaDocPreviewModal(file)}
+                                                >
+                                                  <Eye size={13} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="FdaVerifDocActionBtn"
+                                                  title="Remove File"
+                                                  onClick={() => handleRemoveSavedFile(file)}
+                                                >
+                                                  <X size={13} />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
-                            )}
+                              )}
 
                           </div>
                         </>
@@ -3118,11 +2870,12 @@ function FDAVerification() {
           {/* ============================================================================ */}
           {fdaActiveTab === 'lea_response' && (() => {
             const LEA_PAGE_SIZE = FDA_VERIF_TABLE_PAGE_SIZE;
-            const totalLeaPages = Math.ceil(filteredLeaResponse.length / LEA_PAGE_SIZE) || 1;
+            const totalLeaPages = Math.ceil(leaResponseTotal / LEA_PAGE_SIZE) || 1;
             const safeLeaPage = Math.min(Math.max(1, leaPage), totalLeaPages);
-            const lStartIdx = (safeLeaPage - 1) * LEA_PAGE_SIZE;
-            const lEndIdx = Math.min(lStartIdx + LEA_PAGE_SIZE, filteredLeaResponse.length);
-            const paginatedLea = filteredLeaResponse.slice(lStartIdx, lEndIdx);
+            // The server already returned exactly one page, so the list is not sliced here.
+            const paginatedLea = filteredLeaResponse;
+            const lStartIdx = (leaPage - 1) * LEA_PAGE_SIZE + 1;
+            const lEndIdx = lStartIdx + paginatedLea.length - 1;
 
             return (
               <div className="FdaVerifTableSection">
@@ -3227,7 +2980,7 @@ function FDAVerification() {
                         </tr>
                       </thead>
                       <tbody>
-                        {leaResponseLoading && filteredLeaResponse.length === 0 ? (
+                        {leaResponseLoading && leaResponseList.length === 0 ? (
                           <tr>
                             <td colSpan="7" className="FdaEmptyState">
                               <Clock size={28} style={{ opacity: 0.4 }} />
@@ -3312,7 +3065,7 @@ function FDAVerification() {
                   {/* Pagination Footer */}
                   <div className="FdaTableFooter">
                     <span className="FdaFooterInfo">
-                      Showing {filteredLeaResponse.length === 0 ? 0 : lStartIdx + 1}–{lEndIdx} of {filteredLeaResponse.length} entries
+                      Showing {paginatedLea.length === 0 ? 0 : lStartIdx}–{paginatedLea.length === 0 ? 0 : lEndIdx} of {leaResponseTotal} entries
                     </span>
                     <div className="FdaPagination">
                       <button
@@ -3554,7 +3307,14 @@ function FDAVerification() {
                             {fdaRecordModalData.requested_by_name ?? fdaRecordModalData.complainant ?? 'N/A'}
                           </span>
                         </div>
-                        {fdaRecordModalData._type === 'completed' && (
+                        {fdaRecordModalData.product_code && (
+                          <div className="FdaRecordInfoItem">
+                            <span className="FdaVerifInfoLabel">PRODUCT CODE</span>
+                            <span className="FdaVerifInfoValue">{fdaRecordModalData.product_code}</span>
+                          </div>
+                        )}
+                        {/* LEA's original evidence: shown for both completed and rejected records */}
+                        {(fdaRecordModalData._type === 'completed' || fdaRecordModalData._type === 'rejected') && (
                           <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
                             <span className="FdaVerifInfoLabel">Attached Files / Evidence</span>
                             <div className="FdaVerifDocsGrid">
@@ -3589,9 +3349,30 @@ function FDAVerification() {
                             </div>
                           </div>
                         )}
+                        {/* Responding FDA officer's files: completed records only (rejected has no response_files) */}
+                        {fdaRecordModalData._type === 'completed' && (
+                          <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
+                            <span className="FdaVerifInfoLabel">FDA Response Documents</span>
+                            {renderRecordFileCards(fdaRecordModalData.response_files, 'No FDA response documents uploaded.')}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
+
+                  {/* LEA reminder (completed and rejected records) */}
+                  {fdaRecordModalData._type !== 'lea_response' && fdaRecordModalData.reminder_sent_at && (
+                    <div className="FdaVerif-lea-reminder-card">
+                      <AlertTriangle size={16} />
+                      <div>
+                        <strong>LEA Reminder Sent:</strong> LEA officers transmitted an expedited follow-up reminder on{' '}
+                        {new Date(fdaRecordModalData.reminder_sent_at).toLocaleString('en-US', {
+                          year: 'numeric', month: 'short', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit', hour12: true,
+                        })}.
+                      </div>
+                    </div>
+                  )}
 
                   {/* COMPLETED RECORD DETAILS */}
                   {fdaRecordModalData._type === 'completed' && (
@@ -3768,51 +3549,51 @@ function FDAVerification() {
 
                             const stepsConfig = isRegisteredOrRejected
                               ? [
-                                  {
-                                    key: 'awaiting_lea',
-                                    title: 'Awaiting LEA Action',
-                                    date: fdaRecordModalData.responded_at,
-                                    dateLabel: 'Date FDA Responded:',
-                                    actor: null,
-                                  },
-                                  {
-                                    key: 'acknowledged',
-                                    title: 'Acknowledged - Case Closed',
-                                    date: fdaRecordModalData.acknowledged_at,
-                                    dateLabel: 'Acknowledged At:',
-                                    actor: fdaRecordModalData.acknowledged_by_name,
-                                    actorLabel: 'Acknowledged By:',
-                                  },
-                                ]
+                                {
+                                  key: 'awaiting_lea',
+                                  title: 'Awaiting LEA Action',
+                                  date: fdaRecordModalData.responded_at,
+                                  dateLabel: 'Date FDA Responded:',
+                                  actor: null,
+                                },
+                                {
+                                  key: 'acknowledged',
+                                  title: 'Acknowledged - Case Closed',
+                                  date: fdaRecordModalData.acknowledged_at,
+                                  dateLabel: 'Acknowledged At:',
+                                  actor: fdaRecordModalData.acknowledged_by_name,
+                                  actorLabel: 'Acknowledged By:',
+                                },
+                              ]
                               : [
-                                  {
-                                    key: 'awaiting_lea',
-                                    title: 'Awaiting LEA Action',
-                                    date: fdaRecordModalData.responded_at,
-                                    dateLabel: 'Date FDA Responded:',
-                                    actor: null,
-                                  },
-                                  // CHANGED — removed 'acknowledged' step; LEA transitions directly from awaiting_lea to takedown_initiated
-                                  {
-                                    key: 'takedown_initiated',
-                                    title: 'Takedown Initiated',
-                                    date: fdaRecordModalData.takedown_initiated_at,
-                                    dateLabel: 'Initiated At:',
-                                    actor: fdaRecordModalData.takedown_initiated_by_name,
-                                    actorLabel: 'Initiated By:',
-                                    fieldOperationNotes: fdaRecordModalData.field_operation_notes,
-                                  },
-                                  {
-                                    key: 'closed',
-                                    title: 'Case Closed',
-                                    date: fdaRecordModalData.closed_at,
-                                    dateLabel: 'Closed At:',
-                                    actor: fdaRecordModalData.closed_by_name,
-                                    actorLabel: 'Closed By:',
-                                    closingNotes: fdaRecordModalData.closing_notes,
-                                    closeReason: fdaRecordModalData.close_reason,
-                                  },
-                                ];
+                                {
+                                  key: 'awaiting_lea',
+                                  title: 'Awaiting LEA Action',
+                                  date: fdaRecordModalData.responded_at,
+                                  dateLabel: 'Date FDA Responded:',
+                                  actor: null,
+                                },
+                                // CHANGED — removed 'acknowledged' step; LEA transitions directly from awaiting_lea to takedown_initiated
+                                {
+                                  key: 'takedown_initiated',
+                                  title: 'Takedown Initiated',
+                                  date: fdaRecordModalData.takedown_initiated_at,
+                                  dateLabel: 'Initiated At:',
+                                  actor: fdaRecordModalData.takedown_initiated_by_name,
+                                  actorLabel: 'Initiated By:',
+                                  fieldOperationNotes: fdaRecordModalData.field_operation_notes,
+                                },
+                                {
+                                  key: 'closed',
+                                  title: 'Case Closed',
+                                  date: fdaRecordModalData.closed_at,
+                                  dateLabel: 'Closed At:',
+                                  actor: fdaRecordModalData.closed_by_name,
+                                  actorLabel: 'Closed By:',
+                                  closingNotes: fdaRecordModalData.closing_notes,
+                                  closeReason: fdaRecordModalData.close_reason,
+                                },
+                              ];
 
                             return stepsConfig.map((step, idx) => {
                               const isCompleted = idx < effectiveCurrentIndex;
@@ -4061,6 +3842,16 @@ function FDAVerification() {
                   <button
                     className="FdaVerifBtnDownloadAttachment"
                     onClick={() => {
+                      if (fdaDocPreviewModal.localFile) {
+                        const url = URL.createObjectURL(fdaDocPreviewModal.localFile);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fdaDocPreviewModal.file_name;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        setFdaDocPreviewModal(null);
+                        return;
+                      }
                       apiFetch(`/shared-files/${fdaDocPreviewModal.file_id}/download`)
                         .then((res) => {
                           if (!res.ok) throw new Error(`HTTP ${res.status}`);
