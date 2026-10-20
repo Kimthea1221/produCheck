@@ -209,6 +209,38 @@ class FdaComplaintListItem(BaseModel):
     status: str
     created_at: datetime
 
+# ADDED: the walk-in `verification` object the FDA View Reports modal reads
+class FdaReportVerification(BaseModel):
+    request_source: str
+    requested_by_name: str | None = None
+    requested_at: datetime | None = None
+    product_code: str | None = None
+    priority: str | None = None
+    verification_result: str | None = None   # 'registered' | 'unregistered' | 'rejected' | None while pending
+    cpr_number: str | None = None
+    cpr_expiry: date | None = None
+    verified_by_name: str | None = None
+    unregistered_reason: str | None = None
+    response_notes: str | None = None
+    responded_at: datetime | None = None
+    rejected_by_name: str | None = None
+    rejection_reason: str | None = None
+
+
+# ADDED: the walk-in `lea_followup` object the same modal reads
+class FdaReportLeaFollowup(BaseModel):
+    lea_stage: str   # 'awaiting_lea' | 'acknowledged' | 'takedown_initiated' | 'closed'
+    reminder_sent_at: datetime | None = None
+    acknowledged_at: datetime | None = None
+    acknowledged_by_name: str | None = None
+    takedown_initiated_at: datetime | None = None
+    takedown_initiated_by_name: str | None = None
+    field_operation_notes: str | None = None
+    closed_at: datetime | None = None
+    closed_by_name: str | None = None
+    closing_notes: str | None = None
+    close_reason: str | None = None
+
 # desktop/schemas/complaints/complaints.py — add
 class FdaComplaintDetailResponse(BaseModel):
     complaint_id: UUID
@@ -221,6 +253,8 @@ class FdaComplaintDetailResponse(BaseModel):
     created_at: datetime
     description: str | None
     attached_files: list[SharedFileResponse]
+    verification: FdaReportVerification | None = None   # ADDED: walk-in only
+    lea_followup: FdaReportLeaFollowup | None = None    # ADDED: walk-in only
 
 # fda-status description schema
 class StatusUpdateRequest(BaseModel):

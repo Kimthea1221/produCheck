@@ -11,7 +11,7 @@ from app.models.verification_requests import VerificationRequest
 from app.models.verification_requests import VerificationRequest
 from app.models.complaints import Complaint
 
-from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary   # CHANGED
+from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary, FdaReportVerification, FdaReportLeaFollowup   # CHANGED
 
 
 # One complaint can have several requests (recall, resend): newest by requested_at wins
@@ -67,11 +67,6 @@ def get_lea_evidence_files(db: Session, complaint_id: UUID) -> list[SharedFileRe
         .all()
     )
     return [SharedFileResponse.model_validate(f) for f in files]
-
-
-# File: backend/app/desktop/services/verification/verification_helpers.py
-# Imports: CHANGE the schema import line
-from app.desktop.schemas.complaints.complaints import SharedFileResponse, WalkinVerificationSummary   # CHANGED
 
 
 # Constant + function: 
@@ -156,3 +151,53 @@ def get_request_and_complaint_in_region(db: Session, request_id: UUID, current_u
     if result is None:
         raise HTTPException(status_code=404, detail="Verification request not found.")
     return result
+
+
+# ADDED: the FDA View Reports modal's `verification` + `lea_followup`, reshaped from the same
+# walk-in data LEA sees. (None, None) when no request was ever sent.
+def get_fda_report_exchange(db: Session, complaint) -> tuple[FdaReportVerification | None, FdaReportLeaFollowup | None]:
+    summary = get_walkin_verification(db, complaint)
+    if summary is None:
+        return None, None
+
+    is_completed = complaint.status == "completed"
+    if is_completed:
+        stage = "closed"
+    elif complaint.status == "takedown_initiated":
+        stage = "takedown_initiated"
+    elif summary.acknowledged_at is not None:
+        stage = "acknowledged"
+    else:
+        stage = "awaiting_lea"
+
+    verification = FdaReportVerification(
+        request_source=complaint.source,
+        requested_by_name=summary.requested_by_name,
+        requested_at=summary.requested_at,
+        product_code=summary.product_code,
+        priority=summary.priority,
+        verification_result=summary.verification_result,
+        cpr_number=summary.cpr_number,
+        cpr_expiry=summary.cpr_expiry,
+        verified_by_name=summary.verified_by_name,
+        unregistered_reason=summary.unregistered_reason,
+        response_notes=summary.response_notes,
+        responded_at=summary.responded_at,
+        # same responder column; the page labels it "Rejected By" for a rejection
+        rejected_by_name=summary.verified_by_name if summary.verification_result == "rejected" else None,
+        rejection_reason=summary.rejection_reason,
+    )
+    lea_followup = FdaReportLeaFollowup(
+        lea_stage=stage,
+        reminder_sent_at=summary.reminder_sent_at,
+        acknowledged_at=summary.acknowledged_at,
+        acknowledged_by_name=summary.acknowledged_by_name,
+        takedown_initiated_at=summary.takedown_initiated_at,
+        takedown_initiated_by_name=summary.takedown_initiated_by_name,
+        field_operation_notes=summary.field_operation_notes,
+        # closing fields belong to a completed takedown only, not to an acknowledged registered/rejected case
+        closed_at=summary.closed_at if is_completed else None,
+        closed_by_name=summary.closed_by_name if is_completed else None,
+        closing_notes=summary.reason_detail if is_completed else None,
+    )
+    return verification, lea_followup

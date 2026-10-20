@@ -8,6 +8,7 @@ from app.desktop.schemas.complaints.complaints import SharedFileResponse, FdaCom
 
 # ADDED: shared LEA check, so LEA can still open any complaint
 from app.desktop.services.account_status.guards import is_lea_user
+from app.desktop.services.verification.verification_helpers import get_fda_report_exchange   # ADDED
 
 # services/complaints/fda_reports_service.py — one line change
 
@@ -84,6 +85,11 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
             SharedFile.complaint_id == complaint_id,
             SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
         ).all()
+
+    # ADDED: walk-in only; extension complaints keep both fields as None
+    verification, lea_followup = (None, None)
+    if complaint.source == "walk_in":
+        verification, lea_followup = get_fda_report_exchange(db, complaint)
       
     return FdaComplaintDetailResponse(
         complaint_id=complaint.complaint_id,
@@ -96,4 +102,6 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
         created_at=complaint.created_at,
         description=description,
         attached_files=[SharedFileResponse.model_validate(f) for f in files],
+        verification=verification,
+        lea_followup=lea_followup,
     )
