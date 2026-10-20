@@ -26,8 +26,7 @@ from app.desktop.schemas.verification.verification import (
     LeaFollowUpListResponse, 
 )
 
-from app.desktop.services.verification.verification_helpers import get_response_files   # ADDED
-
+from app.desktop.services.verification.verification_helpers import get_response_files, get_lea_evidence_files   # CHANGED
 # ============================================================
 # FDA COMPLETED AND REJECTED LISTS
 # ============================================================
@@ -166,6 +165,9 @@ def get_fda_verification_completed_detail(
         verified_by_name=format_officer_display_name(responder),
         responded_at=verification_request.responded_at,
         response_files=get_response_files(db, verification_request),   # ADDED: the officer's own response files
+        product_code=verification_request.product_code,                          # ADDED
+        reminder_sent_at=verification_request.reminder_sent_at,                  # ADDED
+        attached_files=get_lea_evidence_files(db, complaint.complaint_id),       # ADDED
     )
 
 
@@ -230,6 +232,9 @@ def get_fda_verification_rejected_detail(
         requested_by_name=get_display_name_across_agencies(db, verification_request.requested_by),        rejected_by_name=format_officer_display_name(responder),
         responded_at=verification_request.responded_at,
         rejection_reason=verification_request.rejection_reason,
+        product_code=verification_request.product_code,                          # ADDED
+        reminder_sent_at=verification_request.reminder_sent_at,                  # ADDED
+        attached_files=get_lea_evidence_files(db, complaint.complaint_id),       # ADDED
     )
 
 # tiny dashboard for queue, completed, and rejected counts

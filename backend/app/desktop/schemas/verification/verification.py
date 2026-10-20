@@ -48,6 +48,8 @@ class VerificationRequestAwaitingFDAResponse(BaseModel):
     source: str
     priority: str
     requested_at: datetime
+    has_draft: bool = False        # ADDED: this officer already saved a draft on this request
+    draft_id: UUID | None = None   
 
 # ============================================================
 # FDA VERIFICATION RESPONSE (real submit — not a draft)
@@ -165,6 +167,9 @@ class FdaVerificationCompletedDetailResponse(BaseModel):
     verified_by_name: str | None
     responded_at: datetime
     response_files: list[SharedFileResponse] = []   # ADDED: the responding officer's files, same as LEA sees
+    product_code: str | None = None                  # ADDED
+    reminder_sent_at: datetime | None = None         # ADDED
+    attached_files: list[SharedFileResponse] = []    # ADDED: LEA's original evidence
 
 
 # ============================================================
@@ -200,6 +205,9 @@ class FdaVerificationRejectedDetailResponse(BaseModel):
     rejected_by_name: str | None
     responded_at: datetime
     rejection_reason: str
+    product_code: str | None = None                  # ADDED
+    reminder_sent_at: datetime | None = None         # ADDED
+    attached_files: list[SharedFileResponse] = []    # ADDED: LEA's original evidence
 
 # tiny dashboard count fda
 class FdaVerificationQueueCounts(BaseModel):
