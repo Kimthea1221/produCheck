@@ -390,7 +390,8 @@ def list_lea_follow_up(
                 field_operation_notes=complaint.field_operation_notes if is_unregistered else None,
                 closed_at=complaint.closed_at if is_unregistered else None,
                 closed_by_name=_name(complaint.closed_by) if is_unregistered else None,
-                close_reason="Completed" if lea_stage == "closed" else None,   # CHANGED: frontend displays this text as-is                closing_notes=complaint.closing_notes if is_unregistered else None,
+                close_reason="Completed" if lea_stage == "closed" else None,   # CHANGED: frontend displays this text as-is                
+                closing_notes=complaint.closing_notes if is_unregistered else None,
                 reminder_sent_at=vr.reminder_sent_at,
                 attached_files=[
                     SharedFileResponse.model_validate(f)
