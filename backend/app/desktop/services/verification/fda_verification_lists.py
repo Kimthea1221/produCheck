@@ -26,6 +26,8 @@ from app.desktop.schemas.verification.verification import (
     LeaFollowUpListResponse, 
 )
 
+from app.desktop.services.verification.verification_helpers import get_response_files   # ADDED
+
 # ============================================================
 # FDA COMPLETED AND REJECTED LISTS
 # ============================================================
@@ -151,7 +153,8 @@ def get_fda_verification_completed_detail(
         product_category=complaint.product_category,
         requested_at=verification_request.requested_at,
         # CHANGED — was format_officer_display_name(requester), which is None under RLS
-        requested_by_name=get_display_name_across_agencies(db, verification_request.requested_by),        verification_result=(
+        requested_by_name=get_display_name_across_agencies(db, verification_request.requested_by),        
+        verification_result=(
             "registered"
             if verification_request.verification_request_status == "confirmed_registered"
             else "unregistered"
@@ -162,6 +165,7 @@ def get_fda_verification_completed_detail(
         unregistered_reason=verification_request.unregistered_reason,
         verified_by_name=format_officer_display_name(responder),
         responded_at=verification_request.responded_at,
+        response_files=get_response_files(db, verification_request),   # ADDED: the officer's own response files
     )
 
 

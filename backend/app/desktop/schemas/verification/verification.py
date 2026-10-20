@@ -164,6 +164,7 @@ class FdaVerificationCompletedDetailResponse(BaseModel):
     unregistered_reason: str | None
     verified_by_name: str | None
     responded_at: datetime
+    response_files: list[SharedFileResponse] = []   # ADDED: the responding officer's files, same as LEA sees
 
 
 # ============================================================
