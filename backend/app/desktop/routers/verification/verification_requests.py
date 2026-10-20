@@ -40,6 +40,7 @@ from app.desktop.services.verification.verification_submit_service import (
 from app.models.complaints import Complaint
 from app.models.walkin_complainants import WalkinComplainant
 from app.models.verification_requests import VerificationRequest
+from app.models.fda_verification_drafts import FdaVerificationDraft   # ADDED
 
 from app.desktop.services.verification.fda_verification_response import get_fda_verification_request_detail
 
@@ -209,14 +210,18 @@ def list_verification_requests_awaiting_fda(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    query = db.query(VerificationRequest, Complaint, WalkinComplainant).join(
+    query = db.query(VerificationRequest, Complaint, WalkinComplainant, FdaVerificationDraft.draft_id).join(
         Complaint, VerificationRequest.complaint_id == Complaint.complaint_id
     ).outerjoin(
         WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id
+    ).outerjoin(   # ADDED: this officer's own draft for the request, if any
+        FdaVerificationDraft,
+        (FdaVerificationDraft.verification_request_id == VerificationRequest.request_id)
+        & (FdaVerificationDraft.saved_by == current_user.user_id),
     ).filter(
         VerificationRequest.verification_request_status == "pending",
         Complaint.region_id == current_user.region_id,
-        Complaint.source == "walk_in",   # ADDED: the queue is walk-in only; extension complaints use the status-update page
+        Complaint.source == "walk_in",
     )
 
     if search is not None:
@@ -250,8 +255,10 @@ def list_verification_requests_awaiting_fda(
             source=complaint.source,
             priority=request.priority,
             requested_at=request.requested_at,
+            has_draft=draft_id is not None,   # ADDED
+            draft_id=draft_id,                # ADDED
         )
-        for request, complaint, complainant in results
+        for request, complaint, complainant, draft_id in results   # CHANGED: draft_id added to the tuple
     ]
 
 
@@ -279,6 +286,7 @@ def list_completed_verification_requests(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return list_fda_verification_completed(
         db, current_user, search, category, verification_result, date_from, date_to, page, page_size
     )
@@ -297,6 +305,7 @@ def get_completed_verification_request_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return get_fda_verification_completed_detail(db, request_id, current_user)
 
 
@@ -313,6 +322,7 @@ def export_completed_verification_pdf(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     detail = get_fda_verification_completed_detail(db, request_id, current_user)
     pdf_bytes = build_completed_pdf(detail)
     filename = f"{detail.case_reference}-verification-record.pdf"
@@ -341,6 +351,7 @@ def list_rejected_verification_requests(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return list_fda_verification_rejected(
         db, current_user, search, category, date_from, date_to, page, page_size
     )
@@ -359,6 +370,7 @@ def get_rejected_verification_request_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return get_fda_verification_rejected_detail(db, request_id, current_user)
 
 
@@ -375,6 +387,7 @@ def export_rejected_verification_pdf(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     detail = get_fda_verification_rejected_detail(db, request_id, current_user)
     pdf_bytes = build_rejected_pdf(detail)
     filename = f"{detail.case_reference}-rejected-record.pdf"
