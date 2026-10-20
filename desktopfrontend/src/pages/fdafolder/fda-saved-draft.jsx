@@ -34,34 +34,6 @@ import mammoth from "mammoth"; // ADDED — for docx attachment preview in draft
 // default page_size sent in every GET /drafts/fda-verification/ request.
 const ITEMS_PER_PAGE = 25;
 
-// 🔌 BACKEND: draft attachments are not stored yet. Set false and read attached_files from the draft response once the backend supports it.
-const USE_DRAFT_ATTACHMENT_MOCK = true;
-
-// ⚠️ REMOVE THIS — Mock dataset for draft attachments until backend stores draft files
-const MOCK_DRAFT_ATTACHMENTS = [
-  {
-    // ⚠️ REMOVE THIS
-    file_id: "mock-draft-file-01",
-    file_name: "cpr_certificate_photo.jpg",
-    mime_type: "image/jpeg",
-    file_size_display: "2.4 MB",
-  },
-  {
-    // ⚠️ REMOVE THIS
-    file_id: "mock-draft-file-02",
-    file_name: "fda_database_screenshot.png",
-    mime_type: "image/png",
-    file_size_display: "1.1 MB",
-  },
-  {
-    // ⚠️ REMOVE THIS
-    file_id: "mock-draft-file-03",
-    file_name: "product_label_inspection.pdf",
-    mime_type: "application/pdf",
-    file_size_display: "450.8 KB",
-  },
-];
-
 // ADDED — maps priority string to corresponding badge CSS class (matches fda-verification.jsx)
 const getPriorityBadgeClass = (priority) => {
   switch (priority) {
@@ -227,6 +199,7 @@ function FdaDraftViewModal({ draft, onClose, onContinueEditing, formatDate }) {
   const isRegistered = rawStatus === "registered";
   const isUnregistered = rawStatus === "unregistered";
   const hasDetermination = isRegistered || isUnregistered;
+  const draftAttachedFiles = draftDetail?.attached_files || [];
 
   return (
     <div className="FdaVerifModalOverlay">
@@ -308,13 +281,13 @@ function FdaDraftViewModal({ draft, onClose, onContinueEditing, formatDate }) {
                 <span className="FdaVerifInfoValue">
                   {requestDetail?.requested_at
                     ? new Date(requestDetail.requested_at).toLocaleString("en-US", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
                     : (requestLoading ? "Loading…" : "—")}
                 </span>
               </div>
@@ -483,18 +456,20 @@ function FdaDraftViewModal({ draft, onClose, onContinueEditing, formatDate }) {
             )}
           </div>
 
-          {/* SECTION 5: ATTACH FILES / EVIDENCE (MOCK) — Shown only when status is Registered or Unregistered */}
-          {hasDetermination && USE_DRAFT_ATTACHMENT_MOCK && (
+          {/* SECTION 5: ATTACH FILES / EVIDENCE — shown when a determination was saved or the draft has files */}
+          {(hasDetermination || draftAttachedFiles.length > 0) && (
             <>
               <hr className="FdaVerifSectionDivider" />
-              <div className="FdaVerifMergedSection FdaVerifMockAttach">
+              <div className="FdaVerifMergedSection">
                 <div className="FdaVerifAttachHeaderRow">
                   <span className="FdaVerifInfoLabel">ATTACHED FILES / EVIDENCE</span>
-                  <span className="FdaVerifMockBadge">Mock preview</span>
                 </div>
 
                 <div className="FdaVerifDocsGrid">
-                  {MOCK_DRAFT_ATTACHMENTS.map((file) => {
+                  {draftAttachedFiles.length === 0 && (
+                    <p className="FdaVerifNoDocsText">No files attached to this draft.</p>
+                  )}
+                  {draftAttachedFiles.map((file) => {
                     const isImage =
                       file.mime_type?.startsWith("image/") ||
                       /\.(jpg|jpeg|png|gif|webp)$/i.test(file.file_name || "");
@@ -513,8 +488,8 @@ function FdaDraftViewModal({ draft, onClose, onContinueEditing, formatDate }) {
                           <button
                             type="button"
                             className="FdaVerifDocActionBtn"
-                            title="Mock file, no preview"
-                            disabled
+                            title="Inspect Attachment"
+                            onClick={() => setPreviewFile(file)}
                           >
                             <Eye size={13} />
                           </button>
@@ -1248,7 +1223,7 @@ function FDASavedDraft() {
                                     top: `${dropdownPos.top}px`,
                                     left: `${dropdownPos.left}px`,
                                     zIndex: 9999,
-                                    width:`150px`,
+                                    width: `150px`,
                                   }}
                                 >
                                   <button
