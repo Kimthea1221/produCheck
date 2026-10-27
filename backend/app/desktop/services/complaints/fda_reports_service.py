@@ -1,5 +1,6 @@
 #for FDA View Reports
 from sqlalchemy.orm import Session
+from sqlalchemy import or_ 
 from app.models.complaints import Complaint
 from app.desktop.schemas.complaints.complaints import FdaComplaintListItem
 from fastapi import HTTPException
@@ -18,11 +19,9 @@ def list_all_complaints_for_fda(
 ) -> list[FdaComplaintListItem]:
     query = db.query(Complaint).filter(
         Complaint.deleted_at.is_(None),
-        Complaint.status != "open",   # not yet sent to FDA by LEA, excluded from this report
-        Complaint.region_id == current_user.region_id,   # FDA personnel are region-scoped, same as LEA
+        or_(Complaint.status != "open", Complaint.source == "extension"),  # hides only open walk-ins
+        Complaint.region_id == current_user.region_id,
     )
-    if current_user.role != "superadmin" and current_user.region_id:
-        query = query.filter(Complaint.region_id == current_user.region_id)
 
     if source is not None:
         query = query.filter(Complaint.source == source)
@@ -61,9 +60,8 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
     query = db.query(Complaint).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.deleted_at.is_(None),
+        Complaint.region_id == current_user.region_id,
     )
-    if current_user.role != "superadmin" and current_user.region_id:
-        query = query.filter(Complaint.region_id == current_user.region_id)
     
     # CHANGED: only walk-in complaints are gated; extension complaints stay exactly as before
     if not is_lea_user(current_user):
