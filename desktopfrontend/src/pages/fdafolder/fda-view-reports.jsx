@@ -54,6 +54,12 @@ function formatDateTime(isoString) {
   });
 }
 
+function csvText(value) {
+  let s = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 // ADDED — formats the backend's ISO timestamp into full date and time string
 function formatFullDateTime(isoString) {
   if (!isoString) return '—';
@@ -103,6 +109,7 @@ const WALKIN_STATUS_MAP = {
 };
 
 const EXTENSION_STATUS_MAP = {
+  "open": "Open",   
   "under_review": "Under Review",
   "takedown_requested": "Request for Takedown",
   "completed": "Completed",
@@ -680,9 +687,9 @@ function FDAViewReports() {
     for (const report of rowsToExport) {
       const values = [
         report.case_reference,
-        `"${report.product_title.replace(/"/g, '""')}"`,
-        `"${(report.manufacturer || '').replace(/"/g, '""')}"`,
-        `"${(report.product_category || '').replace(/"/g, '""')}"`,
+        csvText(report.product_title),
+        csvText(report.manufacturer),
+        csvText(report.product_category),
         getSourceLabel(report.source),
         getWorkflowStatus(report.status, report.source),
         // CHANGED — wrapped in ="..." so Excel treats it as literal text,
@@ -707,6 +714,8 @@ function FDAViewReports() {
   // STATUS COLORS STYLING HELPER
   const getStatusStyle = (status) => {
     switch (status) {
+      case "open":             // ADD
+        return { backgroundColor: "rgba(107, 114, 128, 0.1)", color: "#6B7280" };
       case "under_review":
         return { backgroundColor: "rgba(217, 119, 6, 0.1)", color: "#D97706" };
       case "takedown_requested":
@@ -731,7 +740,7 @@ function FDAViewReports() {
   // -> "Case Closed" vs "Dismissed"), so a single shared list would let
   // someone pick a label that can never match anything on the other tab.
   const statusesList = activeTab === 'Browser Extension'
-    ? ["All", "Under Review", "Request for Takedown", "Completed", "Dismissed"]
+    ? ["All", "Open", "Under Review", "Request for Takedown", "Completed", "Dismissed"]
     : ["All", "Under Review", "Forwarded to LEA", "Operation in Progress", "Takedown Completed", "Case Closed"];
 
   return (
