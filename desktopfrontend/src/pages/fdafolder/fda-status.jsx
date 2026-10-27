@@ -91,7 +91,7 @@ const thumbnailStyle = {
 };
 
 // 🔌 BACKEND: Flip to false once GET /complaints-status-update serializes the PROPOSED key 'product_url'
-const USE_PRODUCT_LINK_MOCK = true;
+const USE_PRODUCT_LINK_MOCK = false;
 
 // 🔌 BACKEND: no real extension complaints needed once the flag is false
 const USE_STATUS_SAMPLE_CASE_MOCK = true;

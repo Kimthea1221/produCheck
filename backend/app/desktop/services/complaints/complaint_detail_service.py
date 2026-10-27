@@ -25,6 +25,7 @@ def get_complaint_verification_detail(db: Session, complaint_id: UUID, region_id
     ).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.region_id == region_id,
+        Complaint.source == "walk_in",   # ADDED: LEA verification flow is walk-in only
         Complaint.deleted_at.is_(None),  #Add
     ).first()
 
@@ -33,8 +34,11 @@ def get_complaint_verification_detail(db: Session, complaint_id: UUID, region_id
 
     complaint, complainant = result
 
-    files = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id).all()
-
+    files = db.query(SharedFile).filter(
+            SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
+        ).all()
+    
     return ComplaintVerificationDetailResponse(
         complaint_id=complaint.complaint_id,
         case_reference=complaint.case_reference,

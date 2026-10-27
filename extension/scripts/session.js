@@ -1,4 +1,4 @@
-//session.js
+//extension/scripts/session.js
 import {
   apiVerificationHistory,
   apiSubmitComplaint,

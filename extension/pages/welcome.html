@@ -1,0 +1,68 @@
+<!-- extension/pages/welcome.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProduCheck | Welcome</title>
+  <link rel="stylesheet" href="../css/global.css" />
+</head>
+<body>
+  <main class="about-card">
+
+    <div class="header-row">
+      <div class="header-left">
+        <img class="logo-placeholder" src="../assets/images/extension_icon.png" alt="ProduCheck Logo" />
+        <h1 class="header-title">ProduCheck</h1>
+      </div>
+    </div>
+
+    <!-- Main view: read the Terms, tick the box, continue -->
+    <div id="welcome-main">
+      <p class="welcome-title">Welcome to ProduCheck!</p>
+      <p class="welcome-intro">
+        Before you start, please read the Terms of Use and Privacy Notice below.
+        ProduCheck stays switched off until you agree.
+      </p>
+
+      <div class="terms-scroll">
+        <div id="terms-slot"></div>
+      </div>
+
+      <label class="agree-row" for="agree-checkbox">
+        <input type="checkbox" id="agree-checkbox" />
+        <span>I have read and agree to the Terms of Use and Privacy Notice</span>
+      </label>
+
+      <button type="button" id="btn-continue" class="btn-primary-green" disabled>Continue</button>
+      <button type="button" id="btn-no-thanks" class="btn-no-thanks">No, thanks</button>
+    </div>
+
+    <!-- After Continue -->
+    <div id="welcome-done" class="welcome-center hidden">
+      <p class="welcome-title">Thank you!</p>
+      <p class="welcome-intro">
+        ProduCheck is now switched on. Open a product page on Shopee, Lazada, TikTok Shop, or
+        Facebook Marketplace and click Check Product. You can read the Terms again any time
+        from About ProduCheck.
+      </p>
+      <button type="button" class="btn-primary-green btn-close-tab">Close this tab</button>
+    </div>
+
+    <!-- After No, thanks -->
+    <div id="welcome-declined" class="welcome-center hidden">
+      <p class="welcome-title">No problem</p>
+      <p class="welcome-intro">
+        ProduCheck stays switched off, so nothing will be checked, captured, or sent.
+        If you change your mind, click the ProduCheck icon in Chrome and choose
+        "Review and Agree to the Terms".
+      </p>
+      <button type="button" id="btn-review-again" class="btn-primary-green">Review the Terms again</button>
+      <button type="button" class="btn-no-thanks btn-close-tab">Close this tab</button>
+    </div>
+
+  </main>
+
+  <script type="module" src="../js/welcome.js"></script>
+</body>
+</html>

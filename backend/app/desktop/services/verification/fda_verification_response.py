@@ -13,6 +13,9 @@ from app.models.verification_requests import VerificationRequest
 from app.models.complaints import Complaint
 from app.models.fda_verification_drafts import FdaVerificationDraft
 from app.core.complaint_status import transition_complaint_status
+
+from app.desktop.services.verification.fda_attachments_service import delete_request_attachments, remove_files_from_disk   # ADDED
+from app.desktop.services.verification.verification_helpers import get_request_and_complaint_in_region   # CHANGED: shared with the drafts router
 from app.desktop.services.notifications.notification_service import (
     notify_lea_fda_responded,  
     notify_lea_fda_rejected,
@@ -21,40 +24,17 @@ from app.desktop.services.notifications.notification_service import (
 
 )
 
-from app.models.users import User
+
 from app.models.shared_files import SharedFile
-from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
+from app.core.user_display import get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import FdaVerificationRequestDetailResponse
+from app.desktop.schemas.complaints.complaints import SharedFileResponse
 from app.desktop.schemas.verification.verification import (
     FdaVerificationSubmitRequest,
     FdaVerificationStatusChoice,
     FdaVerificationRejectRequest,
     FdaVerificationRequestDetailResponse,  # merge with the existing one below, don't duplicate
 )
-from app.desktop.schemas.complaints.complaints import SharedFileResponse
-
-
-
-
-# Shared by both submit and reject below — loads a VerificationRequest
-# together with its parent Complaint, but ONLY if that complaint
-# belongs to the current officer's region. Returns 404 either way if
-# the request truly doesn't exist OR if it exists in a different
-# region — an officer outside the region should never be able to
-# tell the difference.
-def _get_request_and_complaint_in_region(db: Session, request_id: UUID, current_user):
-    result = (
-        db.query(VerificationRequest, Complaint)
-        .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .filter(
-            VerificationRequest.request_id == request_id,
-            Complaint.region_id == current_user.region_id,
-        )
-        .first()
-    )
-    if result is None:
-        raise HTTPException(status_code=404, detail="Verification request not found.")
-    return result
 
 
 # The "Submit Verification" button — FDA officer has decided the
@@ -70,7 +50,7 @@ def submit_fda_verification_response(
     data: FdaVerificationSubmitRequest,
     request: Request = None,
 ) -> tuple[VerificationRequest, Complaint]:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
 
     # Defense in depth — the frontend shouldn't let an officer resubmit
     # an already-decided request, but the backend must never rely on
@@ -99,6 +79,9 @@ def submit_fda_verification_response(
             )
         new_verification_status = "confirmed_registered"
         new_complaint_status = "dismissed"
+        # ADDED: a registered record carries no unregistered reason
+        cpr_number, cpr_expiry, unregistered_reason = data.cpr_number, data.cpr_expiry, None
+
     else:
         if not data.unregistered_reason or not data.unregistered_reason.strip():
             raise HTTPException(
@@ -118,12 +101,14 @@ def submit_fda_verification_response(
                 )
         new_verification_status = "confirmed_unregistered"
         new_complaint_status = "takedown_requested"
+        # ADDED: an unregistered record carries no CPR details
+        cpr_number, cpr_expiry, unregistered_reason = None, None, data.unregistered_reason
 
     verification_request.verification_request_status = new_verification_status
-    verification_request.cpr_number = data.cpr_number
-    verification_request.cpr_expiry = data.cpr_expiry
+    verification_request.cpr_number = cpr_number               # was data.cpr_number
+    verification_request.cpr_expiry = cpr_expiry               # was data.cpr_expiry
     verification_request.response_notes = data.response_notes
-    verification_request.unregistered_reason = data.unregistered_reason
+    verification_request.unregistered_reason = unregistered_reason   # was data.unregistered_reason
     verification_request.responded_by = current_user.user_id
     verification_request.responded_at = datetime.now(timezone.utc)
 
@@ -141,6 +126,9 @@ def submit_fda_verification_response(
         FdaVerificationDraft.verification_request_id == request_id
     ).delete()
 
+    # ADDED: keep only the responding officer's files (the response files LEA will see); delete other officers' leftovers
+    leftover_paths = delete_request_attachments(db, request_id, keep_uploaded_by=current_user_id)
+
 
     # ADDED — notify LEA of the outcome, before commit, same transaction
     notify_lea_fda_responded(db, complaint) #ADDED for notification to LEA personnel that FDA has responded to the verification request
@@ -150,11 +138,12 @@ def submit_fda_verification_response(
     # has been written yet, so verification_requests and complaints
     # never end up out of sync with each other.
     db.commit()
+    remove_files_from_disk(leftover_paths)   # ADDED
     db.refresh(verification_request)
     db.refresh(complaint)
 
     write_audit_log(
-        db,
+        db, 
         user=None,
         user_id_override=current_user_id,
         user_role_override=current_user_role,
@@ -189,7 +178,7 @@ def reject_fda_verification_response(
     data: FdaVerificationRejectRequest,
     request: Request = None,
 ) -> tuple[VerificationRequest, Complaint]:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
 
     if verification_request.verification_request_status != "pending":
         raise HTTPException(
@@ -216,10 +205,14 @@ def reject_fda_verification_response(
         FdaVerificationDraft.verification_request_id == request_id
     ).delete()
 
+    # ADDED: a rejection shows no files to LEA, and uploads are pending-only, so every officer's files for this request would be orphaned
+    file_paths = delete_request_attachments(db, request_id)
+
     notify_lea_fda_rejected(db, complaint, verification_request)  # ADDED for notification to LEA personnel that the verification request has been rejected
     notify_fda_peers_rejected(db, complaint, current_user)  # ADDED for notification to FDA personnel in the same region that a colleague has rejected the verification request
 
     db.commit()
+    remove_files_from_disk(file_paths)   # ADDED
     db.refresh(verification_request)
     db.refresh(complaint)
 
@@ -253,16 +246,13 @@ def get_fda_verification_request_detail(
     request_id: UUID,
     current_user,
 ) -> FdaVerificationRequestDetailResponse:
-    verification_request, complaint = _get_request_and_complaint_in_region(db, request_id, current_user)
-
-    requesting_officer = db.query(User).filter(
-        User.user_id == verification_request.requested_by
-    ).first()
+    verification_request, complaint = get_request_and_complaint_in_region(db, request_id, current_user)
     
     requested_by_name = get_display_name_across_agencies(db, verification_request.requested_by)
 
     files = db.query(SharedFile).filter(
-        SharedFile.complaint_id == complaint.complaint_id
+        SharedFile.complaint_id == complaint.complaint_id,
+        SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
     ).all()
 
     return FdaVerificationRequestDetailResponse(

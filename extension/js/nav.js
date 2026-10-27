@@ -1,3 +1,4 @@
+// extension/js/nav.js
 import { loadPartial } from "./partial-loader.js";
 
 document.addEventListener('DOMContentLoaded', async () => {

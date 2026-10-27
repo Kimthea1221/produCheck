@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import date
 import io
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, File, UploadFile, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,10 @@ from app.desktop.schemas.verification.verification import (
     LeaFdaResponseListItem,
     LeaFdaResponseDetailResponse,
     LeaClosedCaseListResponse,
+    LeaFdaResponseResultChoice,
+    LeaFollowUpStage,
+    LeaFollowUpListResponse,
+    LeaClosedCaseDetailResponse
 )
 
 from app.desktop.services.verification.verification_submit_service import (
@@ -36,6 +40,7 @@ from app.desktop.services.verification.verification_submit_service import (
 from app.models.complaints import Complaint
 from app.models.walkin_complainants import WalkinComplainant
 from app.models.verification_requests import VerificationRequest
+from app.models.fda_verification_drafts import FdaVerificationDraft   # ADDED
 
 from app.desktop.services.verification.fda_verification_response import get_fda_verification_request_detail
 
@@ -45,6 +50,7 @@ from app.desktop.services.verification.fda_verification_lists import (
     list_fda_verification_rejected,
     get_fda_verification_rejected_detail,
     get_fda_verification_queue_counts,
+    list_lea_follow_up,
 )
 
 from app.desktop.services.verification.fda_verification_export import (
@@ -57,7 +63,14 @@ from app.desktop.services.verification.lea_verification_lists import (
     list_lea_fda_response,
     get_lea_fda_response_detail,
     list_lea_closed_cases,
+    get_lea_closed_case_detail
 )
+
+from app.desktop.schemas.complaints.complaints import SharedFileResponse   # ADDED
+from app.desktop.services.verification.fda_attachments_service import upload_fda_attachments, delete_fda_attachment   # ADD
+
+# ADDED: shared LEA-only helpers
+from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user, assert_fda_user 
 
 
 # Same two-router-in-one-file pattern as walkin_complaints.py
@@ -79,6 +92,7 @@ def submit_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return submit_verification_draft(db, draft_id, current_user, request)
 
 
@@ -96,6 +110,7 @@ def create_request_direct(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return create_verification_request_direct(
         db, current_user,
         complaint_id=data.complaint_id,
@@ -120,6 +135,7 @@ def recall_request_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return recall_verification_request(db, request_id, current_user, request)
 
 
@@ -136,9 +152,42 @@ def resend_reminder_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return resend_reminder(db, request_id, current_user)
-
 # Ashanti code ends here
+
+    #
+    #
+    #
+    #
+    #
+    # POST /verification-requests/{request_id}/fda-attachments
+@direct_request_router.post("/{request_id}/fda-attachments", response_model=list[SharedFileResponse])
+def upload_fda_attachments_endpoint(
+    request_id: UUID,
+    files: list[UploadFile] = File(...),   # multipart field name is "files", as the frontend expects
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return upload_fda_attachments(db, request_id, current_user, files)   # role check is its first line
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # DELETE /verification-requests/{request_id}/fda-attachments/{file_id}
+@direct_request_router.delete("/{request_id}/fda-attachments/{file_id}", status_code=204)
+def delete_fda_attachment_endpoint(
+    request_id: UUID,
+    file_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    delete_fda_attachment(db, request_id, file_id, current_user)
+    return Response(status_code=204)   # no body on success
 
 
 # Third router in this file — listing/browsing, separate from the
@@ -161,13 +210,18 @@ def list_verification_requests_awaiting_fda(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    query = db.query(VerificationRequest, Complaint, WalkinComplainant).join(
+    query = db.query(VerificationRequest, Complaint, WalkinComplainant, FdaVerificationDraft.draft_id).join(
         Complaint, VerificationRequest.complaint_id == Complaint.complaint_id
     ).outerjoin(
         WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id
+    ).outerjoin(   # ADDED: this officer's own draft for the request, if any
+        FdaVerificationDraft,
+        (FdaVerificationDraft.verification_request_id == VerificationRequest.request_id)
+        & (FdaVerificationDraft.saved_by == current_user.user_id),
     ).filter(
         VerificationRequest.verification_request_status == "pending",
         Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",
     )
 
     if search is not None:
@@ -187,6 +241,8 @@ def list_verification_requests_awaiting_fda(
 
     results = query.order_by(VerificationRequest.requested_at.desc()).all()
 
+    is_lea = is_lea_user(current_user)  # ADDED
+
     return [
         VerificationRequestAwaitingFDAResponse(
             request_id=request.request_id,
@@ -195,12 +251,14 @@ def list_verification_requests_awaiting_fda(
             product_name=request.product_name,
             manufacturer=complaint.manufacturer,
             product_category=complaint.product_category,
-            complainant_name=complainant.full_name if complainant else None,
+            complainant_name=complainant.full_name if (complainant and is_lea) else None,  # CHANGED: citizen name is LEA-only
             source=complaint.source,
             priority=request.priority,
             requested_at=request.requested_at,
+            has_draft=draft_id is not None,   # ADDED
+            draft_id=draft_id,                # ADDED
         )
-        for request, complaint, complainant in results
+        for request, complaint, complainant, draft_id in results   # CHANGED: draft_id added to the tuple
     ]
 
 
@@ -228,6 +286,7 @@ def list_completed_verification_requests(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return list_fda_verification_completed(
         db, current_user, search, category, verification_result, date_from, date_to, page, page_size
     )
@@ -246,6 +305,7 @@ def get_completed_verification_request_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return get_fda_verification_completed_detail(db, request_id, current_user)
 
 
@@ -262,6 +322,7 @@ def export_completed_verification_pdf(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     detail = get_fda_verification_completed_detail(db, request_id, current_user)
     pdf_bytes = build_completed_pdf(detail)
     filename = f"{detail.case_reference}-verification-record.pdf"
@@ -290,6 +351,7 @@ def list_rejected_verification_requests(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return list_fda_verification_rejected(
         db, current_user, search, category, date_from, date_to, page, page_size
     )
@@ -308,6 +370,7 @@ def get_rejected_verification_request_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     return get_fda_verification_rejected_detail(db, request_id, current_user)
 
 
@@ -324,6 +387,7 @@ def export_rejected_verification_pdf(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_fda_user(current_user)   # ADDED: FDA queue only
     detail = get_fda_verification_rejected_detail(db, request_id, current_user)
     pdf_bytes = build_rejected_pdf(detail)
     filename = f"{detail.case_reference}-rejected-record.pdf"
@@ -361,6 +425,7 @@ def get_lea_verification_queue_counts_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_verification_queue_counts(db, current_user)
 
 
@@ -376,6 +441,7 @@ def list_lea_fda_response_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_fda_response(db, current_user)
 
 
@@ -392,6 +458,7 @@ def get_lea_fda_response_detail_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_fda_response_detail(db, request_id, current_user)
 
 
@@ -414,10 +481,50 @@ def list_lea_closed_cases_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_closed_cases(
         db, current_user, search, category, reason_closed, date_from, date_to, page, page_size
     )
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /verification-requests/closed-cases/{complaint_id}
+@list_router.get("/closed-cases/{complaint_id}", response_model=LeaClosedCaseDetailResponse)
+def get_lea_closed_case_detail_endpoint(
+    complaint_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    assert_lea_user(current_user)   # role check first
+    return get_lea_closed_case_detail(db, complaint_id, current_user)
     # added by Darlene --end
+
+
+    #
+    #
+    #
+    #
+    #
+    #
+    # GET /verification-requests/lea-follow-up
+@list_router.get("/lea-follow-up", response_model=LeaFollowUpListResponse)
+def get_lea_follow_up(
+    search: str | None = Query(None),
+    stage: LeaFollowUpStage | None = Query(None),
+    fda_result: LeaFdaResponseResultChoice | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),   
+):
+    assert_fda_user(current_user)   # role check first
+    return list_lea_follow_up(db, current_user, search, stage, fda_result, page, page_size)
+
 
     #
     #

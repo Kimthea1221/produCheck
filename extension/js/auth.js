@@ -1,4 +1,5 @@
-//Auth.js
+//extension/js/auth.js  
+import "./agreement-guard.js";
 import {
   whenSessionReady,
   isUserLoggedIn,
@@ -554,6 +555,23 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
+  // <a> tags ignore .disabled, so block clicks and dim the link instead
+  function setLinkBusy(link, busy) {
+    if (!link) return;
+    link.dataset.busy = busy ? '1' : '';
+    link.style.pointerEvents = busy ? 'none' : '';
+    link.style.opacity = busy ? '0.5' : '';
+  }
+
+  // keep a link blocked for the server's Retry-After time, otherwise free it right away
+  function releaseLink(link, error) {
+    if (error && error.retryAfter) {
+      setTimeout(() => setLinkBusy(link, false), error.retryAfter * 1000);
+    } else {
+      setLinkBusy(link, false);
+    }
+  }
+
   // Checks the signin/signup form fields before submitting.
   // Returns true only if everything required is filled in correctly.
   const validateForm = () => {
@@ -675,7 +693,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (verifyLink) {
       verifyLink.addEventListener('click', (e) => {
         e.preventDefault();
+        if (verifyLink.dataset.busy === '1') return;
+        setLinkBusy(verifyLink, true);
         resendOtpSession(email, (success, error) => {
+          setLinkBusy(verifyLink, false);
           if (success) {
             enterOtpMode(email, 'signup');
             if (googleLoginBtn) googleLoginBtn.style.display = 'none'; 
@@ -705,7 +726,13 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
+        forgotConfirmButton.disabled = true;
+        forgotConfirmButton.textContent = 'Sending...';
+
         requestPasswordReset(emailValue, (success, error) => {
+          forgotConfirmButton.disabled = false;
+          forgotConfirmButton.textContent = 'Send Reset Code';
+
           if (success) {
             enterForgotOtpStage(emailValue);
             return;
@@ -788,8 +815,17 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!success) {
             if (handleRateLimitError(error, forgotConfirmButton, newPasswordError)) return;
 
-            enterForgotMode();
-            setError(newPasswordError, error?.message || 'Session expired. Please request a new code.');
+            const tokenExpired = error?.status === 400 || error?.status === 401;
+
+            if (tokenExpired) {
+              // reset token is dead, so the user must start over
+              enterForgotMode();
+              setError(emailError, error?.message || 'Session expired. Please request a new code.');
+            } else {
+              // validation error: keep them on the password step
+              setError(newPasswordError, error?.message || 'Could not reset password. Please try again.');
+              if (newPasswordInput) newPasswordInput.classList.add('is-invalid');
+            }
             return;
           }
 
@@ -807,24 +843,30 @@ document.addEventListener('DOMContentLoaded', () => {
   if (resendForgotOtpLink) {
     resendForgotOtpLink.addEventListener('click', (e) => {
       e.preventDefault();
-        requestPasswordReset(forgotPendingEmail, (success, error) => {
-          if (success) {
-            clearForgotOtpInput();
-            if (forgotOtpError) {  
-              forgotOtpError.textContent = 'A new code has been sent.';
-              forgotOtpError.classList.add('is-success');
-            }
-            if (forgotOtpCountdownInterval) clearInterval(forgotOtpCountdownInterval);
-              forgotOtpCountdownInterval = runCountdown(forgotOtpCountdownEl, 5 * 60);
-              return;
-            }
-          
-            if (handleRateLimitError(error, resendForgotOtpLink, forgotOtpError)) return;
+      if (resendForgotOtpLink.dataset.busy === '1') return;
+      setLinkBusy(resendForgotOtpLink, true);
 
-            setError(forgotOtpError, error?.message || 'Could not resend code.');
-        });
-    })
+      requestPasswordReset(forgotPendingEmail, (success, error) => {
+        if (success) {
+          setLinkBusy(resendForgotOtpLink, false);
+          clearForgotOtpInput();
+          if (forgotOtpError) {
+            forgotOtpError.textContent = 'A new code has been sent.';
+            forgotOtpError.classList.add('is-success');
+          }
+          if (forgotOtpCountdownInterval) clearInterval(forgotOtpCountdownInterval);
+          forgotOtpCountdownInterval = runCountdown(forgotOtpCountdownEl, 5 * 60);
+          return;
+        }
+
+        releaseLink(resendForgotOtpLink, error);
+        if (handleRateLimitError(error, null, forgotOtpError)) return;
+
+        setError(forgotOtpError, error?.message || 'Could not resend code.');
+      });
+    });
   }
+
   // flash message after redirect to clear previous message
   const flashMessage = sessionStorage.getItem('authFlashMessage');
   const flashType = sessionStorage.getItem('authFlashType');
@@ -958,18 +1000,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if (resendOtpLink) {
     resendOtpLink.addEventListener('click', (e) => {
       e.preventDefault();
+      if (resendOtpLink.dataset.busy === '1') return;
+      setLinkBusy(resendOtpLink, true);
+
       resendOtpSession(otpPendingEmail, (success, error) => {
         clearOtpInputs();
+
         if (success) {
+          setLinkBusy(resendOtpLink, false);
           setError(otpError, 'A new code has been sent.');
           otpError.classList.add('is-success');
 
           if (otpCountdownInterval) clearInterval(otpCountdownInterval);
           otpCountdownInterval = runCountdown(otpCountdownEl, 5 * 60);
           return;
-        } 
-          
-        if (handleRateLimitError(error, resendOtpLink, otpError)) return;
+        }
+
+        releaseLink(resendOtpLink, error);
+        if (handleRateLimitError(error, null, otpError)) return;
 
         setError(otpError, error?.message || 'Could not resend code.');
       });
@@ -997,7 +1045,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const usernameValue = usernameInput.value.trim();
         const passwordValue = createPasswordInput.value;
 
+        primaryButton.disabled = true;
+        primaryButton.textContent = 'Please wait...';
+
         registerUser({ username: usernameValue, email: emailValue, password: passwordValue }, (success, errorMsg) => {
+          primaryButton.disabled = false;
+          primaryButton.textContent = authModes.signup.buttonLabel;
+          
           if (success) {
             enterOtpMode(emailValue, 'signup');
             return;

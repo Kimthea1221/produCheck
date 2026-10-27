@@ -6,14 +6,14 @@ import TopBar from "../component/top-bar";
 import './fda-css.css';
 import { apiFetch } from '../../utils/apiFetch';
 
-import { 
-  Globe, 
-  Footprints, 
-  Search, 
-  Download, 
-  Eye, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Globe,
+  Footprints,
+  Search,
+  Download,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
   X,
   FileText,
   Image as ImageIcon,
@@ -78,7 +78,7 @@ function getSourceLabel(source) {
 function mapTabToSource(tabName) {
   if (tabName === 'Browser Extension') return 'extension';
   if (tabName === 'Walk-in') return 'walk_in';
-  return null; 
+  return null;
 }
 
 const CATEGORY_LABELS = {
@@ -114,298 +114,20 @@ function getWorkflowStatus(status, source) {
   return map[status] || status;
 }
 
-// ============================================================================
-// 🔌 BACKEND: set to false once GET /complaints/{id}/fda-detail returns
-// real verification and lea_followup objects.
-// ============================================================================
-const USE_VIEW_REPORT_VERIFICATION_MOCK = true;
-
-// ⚠️ REMOVE THIS — Mock verification & LEA follow-up states for Walk-in cases
-// until backend includes verification and lea_followup on GET /complaints/{id}/fda-detail.
-const MOCK_VIEW_REPORT_EXCHANGES = {
-  // ⚠️ REMOVE THIS
-  unregistered_takedown_initiated: {
-    verification: {
-      // 🔌 BACKEND: detail.verification.request_source
-      request_source: "walk_in",
-      // 🔌 BACKEND: detail.verification.requested_by_name
-      requested_by_name: "Lt. Col. Arthur Pendelton, CIDG",
-      // 🔌 BACKEND: detail.verification.requested_at
-      requested_at: "2026-09-28T09:30:00Z",
-      // 🔌 BACKEND: detail.verification.product_code
-      product_code: "LOT-2025-BR-991",
-      // 🔌 BACKEND: detail.verification.priority
-      priority: "High",
-      // 🔌 BACKEND: detail.verification.verification_result
-      verification_result: "unregistered",
-      // 🔌 BACKEND: detail.verification.cpr_number
-      cpr_number: null,
-      // 🔌 BACKEND: detail.verification.cpr_expiry
-      cpr_expiry: null,
-      // 🔌 BACKEND: detail.verification.verified_by_name
-      verified_by_name: "Maria Santos, RPh",
-      // 🔌 BACKEND: detail.verification.unregistered_reason
-      unregistered_reason: "No valid Certificate of Product Registration (CPR) exists in the FDA verification database for this lot number.",
-      // 🔌 BACKEND: detail.verification.response_notes
-      response_notes: "Public health advisory to be issued. Immediate market surveillance and enforcement coordination recommended.",
-      // 🔌 BACKEND: detail.verification.responded_at
-      responded_at: "2026-09-29T11:00:00Z",
-      // 🔌 BACKEND: detail.verification.rejected_by_name
-      rejected_by_name: null,
-      // 🔌 BACKEND: detail.verification.rejection_reason
-      rejection_reason: null,
-    },
-    lea_followup: {
-      // 🔌 BACKEND: detail.lea_followup.lea_stage
-      lea_stage: "takedown_initiated",
-      // 🔌 BACKEND: detail.lea_followup.reminder_sent_at
-      reminder_sent_at: "2026-09-28T16:00:00Z",
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_at
-      acknowledged_at: null,
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_by_name
-      acknowledged_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_at
-      takedown_initiated_at: "2026-09-30T13:45:00Z",
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_by_name
-      takedown_initiated_by_name: "Maj. Eduardo Ramos, CIDG Anti-Fraud",
-      // 🔌 BACKEND: detail.lea_followup.field_operation_notes
-      field_operation_notes: "Enforcement unit mobilized. Coordinating raid with regional intelligence unit on distribution warehouse in Binondo, Manila.",
-      // 🔌 BACKEND: detail.lea_followup.closed_at
-      closed_at: null,
-      // 🔌 BACKEND: detail.lea_followup.closed_by_name
-      closed_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.closing_notes
-      closing_notes: null,
-      // 🔌 BACKEND: detail.lea_followup.close_reason
-      close_reason: null,
-    },
-  },
-  // ⚠️ REMOVE THIS
-  registered_acknowledged: {
-    verification: {
-      // 🔌 BACKEND: detail.verification.request_source
-      request_source: "walk_in",
-      // 🔌 BACKEND: detail.verification.requested_by_name
-      requested_by_name: "Capt. Ronald De Leon, CIDG",
-      // 🔌 BACKEND: detail.verification.requested_at
-      requested_at: "2026-09-25T08:30:00Z",
-      // 🔌 BACKEND: detail.verification.product_code
-      product_code: "LOT-2025-BR-991",
-      // 🔌 BACKEND: detail.verification.priority
-      priority: "Standard",
-      // 🔌 BACKEND: detail.verification.verification_result
-      verification_result: "registered",
-      // 🔌 BACKEND: detail.verification.cpr_number
-      cpr_number: "NN-100000847291",
-      // 🔌 BACKEND: detail.verification.cpr_expiry
-      cpr_expiry: "2028-11-30",
-      // 🔌 BACKEND: detail.verification.verified_by_name
-      verified_by_name: "Maria Santos, RPh",
-      // 🔌 BACKEND: detail.verification.unregistered_reason
-      unregistered_reason: null,
-      // 🔌 BACKEND: detail.verification.response_notes
-      response_notes: "Product has active valid CPR under Brilliant Skin Essentials Inc. Authorized for commercial distribution.",
-      // 🔌 BACKEND: detail.verification.responded_at
-      responded_at: "2026-09-26T10:15:00Z",
-      // 🔌 BACKEND: detail.verification.rejected_by_name
-      rejected_by_name: null,
-      // 🔌 BACKEND: detail.verification.rejection_reason
-      rejection_reason: null,
-    },
-    lea_followup: {
-      // 🔌 BACKEND: detail.lea_followup.lea_stage
-      lea_stage: "acknowledged",
-      // 🔌 BACKEND: detail.lea_followup.reminder_sent_at
-      reminder_sent_at: null,
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_at
-      acknowledged_at: "2026-09-27T14:20:00Z",
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_by_name
-      acknowledged_by_name: "Capt. Ronald De Leon, CIDG",
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_at
-      takedown_initiated_at: null,
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_by_name
-      takedown_initiated_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.field_operation_notes
-      field_operation_notes: null,
-      // 🔌 BACKEND: detail.lea_followup.closed_at
-      closed_at: null,
-      // 🔌 BACKEND: detail.lea_followup.closed_by_name
-      closed_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.closing_notes
-      closing_notes: null,
-      // 🔌 BACKEND: detail.lea_followup.close_reason
-      close_reason: null,
-    },
-  },
-  // ⚠️ REMOVE THIS
-  unregistered_closed: {
-    verification: {
-      // 🔌 BACKEND: detail.verification.request_source
-      request_source: "walk_in",
-      // 🔌 BACKEND: detail.verification.requested_by_name
-      requested_by_name: "Maj. Eduardo Ramos, CIDG Anti-Fraud",
-      // 🔌 BACKEND: detail.verification.requested_at
-      requested_at: "2026-09-15T10:00:00Z",
-      // 🔌 BACKEND: detail.verification.product_code
-      product_code: "LOT-2025-BR-991",
-      // 🔌 BACKEND: detail.verification.priority
-      priority: "Standard",
-      // 🔌 BACKEND: detail.verification.verification_result
-      verification_result: "unregistered",
-      // 🔌 BACKEND: detail.verification.cpr_number
-      cpr_number: null,
-      // 🔌 BACKEND: detail.verification.cpr_expiry
-      cpr_expiry: null,
-      // 🔌 BACKEND: detail.verification.verified_by_name
-      verified_by_name: "Maria Santos, RPh",
-      // 🔌 BACKEND: detail.verification.unregistered_reason
-      unregistered_reason: "Product formulation contains prohibited ingredients not registered with FDA.",
-      // 🔌 BACKEND: detail.verification.response_notes
-      response_notes: "Advisory notice published. Case endorsed to LEA for field confiscation.",
-      // 🔌 BACKEND: detail.verification.responded_at
-      responded_at: "2026-09-16T14:30:00Z",
-      // 🔌 BACKEND: detail.verification.rejected_by_name
-      rejected_by_name: null,
-      // 🔌 BACKEND: detail.verification.rejection_reason
-      rejection_reason: null,
-    },
-    lea_followup: {
-      // 🔌 BACKEND: detail.lea_followup.lea_stage
-      lea_stage: "closed",
-      // 🔌 BACKEND: detail.lea_followup.reminder_sent_at
-      reminder_sent_at: null,
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_at
-      acknowledged_at: null,
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_by_name
-      acknowledged_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_at
-      takedown_initiated_at: "2026-09-18T09:15:00Z",
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_by_name
-      takedown_initiated_by_name: "Maj. Eduardo Ramos, CIDG Anti-Fraud",
-      // 🔌 BACKEND: detail.lea_followup.field_operation_notes
-      field_operation_notes: "Coordinated search warrant executed at commercial facility. 2,400 counterfeit units seized.",
-      // 🔌 BACKEND: detail.lea_followup.closed_at
-      closed_at: "2026-09-22T16:00:00Z",
-      // 🔌 BACKEND: detail.lea_followup.closed_by_name
-      closed_by_name: "Col. Victoriano Cruz, Regional Director CIDG",
-      // 🔌 BACKEND: detail.lea_followup.closing_notes
-      closing_notes: "All illicit inventory impounded into evidence custody. Formal criminal charges filed under RA 9711.",
-      // 🔌 BACKEND: detail.lea_followup.close_reason
-      close_reason: "Operation Completed - Target Seized and Charges Filed",
-    },
-  },
-  // ⚠️ REMOVE THIS
-  rejected: {
-    verification: {
-      // 🔌 BACKEND: detail.verification.request_source
-      request_source: "walk_in",
-      // 🔌 BACKEND: detail.verification.requested_by_name
-      requested_by_name: "Desk Officer SPO2 Danica Reyes",
-      // 🔌 BACKEND: detail.verification.requested_at
-      requested_at: "2026-10-02T11:20:00Z",
-      // 🔌 BACKEND: detail.verification.product_code
-      product_code: "N/A",
-      // 🔌 BACKEND: detail.verification.priority
-      priority: "Standard",
-      // 🔌 BACKEND: detail.verification.verification_result
-      verification_result: "rejected",
-      // 🔌 BACKEND: detail.verification.cpr_number
-      cpr_number: null,
-      // 🔌 BACKEND: detail.verification.cpr_expiry
-      cpr_expiry: null,
-      // 🔌 BACKEND: detail.verification.verified_by_name
-      verified_by_name: null,
-      // 🔌 BACKEND: detail.verification.unregistered_reason
-      unregistered_reason: null,
-      // 🔌 BACKEND: detail.verification.response_notes
-      response_notes: null,
-      // 🔌 BACKEND: detail.verification.responded_at
-      responded_at: "2026-10-03T15:10:00Z",
-      // 🔌 BACKEND: detail.verification.rejected_by_name
-      rejected_by_name: "Dr. Ferdinand Gomez, Head of Center for Cosmetics",
-      // 🔌 BACKEND: detail.verification.rejection_reason
-      rejection_reason: "Physical evidence packaging photos are illegible and do not show lot number or manufacturer markings. Please resubmit with clear high-resolution photos of product labeling.",
-    },
-    lea_followup: {
-      // 🔌 BACKEND: detail.lea_followup.lea_stage
-      lea_stage: "acknowledged",
-      // 🔌 BACKEND: detail.lea_followup.reminder_sent_at
-      reminder_sent_at: null,
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_at
-      acknowledged_at: "2026-10-04T09:00:00Z",
-      // 🔌 BACKEND: detail.lea_followup.acknowledged_by_name
-      acknowledged_by_name: "Desk Officer SPO2 Danica Reyes",
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_at
-      takedown_initiated_at: null,
-      // 🔌 BACKEND: detail.lea_followup.takedown_initiated_by_name
-      takedown_initiated_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.field_operation_notes
-      field_operation_notes: null,
-      // 🔌 BACKEND: detail.lea_followup.closed_at
-      closed_at: null,
-      // 🔌 BACKEND: detail.lea_followup.closed_by_name
-      closed_by_name: null,
-      // 🔌 BACKEND: detail.lea_followup.closing_notes
-      closing_notes: null,
-      // 🔌 BACKEND: detail.lea_followup.close_reason
-      close_reason: null,
-    },
-  },
-};
-
 // ADDED — Full FDA-LEA Verification Exchange child component for Walk-in cases
 function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail }) {
-  // Local state for interactive mock state switching
-  const [mockState, setMockState] = useState('unregistered_takedown_initiated');
+  // Detail not loaded yet: render nothing so the "no request" message doesn't flash.
+  if (!selectedReportDetail) return null;
 
-  const isUsingMock = USE_VIEW_REPORT_VERIFICATION_MOCK;
+  const activeVerification = selectedReportDetail.verification || null;
+  const activeLeaFollowup = selectedReportDetail.lea_followup || null;
 
-  // Resolve active exchange dataset
-  let activeVerification = null;
-  let activeLeaFollowup = null;
-
-  if (isUsingMock) {
-    if (mockState !== 'no_verification') {
-      const mockRecord = MOCK_VIEW_REPORT_EXCHANGES[mockState];
-      activeVerification = mockRecord?.verification || null;
-      activeLeaFollowup = mockRecord?.lea_followup || null;
-    }
-  } else {
-    // 🔌 BACKEND: detail.verification and detail.lea_followup
-    activeVerification = selectedReportDetail?.verification || null;
-    activeLeaFollowup = selectedReportDetail?.lea_followup || null;
-  }
-
-  // Common Mock Selector header control
-  const renderMockControls = () => {
-    if (!isUsingMock) return null;
-    return (
-      <div className="FdaViewReportMockControls">
-        <span className="FdaVerifMockBadge">Mock preview</span>
-        <label className="FdaViewReportMockLabel" htmlFor="fda-view-report-mock-select">Mock state:</label>
-        <select
-          id="fda-view-report-mock-select"
-          className="FdaViewReportMockSelect"
-          value={mockState}
-          onChange={(e) => setMockState(e.target.value)}
-        >
-          <option value="unregistered_takedown_initiated">Unregistered + takedown initiated</option>
-          <option value="registered_acknowledged">Registered + acknowledged</option>
-          <option value="unregistered_closed">Unregistered + closed</option>
-          <option value="rejected">Rejected</option>
-          <option value="no_verification">No verification request</option>
-        </select>
-      </div>
-    );
-  };
-
-  // State: No verification request sent
+  // State: detail loaded, no verification request sent
   if (!activeVerification) {
     return (
       <div className="FdaViewReportExchangeWrap">
         <div className="FdaViewReportSectionTop">
           <span className="FdaViewReportSectionTopTitle">Verification &amp; LEA Enforcement</span>
-          {renderMockControls()}
         </div>
         <div className="FdaViewReportNoVerifBox">
           <Info size={15} className="FdaViewReportNoVerifIcon" />
@@ -415,6 +137,8 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
     );
   }
 
+  // verification exists but FDA has not responded yet (pending/recalled)
+  const isPending = activeVerification.verification_result === null || activeVerification.verification_result === undefined;
   const normResult = (activeVerification.verification_result || '').toLowerCase();
   const isRegisteredOrRejected = normResult === 'registered' || normResult === 'rejected';
 
@@ -428,87 +152,91 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
 
   const stepsConfig = isRegisteredOrRejected
     ? [
-        {
-          key: 'awaiting_lea',
-          title: 'Awaiting LEA Action',
-          date: activeVerification.responded_at,
-          dateLabel: 'Date FDA Responded:',
-          actor: null,
-        },
-        {
-          key: 'acknowledged',
-          title: 'Acknowledged - Case Closed',
-          date: activeLeaFollowup?.acknowledged_at,
-          dateLabel: 'Acknowledged At:',
-          actor: activeLeaFollowup?.acknowledged_by_name,
-          actorLabel: 'Acknowledged By:',
-        },
-      ]
+      {
+        key: 'awaiting_lea',
+        title: 'Awaiting LEA Action',
+        date: activeVerification.responded_at,
+        dateLabel: 'Date FDA Responded:',
+        actor: null,
+      },
+      {
+        key: 'acknowledged',
+        title: 'Acknowledged - Case Closed',
+        date: activeLeaFollowup?.acknowledged_at,
+        dateLabel: 'Acknowledged At:',
+        actor: activeLeaFollowup?.acknowledged_by_name,
+        actorLabel: 'Acknowledged By:',
+      },
+    ]
     : [
-        {
-          key: 'awaiting_lea',
-          title: 'Awaiting LEA Action',
-          date: activeVerification.responded_at,
-          dateLabel: 'Date FDA Responded:',
-          actor: null,
-        },
-        {
-          key: 'takedown_initiated',
-          title: 'Takedown Initiated',
-          date: activeLeaFollowup?.takedown_initiated_at,
-          dateLabel: 'Initiated At:',
-          actor: activeLeaFollowup?.takedown_initiated_by_name,
-          actorLabel: 'Initiated By:',
-          fieldOperationNotes: activeLeaFollowup?.field_operation_notes,
-        },
-        {
-          key: 'closed',
-          title: 'Case Closed',
-          date: activeLeaFollowup?.closed_at,
-          dateLabel: 'Closed At:',
-          actor: activeLeaFollowup?.closed_by_name,
-          actorLabel: 'Closed By:',
-          closingNotes: activeLeaFollowup?.closing_notes,
-          closeReason: activeLeaFollowup?.close_reason,
-        },
-      ];
+      {
+        key: 'awaiting_lea',
+        title: 'Awaiting LEA Action',
+        date: activeVerification.responded_at,
+        dateLabel: 'Date FDA Responded:',
+        actor: null,
+      },
+      {
+        key: 'takedown_initiated',
+        title: 'Takedown Initiated',
+        date: activeLeaFollowup?.takedown_initiated_at,
+        dateLabel: 'Initiated At:',
+        actor: activeLeaFollowup?.takedown_initiated_by_name,
+        actorLabel: 'Initiated By:',
+        fieldOperationNotes: activeLeaFollowup?.field_operation_notes,
+      },
+      {
+        key: 'closed',
+        title: 'Case Closed',
+        date: activeLeaFollowup?.closed_at,
+        dateLabel: 'Closed At:',
+        actor: activeLeaFollowup?.closed_by_name,
+        actorLabel: 'Closed By:',
+        closingNotes: activeLeaFollowup?.closing_notes,
+      },
+    ];
 
   return (
     <div className="FdaViewReportExchangeWrap">
-      {/* 1. SECTION TOP WITH MOCK CONTROLS */}
+      {/* 1. SECTION TOP */}
       <div className="FdaViewReportSectionTop">
         <span className="FdaViewReportSectionTopTitle">Verification &amp; LEA Enforcement</span>
-        {renderMockControls()}
       </div>
 
       {/* 2. VERIFICATION REQUEST INFORMATION */}
       <div className="FdaRecordInfoGrid FdaViewReportInfoGridWhite">
         <div className="FdaRecordInfoItem">
           <span className="FdaVerifInfoLabel">Verification Request Source</span>
-          {/* 🔌 BACKEND: detail.verification.request_source */}
           <span className="FdaVerifInfoValue">{getSourceLabel(activeVerification.request_source || selectedReport.source)}</span>
         </div>
         <div className="FdaRecordInfoItem">
           <span className="FdaVerifInfoLabel">Requesting LEA Officer</span>
-          {/* 🔌 BACKEND: detail.verification.requested_by_name */}
           <span className="FdaVerifInfoValue">{activeVerification.requested_by_name || 'N/A'}</span>
         </div>
         <div className="FdaRecordInfoItem">
           <span className="FdaVerifInfoLabel">Date Received</span>
-          {/* 🔌 BACKEND: detail.verification.requested_at */}
           <span className="FdaVerifInfoValue">{formatFullDateTime(activeVerification.requested_at)}</span>
         </div>
         <div className="FdaRecordInfoItem">
           <span className="FdaVerifInfoLabel">Product Code / Barcode</span>
-          {/* 🔌 BACKEND: detail.verification.product_code */}
           <span className="FdaVerifInfoValue">{activeVerification.product_code || '—'}</span>
         </div>
         <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
           <span className="FdaVerifInfoLabel">Priority Level</span>
-          {/* 🔌 BACKEND: detail.verification.priority */}
-          <span className="FdaVerifInfoValue">{activeVerification.priority || 'Standard'}</span>
+          <span className="FdaVerifInfoValue">
+            {activeVerification.priority
+              ? activeVerification.priority.charAt(0).toUpperCase() + activeVerification.priority.slice(1)
+              : 'Standard'}
+          </span>
         </div>
       </div>
+
+      {isPending && (
+        <div className="FdaViewReportNoVerifBox">
+          <Info size={15} className="FdaViewReportNoVerifIcon" />
+          <span>Awaiting FDA response</span>
+        </div>
+      )}
 
       {/* 3. OFFICIAL FDA VERIFICATION RESULT (Registered or Unregistered) */}
       {activeVerification.verification_result && activeVerification.verification_result !== 'rejected' && (
@@ -520,7 +248,6 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
 
           <div className="FdaRecordResultRow">
             <span className="FdaVerifInfoLabel">Verification Determination:</span>
-            {/* 🔌 BACKEND: detail.verification.verification_result */}
             <span className={`FdaVerifResultTag ${activeVerification.verification_result === 'registered' ? 'FdaVerifTagReg' : 'FdaVerifTagUnreg'}`}>
               {activeVerification.verification_result.charAt(0).toUpperCase() + activeVerification.verification_result.slice(1)}
             </span>
@@ -530,27 +257,22 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
             <div className="FdaRecordInfoGrid FdaViewReportInfoGridWhite">
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">FDA CPR Number</span>
-                {/* 🔌 BACKEND: detail.verification.cpr_number */}
                 <span className="FdaVerifInfoValueHighlight">{activeVerification.cpr_number || '—'}</span>
               </div>
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">CPR Expiry Date</span>
-                {/* 🔌 BACKEND: detail.verification.cpr_expiry */}
                 <span className="FdaVerifInfoValue">{activeVerification.cpr_expiry || '—'}</span>
               </div>
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">Verified By</span>
-                {/* 🔌 BACKEND: detail.verification.verified_by_name */}
                 <span className="FdaVerifInfoValue">{activeVerification.verified_by_name || 'N/A'}</span>
               </div>
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">Date Responded</span>
-                {/* 🔌 BACKEND: detail.verification.responded_at */}
                 <span className="FdaVerifInfoValue">{formatFullDateTime(activeVerification.responded_at)}</span>
               </div>
               <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
                 <span className="FdaVerifInfoLabel">Official FDA Remarks</span>
-                {/* 🔌 BACKEND: detail.verification.response_notes */}
                 <p className="FdaRecordRemarksText">{activeVerification.response_notes || '—'}</p>
               </div>
             </div>
@@ -558,22 +280,18 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
             <div className="FdaRecordInfoGrid FdaViewReportInfoGridWhite">
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">Verified By</span>
-                {/* 🔌 BACKEND: detail.verification.verified_by_name */}
                 <span className="FdaVerifInfoValue">{activeVerification.verified_by_name || 'N/A'}</span>
               </div>
               <div className="FdaRecordInfoItem">
                 <span className="FdaVerifInfoLabel">Date Responded</span>
-                {/* 🔌 BACKEND: detail.verification.responded_at */}
                 <span className="FdaVerifInfoValue">{formatFullDateTime(activeVerification.responded_at)}</span>
               </div>
               <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
                 <span className="FdaVerifInfoLabel">Reason Product is Unregistered</span>
-                {/* 🔌 BACKEND: detail.verification.unregistered_reason */}
                 <p className="FdaRecordRemarksText">{activeVerification.unregistered_reason || '—'}</p>
               </div>
               <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
                 <span className="FdaVerifInfoLabel">FDA Advisory Remarks</span>
-                {/* 🔌 BACKEND: detail.verification.response_notes */}
                 <p className="FdaRecordRemarksText">{activeVerification.response_notes || '—'}</p>
               </div>
             </div>
@@ -592,17 +310,14 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
           <div className="FdaRecordInfoGrid FdaViewReportInfoGridWhite">
             <div className="FdaRecordInfoItem">
               <span className="FdaVerifInfoLabel">Rejected By</span>
-              {/* 🔌 BACKEND: detail.verification.rejected_by_name */}
               <span className="FdaVerifInfoValue">{activeVerification.rejected_by_name || 'N/A'}</span>
             </div>
             <div className="FdaRecordInfoItem">
               <span className="FdaVerifInfoLabel">Date Rejected</span>
-              {/* 🔌 BACKEND: detail.verification.responded_at */}
               <span className="FdaVerifInfoValue">{formatFullDateTime(activeVerification.responded_at)}</span>
             </div>
             <div className="FdaRecordInfoItem FdaRecordInfoItemFull">
               <span className="FdaVerifInfoLabel">Rejection Rationale (Sent to LEA)</span>
-              {/* 🔌 BACKEND: detail.verification.rejection_reason */}
               <div className="FdaRecordRejectionReasonBox">
                 <p>{activeVerification.rejection_reason || '—'}</p>
               </div>
@@ -612,13 +327,13 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
       )}
 
       {/* 5. LEA FOLLOW-UP PROGRESSION (Stepper & Reminders) */}
-      {activeLeaFollowup && (
+      {/* Hidden while FDA has not responded: without a result the stepper would wrongly use the unregistered flow. */}
+      {!isPending && activeLeaFollowup && (
         <>
           {activeLeaFollowup.reminder_sent_at && (
             <div className="FdaVerif-lea-reminder-card">
               <AlertTriangle size={16} />
               <div>
-                {/* 🔌 BACKEND: detail.lea_followup.reminder_sent_at */}
                 <strong>LEA Reminder Sent:</strong> LEA officers transmitted an expedited follow-up reminder on{' '}
                 {formatFullDateTime(activeLeaFollowup.reminder_sent_at)}.
               </div>
@@ -676,7 +391,6 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
                       {step.fieldOperationNotes && (
                         <div className="FdaVerif-lea-step-notes">
                           <strong>Field operation status update</strong>
-                          {/* 🔌 BACKEND: detail.lea_followup.field_operation_notes */}
                           <p className="FdaVerif-lea-notes-text">{step.fieldOperationNotes}</p>
                         </div>
                       )}
@@ -685,19 +399,10 @@ function FdaWalkInVerificationExchange({ selectedReport, selectedReportDetail })
                       {step.closingNotes && (
                         <div className="FdaVerif-lea-step-notes FdaVerif-lea-step-notes-closing">
                           <strong>Field operation status update (at closing)</strong>
-                          {/* 🔌 BACKEND: detail.lea_followup.closing_notes */}
                           <p className="FdaVerif-lea-notes-text">{step.closingNotes}</p>
                         </div>
                       )}
 
-                      {/* Reason Closed block */}
-                      {step.closeReason && (
-                        <div className="FdaVerif-lea-step-notes FdaVerif-lea-step-notes-reason">
-                          <strong>Reason Closed</strong>
-                          {/* 🔌 BACKEND: detail.lea_followup.close_reason */}
-                          <p className="FdaVerif-lea-notes-text">{step.closeReason}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -735,22 +440,22 @@ function FDAViewReports() {
 
   // ADDED — GET /complaints/fda-reports on mount
   useEffect(() => {
-  setReportsLoading(true);
-  apiFetch('/complaints/fda-reports')
-    .then(async (res) => {
-      if (!res.ok) {
-        const msg = await parseBackendError(res);
-        setReportsError(msg);
-        return;
-      }
-      return res.json();
-    })
-    .then((data) => {
-      if (data) setReports(data);
-    })
-    .catch(() => setReportsError('Could not load consumer reports.'))
-    .finally(() => setReportsLoading(false));
-}, []);
+    setReportsLoading(true);
+    apiFetch('/complaints/fda-reports')
+      .then(async (res) => {
+        if (!res.ok) {
+          const msg = await parseBackendError(res);
+          setReportsError(msg);
+          return;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) setReports(data);
+      })
+      .catch(() => setReportsError('Could not load consumer reports.'))
+      .finally(() => setReportsLoading(false));
+  }, []);
 
   // EXPANDABLE FILTERS STATE
   const [filterCategory, setFilterCategory] = useState('All');
@@ -776,38 +481,38 @@ function FDAViewReports() {
   const [detailError, setDetailError] = useState('');
 
 
- // ADDED — fetch real case detail whenever a row is opened.
-useEffect(() => {
-  if (!selectedReportId) {
-    setSelectedReportDetail(null);
+  // ADDED — fetch real case detail whenever a row is opened.
+  useEffect(() => {
+    if (!selectedReportId) {
+      setSelectedReportDetail(null);
+      setDetailError('');
+      return;
+    }
+    let cancelled = false;
+
+    setDetailLoading(true);
     setDetailError('');
-    return;
-  }
-  let cancelled = false;
+    apiFetch(`/complaints/${selectedReportId}/fda-detail`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const msg = await parseBackendError(res);
+          if (!cancelled) setDetailError(msg);
+          return;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data && !cancelled) setSelectedReportDetail(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDetailError('Could not load case details.');
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
 
-  setDetailLoading(true);
-  setDetailError('');
-  apiFetch(`/complaints/${selectedReportId}/fda-detail`)
-    .then(async (res) => {
-      if (!res.ok) {
-        const msg = await parseBackendError(res);
-        if (!cancelled) setDetailError(msg);
-        return;
-      }
-      return res.json();
-    })
-    .then((data) => {
-      if (data && !cancelled) setSelectedReportDetail(data);
-    })
-    .catch(() => {
-      if (!cancelled) setDetailError('Could not load case details.');
-    })
-    .finally(() => {
-      if (!cancelled) setDetailLoading(false);
-    });
-
-  return () => { cancelled = true; };
-}, [selectedReportId]);
+    return () => { cancelled = true; };
+  }, [selectedReportId]);
 
   // DOCUMENT PREVIEW MODAL STATE
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -824,25 +529,25 @@ useEffect(() => {
   // <img>/<iframe>/mammoth's fetch can all load with no auth needed,
   // since the browser already has the bytes locally at that point.
   const handleViewAttachment = async (doc) => {
-  try {
-    const res = await apiFetch(`/shared-files/${doc.file_id}/preview`);
-    if (!res.ok) {
-      const msg = await parseBackendError(res);
-      alert(msg || 'Could not open this file.');
-      return;
+    try {
+      const res = await apiFetch(`/shared-files/${doc.file_id}/preview`);
+      if (!res.ok) {
+        const msg = await parseBackendError(res);
+        alert(msg || 'Could not open this file.');
+        return;
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewDoc({
+        name: doc.file_name,
+        type: doc.mime_type,
+        size: doc.file_size_display,
+        url: blobUrl,
+      });
+    } catch {
+      alert('Could not open this file.');
     }
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    setPreviewDoc({
-      name: doc.file_name,
-      type: doc.mime_type,
-      size: doc.file_size_display,
-      url: blobUrl,
-    });
-  } catch {
-    alert('Could not open this file.');
-  }
-};
+  };
 
   // ADDED — release the blob URL when the preview modal closes, so we
   // don't leak memory every time someone views a few attachments in a row.
@@ -862,8 +567,8 @@ useEffect(() => {
       return;
     }
 
-    const isDocx = previewDoc.name?.toLowerCase().endsWith('.docx') || 
-                   previewDoc.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isDocx = previewDoc.name?.toLowerCase().endsWith('.docx') ||
+      previewDoc.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
     if (isDocx && previewDoc.url && previewDoc.url !== '#') {
       setDocxLoading(true);
@@ -921,8 +626,8 @@ useEffect(() => {
 
     const query = searchQuery.toLowerCase();
     const matchesSearch = report.product_title.toLowerCase().includes(query) ||
-                          (report.manufacturer || '').toLowerCase().includes(query) ||
-                          report.case_reference.toLowerCase().includes(query);
+      (report.manufacturer || '').toLowerCase().includes(query) ||
+      report.case_reference.toLowerCase().includes(query);
 
     const matchesCategory = filterCategory === 'All' || report.product_category === filterCategory;
     const matchesStatus = filterStatus === 'All' || getWorkflowStatus(report.status, report.source) === filterStatus;
@@ -935,15 +640,15 @@ useEffect(() => {
     return reports.filter(report => {
       const query = searchQuery.toLowerCase();
       const matchesSearch = report.product_title.toLowerCase().includes(query) ||
-                            (report.manufacturer || '').toLowerCase().includes(query) ||
-                            report.case_reference.toLowerCase().includes(query);
+        (report.manufacturer || '').toLowerCase().includes(query) ||
+        report.case_reference.toLowerCase().includes(query);
 
       const matchesCategory = filterCategory === 'All' || report.product_category === filterCategory;
       const matchesStatus = filterStatus === 'All' || getWorkflowStatus(report.status, report.source) === filterStatus;
 
       if (!matchesSearch || !matchesCategory || !matchesStatus) return false;
 
-      
+
       return report.source === mapTabToSource(tabName);
     }).length;
   };
@@ -1000,7 +705,7 @@ useEffect(() => {
   };
 
   // STATUS COLORS STYLING HELPER
-    const getStatusStyle = (status) => {
+  const getStatusStyle = (status) => {
     switch (status) {
       case "under_review":
         return { backgroundColor: "rgba(217, 119, 6, 0.1)", color: "#D97706" };
@@ -1017,7 +722,7 @@ useEffect(() => {
     }
   };
 
-    // UNIQUE FILTER OPTIONS COMPUTATION
+  // UNIQUE FILTER OPTIONS COMPUTATION
   const categoriesList = ["All", "Cosmetics", "Food", "Devices", "Drugs"];
 
   // CHANGED — now depends on activeTab. Walk-in and Extension use the
@@ -1035,7 +740,7 @@ useEffect(() => {
       <div className="FdaContentContainer">
         <TopBar topbarType="FDA" />
         <div className="FdaMainFeed">
-          
+
           {/* HEADER BLOCK */}
           <div className="FdaHeader">
             <div className="FdaHeaderLeft">
@@ -1177,7 +882,7 @@ useEffect(() => {
                       </tr>
                     ) : (
                       paginatedReports.map(report => (
-                        <tr 
+                        <tr
                           key={report.complaint_id}
                         >
                           <td className="CaseIdCell">{report.case_reference}</td>
@@ -1221,7 +926,7 @@ useEffect(() => {
                 <span className="FdaFooterInfo">
                   Showing {totalItems === 0 ? 0 : startIndex + 1}-{endIndex} of {totalItems} entries
                 </span>
-                
+
                 <div className="FdaPagination">
                   <button
                     className="BtnPageNav"

@@ -1,144 +1,139 @@
- #### Cleaning of Registered Product to build BM25 index ####
-import pandas as pd
-import numpy as np
 import re
-import unicodedata
-import pickle
+import pandas as pd
 from pathlib import Path
+from bs4 import BeautifulSoup
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import nltk
 
-# Load CSV file of registered products
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('stopwords', quiet=True)
+
 BASE_DIR = Path(__file__).resolve().parent
+DATASETS_DIR = BASE_DIR.parent / "datasets"
+ASSET_DIR = BASE_DIR.parent / "assets"
+ASSET_DIR.mkdir(parents=True, exist_ok=True)
 
-datasets_dir = BASE_DIR.parent / "datasets"
-asset_dir = BASE_DIR.parent / "assets"
-asset_dir.mkdir(parents=True, exist_ok=True)
+MARKETING_PATTERNS = [
+    # Promotions
+    r'\bbuy\s*(?:\d+|one|two)\s*(?:take|get)\s*(?:\d+|one|two)(?:\s*free)?\b',
+    r'\bb\d+\s*t\d+\b',
+    r'\bbuy\s*\d+\s*(?:and|&)?\s*get\s*\d+\s*(?:free)?\b',
+    r'\b\d+\s*for\s*\d+\b',
+    r'\b\d+\s*%\s*off\b',
+    r'\b(?:up\s*to\s*)?\d+\s*%\s*(?:off|discount)\b',
 
-file_path = datasets_dir / "registered.csv"
-df = pd.read_csv(file_path, low_memory=False)
+    # General marketing words
+    r'\b(?:free\s*(?:shipping|gift|delivery)|freebie|best\s*seller|bestseller)\b',
+    r'\b(?:hot\s*(?:deal|sale)|flash\s*sale|big\s*sale|on\s*sale|sale|promo|bundle|set\s*of)\b',
+    r'\b(?:brand\s*new|new\s*arrival|new\s*stock|ready\s*stock|in\s*stock)\b',
+    r'\b(?:authentic|original|legit|official\s*(?:store|shop)|genuine)\b',
+    r'\b(?:limited\s*edition|while\s*supplies\s*last|must\s*have|trending|viral)\b',
+    r'\b(?:cod|cash\s*on\s*delivery|lowest\s*price|cheap|affordable|sulit)\b',
+    r'\b(?:(?:free|fast|express|worldwide|international|global|same\s*day)\s*)?(?:shipping|delivery)\b',
+    r'\bships?\s+(?:from|to)\s+\w+\b',
+    r'\bfrom\s+(?:korea|japan|usa|thailand)\b',
+    r'\bmade\s+(?:in|from)\s+\w+\b',
+    r'\bsold\s+per\s+(?:piece|pc|pcs|item)\b',
+    r'^\s*(?:new|hot|sale)\b[\s:!-]*',
+    r'\(?\s*\d+\s*(?:box|boxes|pcs|pc|pieces|sachets?|sets?)\s*\)?',
 
-
-# Change this if needed after checking the output above
-# The error indicates 'PRODUCT_NAME' is not found. From the printout, 'Product Title' is the correct column.
-TITLE_COLUMN = "PRODUCT_NAME"
-# BRAND_COLUMN and COMPANY_COLUMN are not present in 'unregistered.csv' as per column list.
-# These should only be used if you are loading a 'registered' products dataset with these columns.
-BRAND_COLUMN = "BRAND_NAME"
-COMPANY_COLUMN = "COMPANY_NAME"
-
-#-----Cleaning -------#
-# Marketing words to remove
-marketing_words = [
-    'official',
-    'authentic',
-    'original',
-    'bestseller',
-    'best seller',
-    'sale',
-    'promo',
-    'discount',
-    'free shipping',
-    '100 genuine',
-    'guaranteed'
 ]
 
-# Abbreviations
-abbreviations = {
-    'pc': 'piece',
-    'pcs': 'pieces',
-    'ml': 'milliliter',
-    'mg': 'milligram',
-    'kg': 'kilogram',
-    'g': 'gram'
-}
+MARKETING_RE = re.compile('|'.join(MARKETING_PATTERNS), flags=re.IGNORECASE)
 
-# Brand aliases
-brand_aliases = {
-    'p&g': 'procter gamble',
-    'pg': 'procter gamble',
-    'unilvr': 'unilever'
-}
 
-def clean_title(text):
-
+def clean_productTitle(text):
     if pd.isna(text):
         return ""
 
-    text = str(text)
+    text = str(text).lower()
+    text = re.sub(r'[®©™]', '', text)
+    text = re.sub(r'\bmake[\s-]?up\b', 'makeup', text)
+    text = BeautifulSoup(text, "html.parser").get_text()
+    text = re.sub(r'http\S+|www\S+', '', text)
 
-    # Unicode normalization
-    text = unicodedata.normalize('NFKD', text)
+    # Remove marketing phrases
+    text = MARKETING_RE.sub(' ', text)
 
-    # Lowercase
-    text = text.lower()
+    # Remove duration-based claims, e.g.:
+    # 48H Sweat & Odor Protection
+    # 24 hours sweat protection
+    # 72H Freshness
+    text = re.sub(
+        r'\b\d+\s*(?:h|hours?)\b'
+        r'(?:\s+(?:(?:sweat|odor|odour|wetness)\s*(?:&|and)?\s*)?'
+        r'(?:protection|freshness|control))?',
+        ' ',
+        text,
+        flags=re.IGNORECASE
+    )
 
-    # Remove emojis and unicode symbols
-    text = text.encode('ascii', 'ignore').decode('ascii')
+    # Remove measurements such as 150ml, 500mg, 2kg, 1.5oz
+    text = re.sub(
+        r'(?<![a-z0-9])\d+(?:[.,]\d+)?\s*'
+        r'(?:fl\s?oz|ml|mg|mcg|kg|g|l|oz|iu|pcs|pc)\b',
+        ' ',
+        text
+    )
 
-    # Handle brand aliases
-    for alias, standard in brand_aliases.items():
-        text = text.replace(alias, standard)
+    # Remove remaining standalone numbers and percentages
+    # (the + in the lookahead keeps "50+" intact)
+    text = re.sub(
+        r'(?<![a-z0-9])\d+(?:[.,]\d+)?%?(?![a-z0-9+])',
+        ' ',
+        text
+    )
 
-    # Remove marketing words
-    for word in marketing_words:
-        text = text.replace(word, '')
-
-    # Normalize units
-    text = re.sub(r'(\d+)\s*ml', r'\1 milliliter', text)
-    text = re.sub(r'(\d+)\s*mg', r'\1 milligram', text)
-    text = re.sub(r'(\d+)\s*kg', r'\1 kilogram', text)
-    text = re.sub(r'(\d+)\s*g', r'\1 gram', text)
-
-    # Expand abbreviations
-    words = text.split()
-    words = [abbreviations.get(word, word) for word in words]
-    text = " ".join(words)
-
-    # Remove special characters and punctuation
-    text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text)
-
-
-    # Normalize whitespace
+    # Normalize punctuation, but keep "50+" and "PA+ / PA++ / PA+++ / PA++++"
+    text = text.replace('_', ' ')
+    text = re.sub(
+        r"(\d+\+|\bpa\++)|[^\w\s.'&]",
+        lambda m: m.group(1) or ' ',
+        text
+    )
+    text = re.sub(r"(?<![^\W_])[.'&]|[.'&](?![^\W_])", ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
-
 
     return text
 
-# Apply the cleaning function to the specified column
-df[TITLE_COLUMN] = df[TITLE_COLUMN].apply(clean_title)
+stop_words = set(stopwords.words("english"))
+
+def tokenize_for_bm25(cleaned_text):
+    return [w for w in word_tokenize(cleaned_text) if w not in stop_words]
+
+registered_df = pd.read_csv(DATASETS_DIR / "registered.csv", low_memory=False)
+
+registered_df['cleaned_title'] = registered_df['PRODUCT_NAME'].apply(clean_productTitle)
+registered_df = registered_df[registered_df['cleaned_title'].str.strip() != ""]
+registered_df = registered_df.drop_duplicates(subset='cleaned_title', keep='first')
+registered_df = registered_df.reset_index(drop=True) 
+
+registered_df['full_product_info'] = (
+    registered_df['BRAND_NAME'].fillna('') + ' ' +
+    registered_df['cleaned_title'].fillna('')
+)
+
+registered_df['tokens']   = registered_df['full_product_info'].apply(word_tokenize)
+registered_df['filtered'] = registered_df['full_product_info'].str.lower().apply(tokenize_for_bm25)
+
+registered_df.to_pickle(ASSET_DIR/"Registered_cleaned.pkl")
 
 
-# Save cleaned dataset
-output_path = asset_dir / "Registered_cleaned.csv"
-df.to_csv(output_path, index=False)
+unregistered_df = pd.read_csv(DATASETS_DIR / "unregistered.csv", low_memory=False)
 
-#Save the df as pickle
-with open(asset_dir / "Registered_cleaned.pkl", 'wb') as f:
-    pickle.dump(df, f)
+unregistered_df['cleaned_title'] = unregistered_df['Product Title'].apply(clean_productTitle)
+unregistered_df = unregistered_df[unregistered_df['cleaned_title'].str.strip() != ""]
+unregistered_df = unregistered_df.drop_duplicates(subset='cleaned_title', keep='first')
+unregistered_df = unregistered_df.reset_index(drop=True)
 
-print("\nRegistered Cleaning completed!")
+unregistered_df['tokens']   = unregistered_df['cleaned_title'].apply(word_tokenize)
+unregistered_df['filtered'] = unregistered_df['cleaned_title'].apply(tokenize_for_bm25)
 
+unregistered_df.to_pickle(ASSET_DIR/"Unregistered_cleaned.pkl")
 
-#------------------------------------------------------------------------------------------------------------------------#
-
-#### Cleaning of Unregistered Product to build BM25 index ####
-
-# Load CSV file of registered products
-file_path = datasets_dir / "unregistered.csv"
-df = pd.read_csv(file_path)
-
-
-# Change this if needed after checking the output above
-UN_TITLE_COLUMN = "Product Title"
-
-# Apply the cleaning function to the specified column
-df[UN_TITLE_COLUMN] = df[UN_TITLE_COLUMN].apply(clean_title)
-
-
-# Save cleaned dataset
-output_path = asset_dir / "Unregistered_cleaned.csv"
-df.to_csv(output_path, index=False)
-
-with open(asset_dir / "Unregistered_cleaned.pkl", 'wb') as f:
-    pickle.dump(df, f)
-
-print("\nUnregistered Cleaning completed!")
+print("Registered:  ", registered_df.shape,
+      "| index consecutive:", registered_df.index.equals(pd.RangeIndex(len(registered_df))))
+print("Unregistered:", unregistered_df.shape,
+      "| index consecutive:", unregistered_df.index.equals(pd.RangeIndex(len(unregistered_df))))

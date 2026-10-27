@@ -184,6 +184,7 @@ def list_complaints(db: Session = Depends(get_db), current_user = Depends(get_cu
             "complaintId": str(c.complaint_id),
             "caseReference": c.case_reference,
             "productTitle": c.product_title,
+            "product_url": c.product_url,
             "manufacturer": c.manufacturer,
             "region": region.region_name if region else None,
             "status": c.status,

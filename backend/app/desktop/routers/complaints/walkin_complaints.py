@@ -16,6 +16,13 @@ from app.desktop.services.drafts.draft_submit_service import (
     create_walkin_complaint_direct,
     update_walkin_complaint_direct,
 )
+
+# ADDED: shared LEA-only helper
+from app.desktop.services.account_status.guards import assert_lea_user
+
+
+from app.desktop.services.verification.verification_helpers import get_walkin_effective_status   # ADDED
+
 from app.models.verification_requests import VerificationRequest
 from app.models.walkin_complainants import WalkinComplainant
 from app.desktop.schemas.complaints.complaints import WalkinComplaintListResponse
@@ -27,6 +34,67 @@ from app.models.complaints import Complaint
 draft_submit_router = APIRouter(prefix="/drafts/walkin", tags=["Walk-in Complaints"])
 direct_complaint_router = APIRouter(prefix="/complaints/walkin", tags=["Walk-in Complaints"])
 
+
+def _blank_to_none(value: str | None) -> str | None:
+    # The browser sends "" for an empty box: treat blank as "not provided"
+    value = (value or "").strip()
+    return value or None
+
+
+# ADDED: complainant details are all optional, so blanks become NULL (also keeps "" out of the id_type constraint)
+def _complainant_fields(full_name, contact_number, email, id_type, address) -> dict:
+    return {
+        "full_name": _blank_to_none(full_name),
+        "contact_number": _blank_to_none(contact_number),
+        "email": _blank_to_none(email),
+        "id_type": _blank_to_none(id_type),
+        "address": _blank_to_none(address),
+    }
+
+
+# ADDED: shared by create (POST) and edit (PUT). Only the product name is required.
+# Minimum lengths apply only to values that were provided.
+def _build_complaint_fields(
+    product_name, manufacturer, product_category, place_of_purchase,
+    date_of_purchase, amount_paid, nature_of_complaint,
+) -> dict:
+    product_name = (product_name or "").strip()
+    if len(product_name) < 2:
+        raise HTTPException(status_code=422, detail="Product name is required (at least 2 characters).")
+
+    manufacturer = _blank_to_none(manufacturer)
+    product_category = _blank_to_none(product_category)
+    place_of_purchase = _blank_to_none(place_of_purchase)
+    date_text = _blank_to_none(date_of_purchase)
+    nature = _blank_to_none(nature_of_complaint)
+
+    if manufacturer and len(manufacturer) < 2:
+        raise HTTPException(status_code=422, detail="Manufacturer/Seller must be at least 2 characters.")
+    if place_of_purchase and len(place_of_purchase) < 2:
+        raise HTTPException(status_code=422, detail="Place of purchase must be at least 2 characters.")
+
+    if nature:
+        # CRLF -> LF so the count matches the browser's maxLength (same reason as before)
+        nature = nature.replace("\r\n", "\n").replace("\r", "\n")
+        if len(nature) < 10 or len(nature) > 2000:
+            raise HTTPException(status_code=422, detail="Nature of complaint must be between 10 and 2000 characters.")
+
+    purchase_date = None
+    if date_text:
+        try:
+            purchase_date = date.fromisoformat(date_text)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Date of purchase must be a valid date (YYYY-MM-DD).")
+
+    return {
+        "product_title": product_name,
+        "manufacturer": manufacturer,
+        "product_category": product_category,
+        "place_of_purchase": place_of_purchase,
+        "date_of_purchase": purchase_date,
+        "amount_paid": amount_paid,
+        "nature_of_complaint": nature,
+    }
 
     #
     #
@@ -42,6 +110,7 @@ def submit_draft(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: walk-in intake is LEA-only
     new_complaint = submit_walkin_draft(db, draft_id, current_user, request)
     return new_complaint
 
@@ -63,46 +132,25 @@ def create_complaint_direct(
     address: str | None = Form(None, max_length=300),
     amount_paid: float | None = Form(None),
 
-    product_name: str = Form(..., max_length=150, min_length=2),
-    manufacturer: str = Form(..., max_length=150, min_length=2),
-    product_category: str = Form(..., max_length=150),
-    place_of_purchase: str = Form(..., max_length=300, min_length=2),
-    date_of_purchase: str = Form(...),
-    nature_of_complaint: str = Form(...),
+    product_name: str | None = Form(None, max_length=150),   # CHANGED: was required in the signature; _build_complaint_fields now returns the plain-text 422
+    manufacturer: str | None = Form(None, max_length=150),         # CHANGED: optional
+    product_category: str | None = Form(None, max_length=150),     # CHANGED: optional
+    place_of_purchase: str | None = Form(None, max_length=300),    # CHANGED: optional
+    date_of_purchase: str | None = Form(None),                     # CHANGED: optional
+    nature_of_complaint: str | None = Form(None),                  # CHANGED: optional
 
     files: list[UploadFile] = File(default=[]),
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    complainant_fields = {
-        "full_name": full_name,
-        "contact_number": contact_number,
-        "email": email,
-        "id_type": id_type,
-        "address": address,
-    }
+    assert_lea_user(current_user)
+    complainant_fields = _complainant_fields(full_name, contact_number, email, id_type, address)   # CHANGED
+    complaint_fields = _build_complaint_fields(                                                    # CHANGED
+        product_name, manufacturer, product_category, place_of_purchase,
+        date_of_purchase, amount_paid, nature_of_complaint,
+    )
 
-    # Normalize CRLF (\r\n) → LF (\n) so the char count matches what the
-    # browser's maxLength attribute reported to the officer. Without this,
-    # a 2000-char textarea with 50 line breaks arrives as 2050 chars.
-    if nature_of_complaint:
-        nature_of_complaint = nature_of_complaint.replace('\r\n', '\n').replace('\r', '\n')
-
-    if len(nature_of_complaint) < 10:
-        raise HTTPException(status_code=422, detail="Nature of complaint must be at least 10 characters.")
-    if len(nature_of_complaint) > 2000:
-        raise HTTPException(status_code=422, detail="Nature of complaint must be at most 2000 characters.")
-
-    complaint_fields = {
-        "product_title": product_name,
-        "manufacturer": manufacturer,
-        "product_category": product_category,
-        "place_of_purchase": place_of_purchase,
-        "date_of_purchase": date.fromisoformat(date_of_purchase),
-        "amount_paid": amount_paid,
-        "nature_of_complaint": nature_of_complaint,
-    }
-
+    # The attachment rule is unchanged: at least one file, max 10, 25 MB each (checked in the service)
     new_complaint = create_walkin_complaint_direct(
         db, current_user, complainant_fields, complaint_fields, files, request
     )
@@ -124,6 +172,7 @@ def list_walkin_complaints(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: this list returns citizen names
     latest_request_subq = (
         db.query(
             VerificationRequest.complaint_id,
@@ -165,12 +214,7 @@ def list_walkin_complaints(
 
     results = []
     for complaint, complainant, vr in rows.order_by(Complaint.created_at.desc()).all():
-        if complaint.status == "open":
-            effective_status = "queued"
-        elif vr:
-            effective_status = vr.verification_request_status
-        else:
-            effective_status = "queued"
+        effective_status = get_walkin_effective_status(complaint, vr)   # CHANGED (A2.3): takedown stages included
 
         if status is not None and effective_status != status:
             continue
@@ -187,6 +231,7 @@ def list_walkin_complaints(
         ))
 
     return results
+
 
     #
     #
@@ -205,44 +250,24 @@ def update_complaint_direct(
     address: str | None = Form(None, max_length=300),
     amount_paid: float | None = Form(None),
 
-    product_name: str = Form(..., max_length=150, min_length=2),
-    manufacturer: str = Form(..., max_length=150, min_length=2),
-    product_category: str = Form(..., max_length=150),
-    place_of_purchase: str = Form(..., max_length=300, min_length=2),
-    date_of_purchase: str = Form(...),
-    nature_of_complaint: str = Form(...),
+    product_name: str | None = Form(None, max_length=150),   # CHANGED: was required in the signature; _build_complaint_fields now returns the plain-text 422
+    manufacturer: str | None = Form(None, max_length=150),         # CHANGED: optional
+    product_category: str | None = Form(None, max_length=150),     # CHANGED: optional
+    place_of_purchase: str | None = Form(None, max_length=300),    # CHANGED: optional
+    date_of_purchase: str | None = Form(None),                     # CHANGED: optional
+    nature_of_complaint: str | None = Form(None),                  # CHANGED: optional
 
     remove_attachment_ids: list[UUID] = Form(default=[]),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    complainant_fields = {
-        "full_name": full_name,
-        "contact_number": contact_number,
-        "email": email,
-        "id_type": id_type,
-        "address": address,
-    }
-
-    # Same CRLF normalization as the POST path
-    if nature_of_complaint:
-        nature_of_complaint = nature_of_complaint.replace('\r\n', '\n').replace('\r', '\n')
-        if len(nature_of_complaint) < 10 or len(nature_of_complaint) > 2000:
-            raise HTTPException(
-                status_code=422,
-                detail="nature_of_complaint must be between 10 and 2000 characters."
-            )
-
-    complaint_fields = {
-        "product_title": product_name,
-        "manufacturer": manufacturer,
-        "product_category": product_category,
-        "place_of_purchase": place_of_purchase,
-        "date_of_purchase": date.fromisoformat(date_of_purchase),
-        "amount_paid": amount_paid,
-        "nature_of_complaint": nature_of_complaint,
-    }
+    assert_lea_user(current_user)
+    complainant_fields = _complainant_fields(full_name, contact_number, email, id_type, address)   # CHANGED
+    complaint_fields = _build_complaint_fields(                                                    # CHANGED
+        product_name, manufacturer, product_category, place_of_purchase,
+        date_of_purchase, amount_paid, nature_of_complaint,
+    )
 
     updated_complaint = update_walkin_complaint_direct(
         db, current_user, complaint_id, complainant_fields, complaint_fields, files, remove_attachment_ids, request
@@ -264,6 +289,7 @@ def delete_walkin_complaint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     complaint = db.query(Complaint).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.region_id == current_user.region_id,

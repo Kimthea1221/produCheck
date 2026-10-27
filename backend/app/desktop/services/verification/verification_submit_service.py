@@ -35,6 +35,7 @@ def _create_verification_request(
     complaint = db.query(Complaint).filter(
         Complaint.complaint_id == complaint_id,
         Complaint.region_id == region_id,   # region scoping to ensure the complaint belongs to the user's region
+        Complaint.source == "walk_in",   # ADDED: extension complaints never go through LEA verification
         ).first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Linked complaint not found.")
@@ -175,6 +176,7 @@ def recall_verification_request(db: Session, request_id: UUID, current_user, htt
     ).filter(
         VerificationRequest.request_id == request_id,
         Complaint.region_id == current_user.region_id,   # region scoping, same pattern as everywhere else
+        Complaint.source == "walk_in",   # ADDED
     ).first()
 
     if not request:
@@ -247,6 +249,7 @@ def resend_reminder(db: Session, request_id: UUID, current_user) -> Verification
     ).filter(
         VerificationRequest.request_id == request_id,
         Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",   # ADDED
     ).first()
 
     if not request:

@@ -309,7 +309,10 @@ def update_walkin_complaint_direct(
     # Existing files not being removed still count — only check that
     # after removals + no new uploads, we wouldn't end up at zero.
 
-    existing_query = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id)
+    existing_query = db.query(SharedFile).filter(
+        SharedFile.complaint_id == complaint_id,
+        SharedFile.request_id.is_(None),   # ADDED: count only LEA's own files, not FDA's response files
+    )
     if remove_attachment_ids:
         existing_query = existing_query.filter(SharedFile.file_id.notin_(remove_attachment_ids))
     existing_count = existing_query.count()
@@ -354,6 +357,7 @@ def update_walkin_complaint_direct(
         files_to_remove = db.query(SharedFile).filter(
             SharedFile.file_id.in_(remove_attachment_ids),
             SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA can never delete FDA's response files
         ).all()
         for f in files_to_remove:
             if os.path.exists(f.file_path):

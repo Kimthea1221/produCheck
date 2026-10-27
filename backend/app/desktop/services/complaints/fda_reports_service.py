@@ -6,6 +6,9 @@ from fastapi import HTTPException
 from app.models.shared_files import SharedFile
 from app.desktop.schemas.complaints.complaints import SharedFileResponse, FdaComplaintDetailResponse
 
+# ADDED: shared LEA check, so LEA can still open any complaint
+from app.desktop.services.account_status.guards import is_lea_user
+from app.desktop.services.verification.verification_helpers import get_fda_report_exchange   # ADDED
 
 # services/complaints/fda_reports_service.py — one line change
 
@@ -61,6 +64,12 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
     )
     if current_user.role != "superadmin" and current_user.region_id:
         query = query.filter(Complaint.region_id == current_user.region_id)
+    
+    # CHANGED: only walk-in complaints are gated; extension complaints stay exactly as before
+    if not is_lea_user(current_user):
+        query = query.filter(
+            (Complaint.source != "walk_in") | (Complaint.status != "open")
+        )
         
     complaint = query.first()
 
@@ -72,8 +81,16 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
     # Only one of the two is ever populated for a given complaint.
     description = complaint.nature_of_complaint or complaint.consumer_description
 
-    files = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id).all()
+    files = db.query(SharedFile).filter(
+            SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only
+        ).all()
 
+    # ADDED: walk-in only; extension complaints keep both fields as None
+    verification, lea_followup = (None, None)
+    if complaint.source == "walk_in":
+        verification, lea_followup = get_fda_report_exchange(db, complaint)
+      
     return FdaComplaintDetailResponse(
         complaint_id=complaint.complaint_id,
         case_reference=complaint.case_reference,
@@ -85,4 +102,6 @@ def get_fda_complaint_detail(db: Session, complaint_id, current_user) -> FdaComp
         created_at=complaint.created_at,
         description=description,
         attached_files=[SharedFileResponse.model_validate(f) for f in files],
+        verification=verification,
+        lea_followup=lea_followup,
     )

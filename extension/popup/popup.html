@@ -1,3 +1,4 @@
+<!-- extension/popup/popup.html -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -298,6 +299,26 @@
             <span>Back to Home</span>
           </button>
         </div>
+      </div>
+
+      <!-- STATE: AGREEMENT NEEDED -->
+      <div class="state hidden" id="state-agreement">
+        <div class="home-status-badge off">
+          <span class="home-status-dot"></span>
+          <span class="home-status-text">ProduCheck is switched off</span>
+        </div>
+
+        <div class="home-banner">
+          <div class="home-title">Please agree to the Terms to use ProduCheck</div>
+          <div class="home-message">
+            ProduCheck stays switched off until you read and agree to the Terms of Use and Privacy Notice.
+            Nothing is checked, captured, or sent until then.
+          </div>
+        </div>
+
+        <a class="btn" id="btn-review-terms">
+          <span>Review and Agree to the Terms</span>
+        </a>
       </div>
 
       <!-- STATE 5: HOME -->

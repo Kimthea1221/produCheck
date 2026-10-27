@@ -11,6 +11,7 @@ services:
       - path: ./backend/.env
         required: false
     environment:
+      LLM_API_KEY: ${LLM_API_KEY}
       DATABASE_URL: ${DATABASE_URL}
       MIGRATIONS_DATABASE_URL: ${MIGRATIONS_DATABASE_URL}
       MAIL_EXTENSION_USERNAME: ${MAIL_EXTENSION_USERNAME}

@@ -121,7 +121,6 @@ class DraftAttachmentResponse(BaseModel):
     attachment_id: UUID
     walkin_draft_id: UUID
     file_name: str
-    file_path: str
     file_size_bytes: int
     mime_type: str
     uploaded_at: datetime

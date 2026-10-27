@@ -11,6 +11,9 @@ from app.database.sessions import get_db
 from app.core.dependencies import get_current_user
 from app.desktop.schemas.complaints.complaints import ComplaintVerificationDetailResponse
 from app.desktop.services.complaints.complaint_detail_service import get_complaint_verification_detail
+# ADDED: shared LEA-only helpers and the Role constants
+from app.desktop.services.account_status.guards import assert_lea_user, is_lea_user
+from app.core.constants import Role
 
 from app.desktop.schemas.complaints.complaints import FdaComplaintListItem
 from app.desktop.services.complaints.fda_reports_service import list_all_complaints_for_fda
@@ -35,7 +38,7 @@ from app.desktop.schemas.complaints.complaints import (
     LeaCloseCaseRequest,
     LeaCloseCaseResponse,
 )
-
+from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_walkin_verification, get_walkin_effective_status   # CHANGED
 from app.desktop.services.complaints.lea_initiated_cases import (
     list_lea_initiated_cases,
     get_lea_initiated_case_detail,
@@ -74,6 +77,8 @@ def get_dashboard_trends(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    assert_lea_user(current_user)   # ADDED
+
     now = datetime.now(timezone.utc)
     start_of_year = datetime(now.year, 1, 1, tzinfo=timezone.utc)
     
@@ -93,6 +98,7 @@ def get_dashboard_trends(
     # 2. Forwarded trend (requests sent this year)
     requests = db.query(VerificationRequest).join(Complaint).filter(
         Complaint.region_id == current_user.region_id,
+        Complaint.source == "walk_in",   # ADDED
         VerificationRequest.requested_at >= start_of_year
     ).all()
     
@@ -120,6 +126,7 @@ def get_dashboard_trends(
         
         ops_count = db.query(Complaint).filter(
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status.in_(["takedown_requested", "takedown_initiated", "completed"]),
             Complaint.created_at >= month_start,
             Complaint.created_at < next_month_start,
@@ -128,6 +135,7 @@ def get_dashboard_trends(
         
         takedowns_count = db.query(Complaint).filter(
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status == "dismissed",
             Complaint.created_at >= month_start,
             Complaint.created_at < next_month_start,
@@ -163,6 +171,10 @@ def list_complaints(
         Complaint.region_id == current_user.region_id,
         Complaint.deleted_at.is_(None)
     )
+
+    is_lea = is_lea_user(current_user)   # CHANGED: moved up from below
+    if is_lea:
+        query = query.filter(Complaint.source == "walk_in")   # ADDED: LEA never sees extension complaints, whatever ?source= says
     
     if status:
         query = query.filter(Complaint.status.in_(status))
@@ -178,7 +190,7 @@ def list_complaints(
         )
         
     results = query.order_by(Complaint.created_at.desc()).all()
-    
+
     return [
         ComplaintListItemResponse(
             complaint_id=c.complaint_id,
@@ -188,7 +200,7 @@ def list_complaints(
             product_category=c.product_category,
             source=c.source,
             status=c.status,
-            complainant_name=wc.full_name if wc else None,
+            complainant_name=wc.full_name if (wc and is_lea) else None,  # CHANGED: citizen name is LEA-only
             created_at=c.created_at,
             notes=c.notes
         )
@@ -225,6 +237,7 @@ def get_complaint_detail_for_verification(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_complaint_verification_detail(db, complaint_id, current_user.region_id)
 
 
@@ -234,6 +247,8 @@ def list_complaints_awaiting_request(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
+    
     #complaint_ids_with_requests = db.query(VerificationRequest.complaint_id).subquery() initial code before adding recall and resend reminder
     complaint_ids_with_requests = db.query(VerificationRequest.complaint_id).filter(
         VerificationRequest.verification_request_status == "pending"
@@ -259,6 +274,8 @@ def get_walkin_complaint_detail(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED: before any query, so FDA can't probe which IDs exist
+
     complaint = db.query(Complaint).filter(
     Complaint.complaint_id == complaint_id,
     Complaint.region_id == current_user.region_id,
@@ -275,21 +292,18 @@ def get_walkin_complaint_detail(
             WalkinComplainant.complainant_id == complaint.complainant_id
         ).first()
 
-    files = db.query(SharedFile).filter(SharedFile.complaint_id == complaint_id).all()
-
+    files = db.query(SharedFile).filter(
+            SharedFile.complaint_id == complaint_id,
+            SharedFile.request_id.is_(None),   # ADDED: LEA's original evidence only; FDA response files have a request_id
+        ).all()
     # Same precedence as the list endpoint: complaint.status is the
     # source of truth. "open" always means queued/Ready to Send,
     # regardless of any recalled/rejected request sitting in history.
     # Only fall back to the latest request's status when the complaint
     # itself is not open (i.e. a request is genuinely active or FDA
     # has responded).
-    if complaint.status == "open":
-        effective_status = "queued"
-    else:
-        latest_request = db.query(VerificationRequest).filter(
-            VerificationRequest.complaint_id == complaint_id
-        ).order_by(VerificationRequest.requested_at.desc()).first()
-        effective_status = latest_request.verification_request_status if latest_request else "queued"
+    latest_request = get_latest_verification_request(db, complaint_id)
+    effective_status = get_walkin_effective_status(complaint, latest_request)   # CHANGED: shared with the walk-in list
 
     return WalkinComplaintDetailResponse(
         complaint_id=complaint.complaint_id,
@@ -310,6 +324,7 @@ def get_walkin_complaint_detail(
         id_type=complainant.id_type if complainant else None,
         address=complainant.address if complainant else None,
         attached_files=[SharedFileResponse.model_validate(f) for f in files],
+        verification=get_walkin_verification(db, complaint),   # ADDED
     )
 #Ashanti code ends here
 
@@ -332,6 +347,7 @@ def list_initiated_cases_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return list_lea_initiated_cases(db, current_user)
 
 
@@ -348,6 +364,7 @@ def get_initiated_case_detail_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    assert_lea_user(current_user)  # ADDED
     return get_lea_initiated_case_detail(db, complaint_id, current_user)
 
 
@@ -366,6 +383,9 @@ def close_case_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    # ADDED: same rule as initiate-takedown, whoever can start a takedown can close it
+    if current_user.role != Role.LEA_PERSONNEL:
+        raise HTTPException(status_code=403, detail="Only LEA personnel can close a case.")
     return close_case(db, complaint_id, current_user, data, http_request)
 #added by darlene --end 
 

@@ -24,14 +24,17 @@ db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
 @router .post("/", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def create_user(
+    request: Request,
     db: db_dependency, 
     payload: consumer_acc.CreateConsumerAcc, 
     background_tasks: BackgroundTasks
 ):
 
     consumer, code = consumer_acc_service.create_user(db, payload)
-    background_tasks.add_task(send_otp_email, consumer.email, code)    
+    print(f"[OTP] route reached for {consumer.email}", flush=True)
+    background_tasks.add_task(send_otp_email, consumer.email, code)
 
     return {"detail": "Account created successfully"}
 

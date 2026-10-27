@@ -1,4 +1,5 @@
-// header.js
+// extension/js/header.js 
+import "./agreement-guard.js";
 import { whenSessionReady, isUserLoggedIn, getCurrentUser, logoutUser, updateUsername, deleteAccount } from "../scripts/session.js";
 import { loadPartial } from "./partial-loader.js";
 import { LIMITS, validateUsername, liveLengthCheck } from "../utils/validation.js";
@@ -169,7 +170,7 @@ function initProfileActions() {
 
       deleteAccount(password, (success, error) => {
         if (success) {
-          sessionStorage.setItem('authFlashMessage', 'Your account and personal information have been permanently removed.');
+          sessionStorage.setItem('authFlashMessage', 'Your email, username, and password have been removed. Your verification history and complaints already sent stay on file, no longer connected to you.');
           sessionStorage.setItem('authFlashType', 'success');
           sessionStorage.setItem('authFlashTitle', 'Account deleted');
           window.location.href = 'auth.html';

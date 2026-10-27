@@ -2,9 +2,12 @@ import { BrowserWindow as e, Menu as t, app as n } from "electron";
 import { fileURLToPath as r } from "url";
 import i from "path";
 //#region src/electron/main.js
-var a = i.dirname(r(import.meta.url)), o = null, s = !1, c = null;
+var a = i.dirname(r(import.meta.url));
+n.name = "ICMDA";
+var o = null, s = !1, c = null;
 function l() {
 	o = new e({
+		title: "ICMDA",
 		width: 1280,
 		height: 800,
 		minWidth: 800,

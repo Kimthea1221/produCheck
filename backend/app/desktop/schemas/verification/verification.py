@@ -6,7 +6,8 @@ from enum import Enum
 
 from app.desktop.schemas.drafts.drafts import Priority
 from app.desktop.schemas.common import NonEmptyStr
-from app.desktop.schemas.complaints.complaints import SharedFileResponse
+from app.desktop.schemas.complaints.complaints import SharedFileResponse, LeaFdaResponseSummary   # CHANGED: added LeaFdaResponseSummary
+
 
 
 
@@ -47,6 +48,8 @@ class VerificationRequestAwaitingFDAResponse(BaseModel):
     source: str
     priority: str
     requested_at: datetime
+    has_draft: bool = False        # ADDED: this officer already saved a draft on this request
+    draft_id: UUID | None = None   
 
 # ============================================================
 # FDA VERIFICATION RESPONSE (real submit — not a draft)
@@ -163,6 +166,10 @@ class FdaVerificationCompletedDetailResponse(BaseModel):
     unregistered_reason: str | None
     verified_by_name: str | None
     responded_at: datetime
+    response_files: list[SharedFileResponse] = []   # ADDED: the responding officer's files, same as LEA sees
+    product_code: str | None = None                  # ADDED
+    reminder_sent_at: datetime | None = None         # ADDED
+    attached_files: list[SharedFileResponse] = []    # ADDED: LEA's original evidence
 
 
 # ============================================================
@@ -198,6 +205,9 @@ class FdaVerificationRejectedDetailResponse(BaseModel):
     rejected_by_name: str | None
     responded_at: datetime
     rejection_reason: str
+    product_code: str | None = None                  # ADDED
+    reminder_sent_at: datetime | None = None         # ADDED
+    attached_files: list[SharedFileResponse] = []    # ADDED: LEA's original evidence
 
 # tiny dashboard count fda
 class FdaVerificationQueueCounts(BaseModel):
@@ -241,7 +251,6 @@ class LeaFdaResponseDetailResponse(BaseModel):
     case_reference: str
     product_title: str
     manufacturer: str | None
-    complainant_name: str | None
     product_category: str | None
     logged_at: datetime
     source: str
@@ -260,6 +269,12 @@ class LeaFdaResponseDetailResponse(BaseModel):
 
     # rejected
     rejection_reason: str | None
+    # ADDED: FDA Response tab shows the request fields and FDA's own attachments
+    product_code: str | None = None
+    priority: str | None = None
+    notes_to_fda: str | None = None
+    response_files: list[SharedFileResponse] = []
+
 
 # Optional, confirm later if it becomes required.
 class LeaInitiateTakedownRequest(BaseModel):
@@ -294,3 +309,62 @@ class LeaClosedCaseListResponse(BaseModel):
     page: int
     page_size: int
 # added by Darlene --end
+
+
+# ADDED: FDA "LEA Response" tab (lea-follow-up). Stage is derived at query time, never stored.
+class LeaFollowUpStage(str, Enum):
+    awaiting_lea = "awaiting_lea"
+    acknowledged = "acknowledged"
+    takedown_initiated = "takedown_initiated"
+    closed = "closed"
+
+
+# Deliberately has NO complainant fields: FDA must never receive them.
+class LeaFollowUpListItem(BaseModel):
+    request_id: UUID
+    case_reference: str
+    product_title: str
+    product_category: str | None
+    manufacturer: str | None
+    source: str
+    product_code: str | None
+    fda_result: LeaFdaResponseResultChoice
+    responded_at: datetime
+    verified_by_name: str | None
+    lea_stage: LeaFollowUpStage
+    last_updated_at: datetime
+    acknowledged_at: datetime | None
+    acknowledged_by_name: str | None
+    takedown_initiated_at: datetime | None
+    takedown_initiated_by_name: str | None
+    field_operation_notes: str | None
+    closed_at: datetime | None
+    closed_by_name: str | None
+    close_reason: str | None
+    closing_notes: str | None
+    reminder_sent_at: datetime | None
+    attached_files: list[SharedFileResponse]   # LEA's original evidence (request_id IS NULL)
+
+
+class LeaFollowUpListResponse(BaseModel):
+    items: list[LeaFollowUpListItem]
+    total: int
+    page: int
+    page_size: int
+
+
+# ADDED: full final record for the Closed Cases modal. Date/closed-by/closing note stay on the list row.
+class LeaClosedCaseDetailResponse(LeaFdaResponseSummary):
+    verification_result: LeaFdaResponseResultChoice | None = None
+    requested_by_name: str | None = None
+    requested_at: datetime | None = None
+    cpr_number: str | None = None
+    cpr_expiry: date | None = None
+    rejection_reason: str | None = None
+    rejected_by_name: str | None = None
+    lea_acknowledged_at: datetime | None = None
+    acknowledged_by_name: str | None = None
+    takedown_initiated_at: datetime | None = None
+    takedown_initiated_by_name: str | None = None
+    field_operation_notes: str | None = None
+    attached_files: list[SharedFileResponse] = []

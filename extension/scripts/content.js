@@ -1,8 +1,22 @@
-//content.js
+//extension/scripts/content.js
 console.log('FDA Checker content script loaded');
-console.log("Hello World from content.js")
 
-chrome.runtime.sendMessage({ action: 'pageVisited', url: location.href });
+
+function productKey(url) {
+  try {
+    const u = new URL(url);
+    const p = decodeURIComponent(u.pathname);
+    let m;
+    if (u.hostname.includes('shopee') && (m = p.match(/-i\.(\d+)\.(\d+)/))) return `shopee:${m[1]}.${m[2]}`;
+    if (u.hostname.includes('lazada') && (m = p.match(/-i(\d+)/))) return `lazada:${m[1]}`;
+    if (u.hostname.includes('tiktok') && (m = p.match(/\/pdp\/(?:.*\/)?(\d+)\/?$/))) return `tiktok:${m[1]}`;
+    if (u.hostname.includes('facebook') && (m = p.match(/\/marketplace\/item\/(\d+)/))) return `facebook:${m[1]}`;
+    return u.origin + u.pathname;   // fallback for anything else
+  } catch {
+    return url;
+  }
+}
+
 
 const verifyBtn = document.createElement("button");
 verifyBtn.textContent = "Check Product";
@@ -21,38 +35,36 @@ verifyBtn.style.right = "24px";
 document.body.appendChild(verifyBtn);
 
 let verifyButtonEnabled = true; // default
+let termsAgreed = false;        // stays false until the person agrees to the Terms
 let lastStoreName = '';
+let lastSearchText = '';
 
 // checking if its in the product page
 function isProductPage() {
 
-    const currentUrl = location.href;
+  const currentUrl = location.href;
 
-    if ((currentUrl.includes("shopee.ph") && currentUrl.includes("-i.")) || currentUrl.includes("shopee.ph/product")) {
-        console.log("Product page of shopee");
-        return true;
-    }    
+  if ((currentUrl.includes("shopee.ph") && currentUrl.includes("-i.")) || currentUrl.includes("shopee.ph/product")) {
+    return true;
+  }
 
-    if (currentUrl.includes("lazada.com.ph/products/") && currentUrl.includes(".html")){
-        console.log("Product page of lazada");
-        return true;
-    } 
+  if (currentUrl.includes("lazada.com.ph/products/") && currentUrl.includes(".html")) {
+    return true;
+  }
 
-    if (currentUrl.includes("facebook.com/marketplace/item/")) {
-        console.log("Product page of facebook");
-        return true;  
-    } 
+  if (currentUrl.includes("facebook.com/marketplace/item/")) {
+    return true;
+  }
 
-    if (currentUrl.includes("shop.tiktok.com/ph/pdp")) {
-        console.log("Product page of tiktok");
-        return true;
-    }   
+  if (currentUrl.includes("shop.tiktok.com/ph/pdp")) {
+    return true;
+  }
 
-    return false;
+  return false;
 }
 
 function updateButton() {
-  verifyBtn.style.display = (verifyButtonEnabled && isProductPage()) ? "block" : "none";
+  verifyBtn.style.display = (termsAgreed && verifyButtonEnabled && isProductPage()) ? "block" : "none";
 }
 
 let lastUrl = location.href;
@@ -60,19 +72,27 @@ setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     updateButton();
+    if (modal) modal.style.display = 'none';
   }
 }, 500);
 
-chrome.storage.local.get(['verifyButtonEnabled'], (result) => {
+chrome.storage.local.get(['verifyButtonEnabled', 'termsAgreed'], (result) => {
   verifyButtonEnabled = result.verifyButtonEnabled !== false;
-  updateButton();   // new
+  termsAgreed = result.termsAgreed === true;
+  updateButton();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.verifyButtonEnabled) {
+  if (area !== 'local') return;
+  if (changes.verifyButtonEnabled) {
     verifyButtonEnabled = changes.verifyButtonEnabled.newValue;
-    updateButton();   // replaces the old display = "none" line
   }
+  if (changes.termsAgreed) {
+    termsAgreed = changes.termsAgreed.newValue === true;
+    // if agreement was switched off, close any open result box
+    if (!termsAgreed && modal) modal.style.display = 'none';
+  }
+  updateButton();
 });
 
 function platform(url) {
@@ -96,8 +116,8 @@ const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 const RF_FIELDS = [
   { input: '#rf-product-name', error: '#rf-product-name-error', label: 'Product name', max: RF_LIMITS.PRODUCT_NAME_MAX, required: true },
-  { input: '#rf-store-name',   error: '#rf-store-name-error',   label: 'Store name',   max: RF_LIMITS.STORE_NAME_MAX,   required: true },
-  { input: '#rf-description',  error: '#rf-description-error',  label: 'Description',  max: RF_LIMITS.DESCRIPTION_MAX,  required: false },
+  { input: '#rf-store-name', error: '#rf-store-name-error', label: 'Store name', max: RF_LIMITS.STORE_NAME_MAX, required: true },
+  { input: '#rf-description', error: '#rf-description-error', label: 'Description', max: RF_LIMITS.DESCRIPTION_MAX, required: false },
 ];
 
 // live = true while typing: only length is checked, "required" waits for submit
@@ -136,7 +156,7 @@ function createModal() {
   modal.style.minHeight = '500px';
   modal.style.maxHeight = '600px';
   modal.style.overflowY = 'auto';
- 
+
   modal.innerHTML = `
     <header class="mo-header">
       <img src="${chrome.runtime.getURL('assets/images/extension_icon.png')}" alt="ProduCheck Logo" class="mo-logo" />
@@ -394,6 +414,17 @@ function createModal() {
         </div>
       </div>
 
+      <div class="state hidden rf-result" id="state-check-error">
+        <div class="icon-ring icon-ring--error">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.5v.01" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <p class="rf-result-title">Couldn't Check This Product</p>
+        <p class="rf-result-message" id="check-error-message">Something went wrong. Please try again.</p>
+        <div class="action-row">
+          <button class="btn btn-primary btn-error" id="check-error-close" type="button">Close</button>
+        </div>
+      </div>
+
       <div class="state hidden rf-result" id="state-report-success">
         <div class="icon-ring icon-ring--success">
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -427,7 +458,7 @@ function createModal() {
 
     </main>
   `;
- 
+
   document.body.appendChild(modal);
 
   // live red text while typing
@@ -439,7 +470,7 @@ function createModal() {
   const attachInput = modal.querySelector('#rf-attach-input');
   const attachPreview = modal.querySelector('#rf-attach-preview');
   const attachText = modal.querySelector('#rf-attach-text');
-  
+
   attachBox.addEventListener('click', () => attachInput.click());
 
   attachInput.addEventListener('change', () => {
@@ -480,7 +511,11 @@ function createModal() {
   modal.querySelector('#rf-error-back').addEventListener('click', () => {
     showState('state-report-form');
   });
- 
+
+  modal.querySelector('#check-error-close').addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+
   modal.querySelectorAll('.btn-skip').forEach(btn => {
     btn.addEventListener('click', () => { modal.style.display = 'none'; });
   });
@@ -496,7 +531,7 @@ function createModal() {
 
   let lastResultState = '';
   modal.querySelectorAll('.btn-report').forEach(btn => {
-    btn.addEventListener('click', () => {  
+    btn.addEventListener('click', () => {
       chrome.runtime.sendMessage({ action: "checkAuth" }, (res) => {
         if (!res?.loggedIn) {
           lastResultState = btn.closest('.state').id;
@@ -505,13 +540,13 @@ function createModal() {
         }
 
         lastResultState = btn.closest('.state').id;
-       
+
         const productName = modal.querySelector('#rf-product-name');
         const url = modal.querySelector('#rf-product-url');
-       
+
         if (productName) productName.value = lastProductTitle;
         if (url) url.value = sanitizeUrl(lastProductUrl);
-       
+
         modal.querySelector('#rf-store-name').value = lastStoreName;
         modal.querySelector('#rf-description').value = '';
 
@@ -520,7 +555,7 @@ function createModal() {
           modal.querySelector(f.input).classList.remove('rf-input-invalid');
         });
         modal.querySelector('#rf-attach-error').textContent = '';
-       
+
         showState('state-report-form');
       });
     });
@@ -542,8 +577,11 @@ function createModal() {
         return;
       }
 
+      const fullName = modal.querySelector('#rf-product-name').value.trim()
+        .slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+
       const complaint = {
-        productName: modal.querySelector('#rf-product-name').value,
+        productName: fullName,
         productUrl: sanitizeUrl(lastProductUrl),
         storeName: modal.querySelector('#rf-store-name').value,
         description: modal.querySelector('#rf-description').value,
@@ -582,14 +620,21 @@ function sanitizeUrl(rawUrl) {
     let url = new URL(rawUrl);
     let suspiciousPatterns = /token|session|auth|sp_atk|spm/i;
     [...url.searchParams.keys()].forEach(key => {
-        if (suspiciousPatterns.test(key)) {
-            url.searchParams.delete(key);
-        }
+      if (suspiciousPatterns.test(key)) {
+        url.searchParams.delete(key);
+      }
     });
     return url.toString();
   } catch {
     return rawUrl;
   }
+}
+
+function showCheckError(message) {
+  createModal();
+  const msgEl = modal.querySelector('#check-error-message');
+  if (msgEl) msgEl.textContent = message;
+  showState('state-check-error');
 }
 
 function showState(stateId) {
@@ -604,19 +649,37 @@ function showState(stateId) {
   const reportStates = ['state-report-form', 'state-report-success', 'state-report-error'];
   closeX.style.display = reportStates.includes(stateId) ? 'block' : 'none';
 }
- 
+
+function setLoading(on, text = 'Verifying product…') {
+  modal.querySelector('#state-loading .spinner').style.display = on ? '' : 'none';
+  modal.querySelector('#state-loading .state-message').textContent = text;
+  showState('state-loading');
+  if (!on) modal.querySelector('#mo-close-x').style.display = 'block';
+}
+
 function renderResult(status, productTitle, results = []) {
   const stateId = ['registered', 'suspicious', 'unregistered'].includes(status)
     ? `state-${status}`
     : 'state-suspicious';
- 
+
+  const stateEl = modal.querySelector(`#${stateId}`);
+  let note = stateEl.querySelector('.detected-note');
+  if (!note) {
+    note = document.createElement('div');
+    note.className = 'detected-note';
+    note.style.cssText = 'font-size:11px;color:#6b7280;margin:6px 0;';
+    stateEl.firstElementChild.after(note);
+  }
+  note.textContent = lastSearchText ? `Searched as: ${lastSearchText}` : '';
+  note.style.display = lastSearchText ? 'block' : 'none';
+
   const nameSpan = modal.querySelector(`#product-name-${status}`);
   if (nameSpan) nameSpan.textContent = productTitle;
- 
+
   if (status === 'registered' || status === 'unregistered') {
     populateMatches(stateId, results);
   }
- 
+
   showState(stateId);
 }
 
@@ -629,7 +692,7 @@ function matchTier(pct) {
 function populateMatches(stateId, results) {
   const suffix = stateId === 'state-unregistered' ? '-red' : '';
   const cards = modal.querySelectorAll(`#${stateId} .match-card${suffix}`);
- 
+
   cards.forEach((card, i) => {
     const match = results[i];
     if (!match) { card.style.display = 'none'; return; }
@@ -660,36 +723,67 @@ verifyBtn.addEventListener("click", async () => {
   verifyBtn.style.display = "none";
   if (modal) modal.style.display = "none";
 
-  document.getElementById("debug-shot")?.remove();
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  chrome.runtime.sendMessage({ 
+  chrome.runtime.sendMessage({
     action: "captureScreenshot",
     url: location.href,
-    platform: platform(location.href)
-  }, (response) => {
+    platform: platform(location.href),
+    dpr: window.devicePixelRatio,
+    rect: { x: 0, y: 0, w: window.innerWidth / 2, h: window.innerHeight }
+  }, (shot) => {
     updateButton();
     createModal();
-    showState('state-loading');
+    setLoading(true, 'Reading the listing…');
 
-    if (!response?.success) {
-      console.error("Capture failed:", response?.error);
+    if (!shot?.success) {
+      setLoading(false, "We couldn't capture this page. Please wait for the page to finish loading, then try again.");
       return;
     }
 
-    lastProductTitle = (response.title || '').slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
-    lastStoreName = response.store || '';
-
     chrome.runtime.sendMessage({
-      action: "extractedTitle",
-      title: lastProductTitle,
+      action: "verifyScreenshot",
+      image: shot.dataUrl,
+      url: location.href,
       platform: platform(location.href),
-      url: location.href
-    }, (res) => {
-      const verdict = res?.data?.verdict || 'no_match';
-      const status = verdict === 'no_match' ? 'suspicious' : verdict;
-      lastVerificationStatus = status;
-      renderResult(status, lastProductTitle, res?.data?.top5_registered || []);
+      dpr: window.devicePixelRatio,
+      rect: { x: 0, y: 0, w: window.innerWidth / 2, h: window.innerHeight }
+    }, (response) => {
+      if (!response?.success || response.error || !response.title) {
+        const unreadable = response?.success && response.error === 'unreadable';
+        setLoading(false, unreadable
+          ? "We couldn't read the product title on this page. Make sure the title is visible on screen, close any pop-ups, then try again."
+          : "Something went wrong on our side. Please try again in a moment.");
+        return;
+      }
+
+      lastProductTitle = (response.title || '').slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+      lastStoreName = response.store || '';
+      lastSearchText = (response.searchText || '').slice(0, RF_LIMITS.PRODUCT_NAME_MAX);
+
+      if (!lastProductTitle.trim()) {
+        showCheckError("We couldn't read a product title from this page. Please make sure the product name is visible on screen, then try again.");
+        return;
+      }
+
+      setLoading(true, 'Checking the FDA database…');
+
+      chrome.runtime.sendMessage({
+        action: "extractedTitle",
+        title: lastSearchText || lastProductTitle,
+        platform: platform(location.href),
+        url: location.href
+      }, (res) => {
+        if (res?.status !== 'success') {
+          setLoading(false, "We couldn't reach the verification service. Please try again.");
+          return;
+        }
+
+        const verdict = res?.data?.verdict || 'no_match';
+        const status = verdict === 'no_match' ? 'suspicious' : verdict;
+        lastVerificationStatus = status;
+        renderResult(status, lastProductTitle, res?.data?.top5_registered || []);
+      });
     });
   });
 });

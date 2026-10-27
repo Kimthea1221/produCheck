@@ -3,10 +3,9 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, Request
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 
 from app.models.complaints import Complaint
-from app.models.walkin_complainants import WalkinComplainant
 from app.core.complaint_status import transition_complaint_status
 from app.core.audit import write_audit_log, get_user_region_code
 from app.core.constants import AuditAction
@@ -17,6 +16,7 @@ from app.desktop.schemas.complaints.complaints import (
     LeaCloseCaseResponse,
 )
 
+from app.desktop.services.verification.verification_helpers import get_latest_verification_request, get_fda_response_fields   # ADDED
 from app.desktop.services.notifications.notification_service import (
     notify_fda_case_closed,
     notify_lea_peers_case_closed,  # ADDED
@@ -28,25 +28,27 @@ from app.desktop.services.notifications.notification_service import (
 def list_lea_initiated_cases(db: Session, current_user) -> list[LeaInitiatedCaseListItem]:
     complaints = (
         db.query(Complaint)
-        .filter(Complaint.region_id == current_user.region_id, Complaint.status == "takedown_initiated")
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
+            Complaint.status == "takedown_initiated",
+        )
         .order_by(Complaint.field_operation_logged_at.desc())
         .all()
     )
     return [LeaInitiatedCaseListItem.model_validate(c) for c in complaints]
 
 
-# Right panel detail — joins in the complainant name, same as the
-# FDA Response detail. No VerificationRequest join needed here; this
-# tab only cares about the Complaint's own state.
+# Right panel detail
 def get_lea_initiated_case_detail(
     db: Session, complaint_id: UUID, current_user
 ) -> LeaInitiatedCaseDetailResponse:
     result = (
-        db.query(Complaint, WalkinComplainant)
-        .outerjoin(WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id)
+        db.query(Complaint)
         .filter(
             Complaint.complaint_id == complaint_id,
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
             Complaint.status == "takedown_initiated",
         )
         .first()
@@ -54,24 +56,26 @@ def get_lea_initiated_case_detail(
     if result is None:
         raise HTTPException(status_code=404, detail="Initiated case not found.")
 
-    complaint, complainant = result
+    complaint = result
+
+    # ADDED: the takedown came from the unregistered request, so read the FDA side from that one
+    vr = get_latest_verification_request(db, complaint.complaint_id, "confirmed_unregistered")
 
     return LeaInitiatedCaseDetailResponse(
         complaint_id=complaint.complaint_id,
         case_reference=complaint.case_reference,
         product_title=complaint.product_title,
         manufacturer=complaint.manufacturer,
-        complainant_name=complainant.full_name if complainant else None,
         product_category=complaint.product_category,
         logged_at=complaint.created_at,
         source=complaint.source,
         field_operation_notes=complaint.field_operation_notes,
+        **get_fda_response_fields(db, vr),   # ADDED: product_code, priority, notes_to_fda, FDA result fields, response_files
     )
 
 
-# "Close Case" — the real transition: takedown_initiated -> completed.
-# Notes are optional here too; if provided, they overwrite the
-# existing field_operation_notes as the final status before closing.
+# "Close Case" — takedown_initiated -> completed. Writes its own columns so the
+# Initiate Takedown record (field_operation_*) is no longer overwritten.
 def close_case(
     db: Session, complaint_id: UUID, current_user, data: LeaCloseCaseRequest, http_request: Request | None = None
 ) -> LeaCloseCaseResponse:
@@ -80,6 +84,7 @@ def close_case(
         .filter(
             Complaint.complaint_id == complaint_id,
             Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: an extension complaint gets the same 404
         )
         .first()
     )
@@ -91,11 +96,11 @@ def close_case(
 
     old_complaint_status = complaint.status
 
-    if data.field_operation_notes is not None:
-        complaint.field_operation_notes = data.field_operation_notes
-
-    complaint.field_operation_logged_at = datetime.now(timezone.utc)
-    complaint.field_operation_logged_by = current_user.user_id
+    # CHANGED: was overwriting field_operation_notes / _logged_at / _logged_by
+    complaint.closed_at = datetime.now(timezone.utc)
+    complaint.closed_by = current_user.user_id
+    if data.closing_notes is not None:
+        complaint.closing_notes = data.closing_notes
 
     transition_complaint_status(complaint, "completed")
 
@@ -131,4 +136,6 @@ def close_case(
         complaint_status=complaint.status,
         field_operation_notes=complaint.field_operation_notes,
         field_operation_logged_at=complaint.field_operation_logged_at,
+        closed_at=complaint.closed_at,            # ADDED
+        closing_notes=complaint.closing_notes,    # ADDED
     )

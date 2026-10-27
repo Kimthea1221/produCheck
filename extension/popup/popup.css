@@ -1,3 +1,4 @@
+/* extension/popup/popup.css */
 /* ================================
    LOCAL FONTS
 ================================ */
@@ -1028,3 +1029,8 @@ body {
   text-decoration: none;
 }
 .fda-portal-link:hover { opacity: 0.9; }
+
+/* AGREEMENT NEEDED STATE */
+.home-status-badge.off { background-color: #F3F3F3; border-color: #E0E0E0; }
+.home-status-badge.off .home-status-dot { background-color: #A0A0A0; }
+.home-status-badge.off .home-status-text { color: #555555; }

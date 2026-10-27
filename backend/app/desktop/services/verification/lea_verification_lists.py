@@ -9,7 +9,6 @@ from sqlalchemy import or_, and_, case as sa_case, cast, Date
 from app.models.complaints import Complaint
 from app.models.verification_requests import VerificationRequest
 from app.models.users import User
-from app.models.walkin_complainants import WalkinComplainant
 from app.core.user_display import format_officer_display_name, get_display_name_across_agencies
 from app.desktop.schemas.verification.verification import (
     LeaVerificationQueueCounts,
@@ -17,6 +16,14 @@ from app.desktop.schemas.verification.verification import (
     LeaFdaResponseDetailResponse,
     LeaClosedCaseListItem,
     LeaClosedCaseListResponse,
+    LeaClosedCaseDetailResponse
+)
+
+from app.desktop.services.verification.verification_helpers import (   # CHANGED
+    get_response_files,
+    get_latest_verification_request,
+    get_fda_response_fields,
+    get_lea_evidence_files,
 )
 
 Responder = aliased(User)
@@ -36,16 +43,19 @@ def _result_choice(verification_request_status: str) -> str:
 # registered/rejected cases already terminal on the complaint but not
 # yet clicked-through by LEA (lea_acknowledged_at still null).
 def _fda_response_condition():
-    return or_(
-        and_(
-            VerificationRequest.verification_request_status == "confirmed_unregistered",
-            Complaint.status == "takedown_requested",
-        ),
-        and_(
-            VerificationRequest.verification_request_status.in_(
-                ["confirmed_registered", "rejected"]
+    return and_(
+        Complaint.source == "walk_in",   # ADDED: LEA never handles extension complaints
+        or_(
+            and_(
+                VerificationRequest.verification_request_status == "confirmed_unregistered",
+                Complaint.status == "takedown_requested",
             ),
-            VerificationRequest.lea_acknowledged_at.is_(None),
+            and_(
+                VerificationRequest.verification_request_status.in_(
+                    ["confirmed_registered", "rejected"]
+                ),
+                VerificationRequest.lea_acknowledged_at.is_(None),
+            ),
         ),
     )
 
@@ -54,14 +64,17 @@ def _fda_response_condition():
 # (always terminal) or dismissed-and-acknowledged (registered/rejected
 # that LEA has clicked through).
 def _closed_condition():
-    return or_(
-        Complaint.status == "completed",
-        and_(
-            Complaint.status == "dismissed",
-            VerificationRequest.verification_request_status.in_(
-                ["confirmed_registered", "rejected"]
+    return and_(
+        Complaint.source == "walk_in",   # ADDED: extension complaints FDA marked completed no longer appear here
+        or_(
+            Complaint.status == "completed",
+            and_(
+                Complaint.status == "dismissed",
+                VerificationRequest.verification_request_status.in_(
+                    ["confirmed_registered", "rejected"]
+                ),
+                VerificationRequest.lea_acknowledged_at.isnot(None),
             ),
-            VerificationRequest.lea_acknowledged_at.isnot(None),
         ),
     )
 # added by Darlene --end
@@ -82,7 +95,11 @@ def get_lea_verification_queue_counts(db: Session, current_user) -> LeaVerificat
 
     initiated_count = (
         db.query(Complaint)
-        .filter(Complaint.region_id == current_user.region_id, Complaint.status == "takedown_initiated")
+        .filter(
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED
+            Complaint.status == "takedown_initiated",
+        )
         .count()
     )
 
@@ -91,7 +108,7 @@ def get_lea_verification_queue_counts(db: Session, current_user) -> LeaVerificat
     # already clicked through).
     dismissed_count = joined.filter(_closed_condition()).count()
 
-    completed_count = joined.filter(Complaint.status == "completed").count()
+    completed_count = joined.filter(Complaint.source == "walk_in", Complaint.status == "completed").count()   # CHANGED: added source
 
     return LeaVerificationQueueCounts(
         fda_response_count=fda_response_count,
@@ -135,21 +152,19 @@ def list_lea_fda_response(db: Session, current_user) -> list[LeaFdaResponseListI
 
 
 # Right panel detail. One joined query pulls the responding officer's
-# name and complainant name so no follow-up queries are needed.
+# name so no follow-up queries are needed.
 # Scoped by the same tab condition as the list — an already-
 # acknowledged case 404s here, same as it disappears from the list.
 def get_lea_fda_response_detail(
     db: Session, request_id: UUID, current_user
 ) -> LeaFdaResponseDetailResponse:
     result = (
-        db.query(VerificationRequest, Complaint, Responder, WalkinComplainant)
+        db.query(VerificationRequest, Complaint, Responder)
         .join(Complaint, VerificationRequest.complaint_id == Complaint.complaint_id)
         # outerjoin, not join — responded_by can be null if somehow
         # queried before FDA actually responded (shouldn't happen given
-        # the condition filter below, but stay defensive), and
-        # complainant_id on Complaint is nullable by design.
+        # the condition filter below, but stay defensive).
         .outerjoin(Responder, VerificationRequest.responded_by == Responder.user_id)
-        .outerjoin(WalkinComplainant, Complaint.complainant_id == WalkinComplainant.complainant_id)
         .filter(Complaint.region_id == current_user.region_id)
         .filter(VerificationRequest.request_id == request_id)
         .filter(_fda_response_condition())
@@ -159,7 +174,7 @@ def get_lea_fda_response_detail(
     if result is None:
         raise HTTPException(status_code=404, detail="FDA response record not found.")
 
-    vr, complaint, responder, complainant = result
+    vr, complaint, responder = result
 
     return LeaFdaResponseDetailResponse(
         request_id=vr.request_id,
@@ -167,7 +182,6 @@ def get_lea_fda_response_detail(
         case_reference=complaint.case_reference,
         product_title=complaint.product_title,
         manufacturer=complaint.manufacturer,
-        complainant_name=complainant.full_name if complainant else None,
         product_category=complaint.product_category,
         logged_at=complaint.created_at,
         source=complaint.source,
@@ -194,6 +208,10 @@ def get_lea_fda_response_detail(
         # column name ever shifts — matches the same defensive pattern
         # used elsewhere for this field.
         rejection_reason=getattr(vr, "rejection_reason", None),
+        product_code=vr.product_code,                 # ADDED
+        priority=vr.priority,                         # ADDED
+        notes_to_fda=vr.complaint_statement,          # ADDED: LEA's note to FDA lives in complaint_statement
+        response_files=get_response_files(db, vr),    # ADDED: responding officer's files only
     )
 
 # ============================================================
@@ -206,7 +224,7 @@ def get_lea_fda_response_detail(
 # ordering use a single "closed_at" concept instead of branching twice.
 def _closed_at_expr():
     return sa_case(
-        (Complaint.status == "completed", Complaint.field_operation_logged_at),
+        (Complaint.status == "completed", Complaint.closed_at),   # CHANGED: was field_operation_logged_at
         else_=VerificationRequest.lea_acknowledged_at,
     )
 
@@ -225,7 +243,7 @@ def list_lea_closed_cases(
     query = (
         db.query(Complaint, VerificationRequest, FieldOpOfficer, AckOfficer)
         .outerjoin(VerificationRequest, VerificationRequest.complaint_id == Complaint.complaint_id)
-        .outerjoin(FieldOpOfficer, Complaint.field_operation_logged_by == FieldOpOfficer.user_id)
+        .outerjoin(FieldOpOfficer, Complaint.closed_by == FieldOpOfficer.user_id)   # CHANGED: was field_operation_logged_by
         .outerjoin(AckOfficer, VerificationRequest.lea_acknowledged_by == AckOfficer.user_id)
         .filter(Complaint.region_id == current_user.region_id)
         .filter(_closed_condition())
@@ -276,10 +294,10 @@ def list_lea_closed_cases(
                     manufacturer=complaint.manufacturer,
                     product_category=complaint.product_category,
                     date_filed=complaint.created_at,
-                    date_closed=complaint.field_operation_logged_at,
-                    closed_by_name=format_officer_display_name(field_op_officer),
+                    date_closed=complaint.closed_at,                                # CHANGED: was field_operation_logged_at
+                    closed_by_name=format_officer_display_name(field_op_officer),   # unchanged, now the closing officer
                     reason_closed="completed",
-                    reason_detail=complaint.field_operation_notes,
+                    reason_detail=complaint.closing_notes,
                 )
             )
         else:
@@ -300,4 +318,72 @@ def list_lea_closed_cases(
             )
 
     return LeaClosedCaseListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+
+# Function: get_lea_closed_case_detail 
+def get_lea_closed_case_detail(db: Session, complaint_id: UUID, current_user) -> LeaClosedCaseDetailResponse:
+    complaint = (
+        db.query(Complaint)
+        .filter(
+            Complaint.complaint_id == complaint_id,
+            Complaint.region_id == current_user.region_id,
+            Complaint.source == "walk_in",   # ADDED: walk-in only, extension complaints never reach LEA
+        )
+        .first()
+    )
+    if complaint is None:
+        raise HTTPException(status_code=404, detail="Closed case not found.")
+
+    # Same rule as _closed_condition: which request closed this case?
+    if complaint.status == "completed":
+        vr = get_latest_verification_request(db, complaint.complaint_id, "confirmed_unregistered")
+    elif complaint.status == "dismissed":
+        vr = (
+            db.query(VerificationRequest)
+            .filter(
+                VerificationRequest.complaint_id == complaint.complaint_id,
+                VerificationRequest.verification_request_status.in_(["confirmed_registered", "rejected"]),
+                VerificationRequest.lea_acknowledged_at.isnot(None),
+            )
+            .order_by(VerificationRequest.requested_at.desc())
+            .first()
+        )
+        if vr is None:
+            raise HTTPException(status_code=404, detail="Closed case not found.")
+    else:
+        raise HTTPException(status_code=404, detail="Closed case not found.")
+
+    fda_fields = get_fda_response_fields(db, vr)   # {} when a completed case has no request on file
+
+    request_fields = {}
+    if vr is not None:
+        request_fields = {
+            "verification_result": _result_choice(vr.verification_request_status),
+            "requested_by_name": get_display_name_across_agencies(db, vr.requested_by),
+            "requested_at": vr.requested_at,
+            "cpr_number": vr.cpr_number,
+            "cpr_expiry": vr.cpr_expiry,
+            "rejection_reason": vr.rejection_reason,
+            # the modal reads rejected_by_name for rejected cases; it is the same person as verified_by_name
+            "rejected_by_name": fda_fields.get("verified_by_name") if vr.verification_request_status == "rejected" else None,
+            "lea_acknowledged_at": vr.lea_acknowledged_at,
+            "acknowledged_by_name": get_display_name_across_agencies(db, vr.lea_acknowledged_by) if vr.lea_acknowledged_by else None,
+        }
+
+    # Takedown record exists only on the unregistered path (completed cases)
+    takedown_fields = {}
+    if complaint.status == "completed":
+        takedown_fields = {
+            "takedown_initiated_at": complaint.field_operation_logged_at,
+            "takedown_initiated_by_name": get_display_name_across_agencies(db, complaint.field_operation_logged_by) if complaint.field_operation_logged_by else None,
+            "field_operation_notes": complaint.field_operation_notes,
+        }
+
+    return LeaClosedCaseDetailResponse(
+        **fda_fields,
+        **request_fields,
+        **takedown_fields,
+        attached_files=get_lea_evidence_files(db, complaint.complaint_id),
+    )
     # added by Darlene --end

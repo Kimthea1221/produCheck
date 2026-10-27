@@ -9,11 +9,28 @@ from app.core.security import pwd_context
 
 OTP_EXPIRATION_MINS = 5
 MAX_OTP_ATTEMPTS = 5
+OTP_COOLDOWN_SECONDS = 60
 
 def generate_otp_code(length: int = 6) -> str:
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
 def create_otp(db: Session, consumer_id, purpose: str) -> str:
+    latest = (db.query(ConsumerOTPToken)
+        .filter(ConsumerOTPToken.consumer_id == consumer_id,
+                ConsumerOTPToken.purpose == purpose)
+        .order_by(ConsumerOTPToken.created_at.desc())
+        .first())
+
+    if latest:
+        age = (datetime.now(timezone.utc) - latest.created_at).total_seconds()
+        if age < OTP_COOLDOWN_SECONDS:
+            wait = int(OTP_COOLDOWN_SECONDS - age) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"Please wait {wait}s before requesting another code.",
+                headers={"Retry-After": str(wait)},
+            )
+
     db.query(ConsumerOTPToken).filter(
         ConsumerOTPToken.consumer_id == consumer_id,
         ConsumerOTPToken.purpose == purpose,
