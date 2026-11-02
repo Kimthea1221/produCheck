@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 import sys
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import func
+from sqlalchemy import func, text
 from fastapi import HTTPException, status, Request, BackgroundTasks
 from app.core.audit import write_audit_log, get_user_region_code
 from app.core.constants import AuditAction
@@ -34,6 +34,41 @@ def increment_marketplace_detection_count(db: Session, product_id) -> bool:
         return False
     db.commit()
     return True
+
+
+def increment_registered_detection_by_name(db: Session, product_name: str, brand_name: str | None = None) -> bool:
+    """Increment marketplace detection count for a registered product by name/brand."""
+    if not product_name or not product_name.strip():
+        return False
+
+    clean_name = product_name.strip()
+    try:
+        db.execute(text("SET app.bypass_rls = 'true'"))
+        query = db.query(RegisteredProduct).filter(
+            RegisteredProduct.deleted_at.is_(None),
+        )
+        if brand_name and brand_name.strip():
+            query = query.filter(RegisteredProduct.brand_name.ilike(brand_name.strip()))
+
+        product = query.filter(
+            func.lower(func.trim(RegisteredProduct.product_name)) == clean_name.lower()
+        ).first()
+
+        if not product:
+            product = db.query(RegisteredProduct).filter(
+                RegisteredProduct.product_name.ilike(f"%{clean_name}%"),
+                RegisteredProduct.deleted_at.is_(None),
+            ).first()
+
+        if not product:
+            return False
+
+        product.marketplace_detection_count = (product.marketplace_detection_count or 0) + 1
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
 
 
 def format_product_response(product: RegisteredProduct, db: Session):

@@ -152,8 +152,27 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
             "faiss_score": round(float(cos_val), 4),
         })
 
-    unreg_scores, _ = unregistered_index.search(query_vec, 1)
+    unreg_scores, unreg_indices = unregistered_index.search(query_vec, 1)
     u1 = float(unreg_scores[0][0]) if len(unreg_scores[0]) > 0 else -1.0
+
+    matched_unregistered: Dict[str, Any] | None = None
+    if len(unreg_scores[0]) > 0 and len(unreg_indices[0]) > 0 and unreg_indices[0][0] >= 0:
+        u_idx = int(unreg_indices[0][0])
+        u_row = unregistered_df.iloc[u_idx]
+        u_title = str(u_row.get("Product Title", u_row.get("cleaned_title", ""))).strip()
+        advisory_title = str(u_row.get("Advisory Title", "")).strip()
+        category = str(u_row.get("Category", "")).strip()
+        post_link = str(u_row.get("Post Link", "")).strip()
+        matched_unregistered = {
+            "index": u_idx,
+            "title": u_title,
+            "product_name": u_title,
+            "advisory_title": advisory_title,
+            "category": category,
+            "post_link": post_link,
+            "score": round(float(u1), 4),
+            "cosine_score": round(float(u1), 4),
+        }
 
     if max(r1, u1) < threshold:
         verdict = "no_match"
@@ -174,6 +193,8 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
         print(f"Registered Cosine   : {r1:.4f}")
         print(f"Unregistered Cosine : {u1:.4f}")
         print(f"Verdict             : {verdict.upper()} (threshold: {threshold:.4f})")
+        if verdict == "unregistered" and matched_unregistered:
+            print(f"Matched Unregistered: {matched_unregistered['title']} (Cosine: {matched_unregistered['cosine_score']:.4f})")
         print("\nTop 5 Registered Candidates:")
         for item in top5_registered:
             print(f"  [{item['rank']}] Cosine: {item['cosine_score']:.4f} | {item['full_product_info']}")
@@ -187,6 +208,7 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
         "reg_cos": r1,
         "unreg_cos": u1,
         "top5_registered": top5_registered,
+        "matched_unregistered": matched_unregistered if verdict == "unregistered" else None,
     }
 
 

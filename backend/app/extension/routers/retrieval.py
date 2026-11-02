@@ -1,8 +1,19 @@
-from fastapi import APIRouter, HTTPException
+import logging
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Any, Dict, List
+from sqlalchemy.orm import Session
 
+from app.database.sessions import get_db
+from app.desktop.services.Product_database.registered_product_service import (
+    increment_registered_detection_by_name,
+)
+from app.desktop.services.Product_database.unregistered_advisory_service import (
+    increment_unregistered_detection_by_title,
+)
 from nlp.retrieval.retrieval import evaluate_match, get_top_5_registered
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalRequest(BaseModel):
@@ -14,7 +25,7 @@ router = APIRouter()
 
 
 @router.post("/verify")
-async def verify(request: RetrievalRequest):
+async def verify(request: RetrievalRequest, db: Session = Depends(get_db)):
     if not request.title or not request.title.strip():
         raise HTTPException(status_code=400, detail="title is required")
 
@@ -37,6 +48,28 @@ async def verify(request: RetrievalRequest):
             for idx, candidate in enumerate(raw_top5, start=1)
         ]
 
+        matched_unregistered = evaluation_result.get("matched_unregistered")
+
+        # Automatically record marketplace detection count in the database
+        if db is not None:
+            try:
+                if verdict == "unregistered" and matched_unregistered:
+                    unreg_title = matched_unregistered.get("title") or matched_unregistered.get("product_name", "")
+                    if unreg_title:
+                        incremented = increment_unregistered_detection_by_title(db, unreg_title)
+                        if incremented:
+                            logger.info("Auto-incremented unregistered detection count for: %s", unreg_title)
+                elif verdict == "registered" and top5_registered:
+                    top_reg = top5_registered[0]
+                    reg_product = top_reg.get("product_name") or top_reg.get("title", "")
+                    reg_brand = top_reg.get("brand_name", "")
+                    if reg_product:
+                        incremented = increment_registered_detection_by_name(db, reg_product, reg_brand)
+                        if incremented:
+                            logger.info("Auto-incremented registered detection count for: %s", reg_product)
+            except Exception as db_err:
+                logger.warning("Could not auto-increment marketplace detection count: %s", db_err)
+
         return {
             "query": evaluation_result.get("query", request.title),
             "cleaned_query": evaluation_result.get("cleaned_query", ""),
@@ -45,6 +78,7 @@ async def verify(request: RetrievalRequest):
             "reg_cos": evaluation_result.get("reg_cos", 0.0),
             "unreg_cos": evaluation_result.get("unreg_cos", 0.0),
             "top5_registered": top5_registered,
+            "matched_unregistered": matched_unregistered,
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

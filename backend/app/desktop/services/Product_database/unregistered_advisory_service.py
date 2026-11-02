@@ -1,6 +1,6 @@
 # backend/app/desktop/services/Product_database/unregistered_advisory_service.py
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import func
+from sqlalchemy import func, text
 from fastapi import HTTPException, status, Request, BackgroundTasks
 from app.core.audit import write_audit_log, get_user_region_code
 from app.core.constants import AuditAction
@@ -33,6 +33,36 @@ def increment_marketplace_detection_count(db: Session, advisory_id) -> bool:
         return False
     db.commit()
     return True
+
+
+def increment_unregistered_detection_by_title(db: Session, product_title: str) -> bool:
+    """Increment marketplace detection count for an unregistered advisory by its product title."""
+    if not product_title or not product_title.strip():
+        return False
+
+    clean_name = product_title.strip()
+    try:
+        db.execute(text("SET app.bypass_rls = 'true'"))
+        advisory = db.query(UnregisteredAdvisory).filter(
+            func.lower(func.trim(UnregisteredAdvisory.product_name)) == clean_name.lower(),
+            UnregisteredAdvisory.deleted_at.is_(None),
+        ).first()
+
+        if not advisory:
+            advisory = db.query(UnregisteredAdvisory).filter(
+                UnregisteredAdvisory.product_name.ilike(f"%{clean_name}%"),
+                UnregisteredAdvisory.deleted_at.is_(None),
+            ).first()
+
+        if not advisory:
+            return False
+
+        advisory.marketplace_detection_count = (advisory.marketplace_detection_count or 0) + 1
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
 
 
 def format_advisory_response(advisory: UnregisteredAdvisory, db: Session):
