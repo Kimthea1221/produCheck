@@ -14,7 +14,7 @@ registered_df = pd.read_pickle(WORK / "Registered_cleaned.pkl")
 unregistered_df = pd.read_pickle(WORK / "Unregistered_cleaned.pkl")
 
 # Load model
-MODEL_PATH = str(BASE / "sbertmodel4")
+MODEL_PATH = str(BASE / "sbertmodel8")
 finetuned_model = SentenceTransformer(MODEL_PATH)
 
 USE_CLEANED_DOCS = True

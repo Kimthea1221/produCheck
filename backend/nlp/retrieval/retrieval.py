@@ -14,22 +14,34 @@ DATA_DIR = BASE_DIR.parent / "assets"
 if not DATA_DIR.exists():
     DATA_DIR = Path("./data")
 
-MODEL_DIR = BASE_DIR.parent / "sbertmodel4"
-if not MODEL_DIR.exists():
-    MODEL_DIR = BASE_DIR.parent / "finetuned_sbert"
-if not MODEL_DIR.exists():
-    MODEL_DIR = Path("./models/sbertmodel8")
+MODEL_DIR = BASE_DIR.parent / "sbertmodel8"
 MODEL_PATH = str(MODEL_DIR)
 
 COSINE_THR = 0.85
 
 MARKETING_PATTERNS = [
+    # Promotions
     r'\bbuy\s*(?:\d+|one|two)\s*(?:take|get)\s*(?:\d+|one|two)(?:\s*free)?\b',
     r'\bb\d+\s*t\d+\b',
     r'\bbuy\s*\d+\s*(?:and|&)?\s*get\s*\d+\s*(?:free)?\b',
     r'\b\d+\s*for\s*\d+\b',
     r'\b\d+\s*%\s*off\b',
     r'\b(?:up\s*to\s*)?\d+\s*%\s*(?:off|discount)\b',
+
+    # General marketing words
+    r'\b(?:free\s*(?:shipping|gift|delivery)|freebie|best\s*seller|bestseller)\b',
+    r'\b(?:hot\s*(?:deal|sale)|flash\s*sale|big\s*sale|on\s*sale|sale|promo|bundle|set\s*of)\b',
+    r'\b(?:brand\s*new|new\s*arrival|new\s*stock|ready\s*stock|in\s*stock)\b',
+    r'\b(?:authentic|original|legit|official\s*(?:store|shop)|genuine)\b',
+    r'\b(?:limited\s*edition|while\s*supplies\s*last|must\s*have|trending|viral)\b',
+    r'\b(?:cod|cash\s*on\s*delivery|lowest\s*price|cheap|affordable|sulit)\b',
+    r'\b(?:(?:free|fast|express|worldwide|international|global|same\s*day)\s*)?(?:shipping|delivery)\b',
+    r'\bships?\s+(?:from|to)\s+\w+\b',
+    r'\bfrom\s+(?:korea|japan|usa|thailand)\b',
+    r'\bmade\s+(?:in|from)\s+\w+\b',
+    r'\bsold\s+per\s+(?:piece|pc|pcs|item)\b',
+    r'^\s*(?:new|hot|sale)\b[\s:!-]*',
+    r'\(?\s*\d+\s*(?:box|boxes|pcs|pc|pieces|sachets?|sets?)\s*\)?',
 ]
 MARKETING_RE = re.compile('|'.join(MARKETING_PATTERNS), flags=re.IGNORECASE)
 
@@ -154,7 +166,10 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
         score = u1
 
     if verbose:
-        print(f"Query               : {query}")
+        try:
+            print(f"Query               : {query}")
+        except Exception:
+            print(f"Query               : {query.encode('ascii', 'replace').decode()}")
         print(f"Cleaned Query       : {cleaned_query}")
         print(f"Registered Cosine   : {r1:.4f}")
         print(f"Unregistered Cosine : {u1:.4f}")
@@ -173,24 +188,6 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
         "unreg_cos": u1,
         "top5_registered": top5_registered,
     }
-
-
-def get_top_5_registered(query: str, k: int = 5) -> List[Dict[str, Any]]:
-    """Retrieve the top 5 registered products for a given query."""
-    res = evaluate_match(query)
-    return res.get("top5_registered", [])[:k]
-
-
-top_5_registered = get_top_5_registered
-get_top_registered_products = get_top_5_registered
-
-
-if __name__ == "__main__":
-    import sys
-    test_query = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else "Biore UV Aqua Rich Watery Essence Sunscreen Face"
-    res = evaluate_match(test_query, verbose=True)
-    print("Result:", res["verdict"], f"(score: {res['score']:.4f})")
-
 
 
 def get_top_5_registered(query: str, k: int = 5) -> List[Dict[str, Any]]:

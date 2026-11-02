@@ -68,14 +68,13 @@ def LoadRegFaissIndex(asset_file: str = "faiss_registered.index"):
 
 
 def load_model():
-    """Load the local fine-tuned model or fall back to base SentenceTransformer."""
-    for local_dir in [BASE_DIR.parent / "sbertmodel4", BASE_DIR.parent / "finetuned_sbert"]:
-        if local_dir.exists():
-            print(f"Loading local model from: {local_dir}")
-            return SentenceTransformer(str(local_dir))
+    """Load the fine-tuned sbertmodel8."""
+    model_dir = BASE_DIR.parent / "sbertmodel8"
+    if not model_dir.exists():
+        raise FileNotFoundError(f"Required model 'sbertmodel8' not found at: {model_dir}")
 
-    print("Loading model 'all-MiniLM-L6-v2'...")
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    print(f"Loading local model from: {model_dir}")
+    return SentenceTransformer(str(model_dir))
 
 
 def load_all_assets():
