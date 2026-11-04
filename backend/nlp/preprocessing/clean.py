@@ -146,12 +146,11 @@ registered_df['full_product_info'] = (
 registered_df['tokens']   = registered_df['full_product_info'].apply(word_tokenize)
 registered_df['filtered'] = registered_df['full_product_info'].apply(tokenize_for_bm25)
 
-registered_df.to_pickle(WORK / 'Registered_cleaned.pkl')
-if not (WORK / 'registered_cleaned.pkl').exists():
-    try:
-        registered_df.to_pickle(WORK / 'registered_cleaned.pkl')
-    except Exception:
-        pass
+registered_df.to_pickle(WORK / 'registered_cleaned.pkl')
+try:
+    registered_df.to_pickle(WORK / 'Registered_cleaned.pkl')
+except Exception:
+    pass
 
 
 unregistered_df['cleaned_title'] = unregistered_df['Product Title'].apply(clean_productTitle)
@@ -162,12 +161,11 @@ unregistered_df = unregistered_df.reset_index(drop=True)
 unregistered_df['tokens']   = unregistered_df['cleaned_title'].apply(word_tokenize)
 unregistered_df['filtered'] = unregistered_df['cleaned_title'].apply(tokenize_for_bm25)
 
-unregistered_df.to_pickle(WORK / 'Unregistered_cleaned.pkl')
-if not (WORK / 'unregistered_cleaned.pkl').exists():
-    try:
-        unregistered_df.to_pickle(WORK / 'unregistered_cleaned.pkl')
-    except Exception:
-        pass
+unregistered_df.to_pickle(WORK / 'unregistered_cleaned.pkl')
+try:
+    unregistered_df.to_pickle(WORK / 'Unregistered_cleaned.pkl')
+except Exception:
+    pass
 
 print("Registered:  ", registered_df.shape,
       "| index consecutive:", registered_df.index.equals(pd.RangeIndex(len(registered_df))))

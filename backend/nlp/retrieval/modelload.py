@@ -51,8 +51,8 @@ def LoadFaissIndex(primary_name: str, *fallbacks: str):
 
 
 # Aliases for backwards compatibility
-def LoadRegAsset(asset_file: str = "Registered_cleaned.pkl"):
-    return LoadDfAsset(asset_file, "registered_cleaned.pkl")
+def LoadRegAsset(asset_file: str = "registered_cleaned.pkl"):
+    return LoadDfAsset(asset_file, "Registered_cleaned.pkl")
 
 
 def BM25RegAsset(asset_file: str = "reg_bm25.pkl"):
@@ -80,8 +80,8 @@ def load_model():
 def load_all_assets():
     print("Running NLP Load Assets pipeline...")
 
-    registeredCleanedDf = LoadDfAsset("Registered_cleaned.pkl", "registered_cleaned.pkl")
-    unregisteredCleanedDf = LoadDfAsset("Unregistered_cleaned.pkl", "unregistered_cleaned.pkl")
+    registeredCleanedDf = LoadDfAsset("registered_cleaned.pkl", "Registered_cleaned.pkl")
+    unregisteredCleanedDf = LoadDfAsset("unregistered_cleaned.pkl", "Unregistered_cleaned.pkl")
 
     bm25RegisteredObj = LoadBM25Asset("reg_bm25.pkl", "bm25_registered.pkl")
     bm25UnregisteredObj = LoadBM25Asset("unreg_bm25.pkl", "bm25_unregistered.pkl")

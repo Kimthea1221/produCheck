@@ -10,8 +10,8 @@ WORK = BASE / "assets"
 WORK.mkdir(parents=True, exist_ok=True)
 
 # Load cleaned datasets
-registered_df = pd.read_pickle(WORK / "Registered_cleaned.pkl")
-unregistered_df = pd.read_pickle(WORK / "Unregistered_cleaned.pkl")
+registered_df = pd.read_pickle(WORK / "registered_cleaned.pkl" if (WORK / "registered_cleaned.pkl").exists() else WORK / "Registered_cleaned.pkl")
+unregistered_df = pd.read_pickle(WORK / "unregistered_cleaned.pkl" if (WORK / "unregistered_cleaned.pkl").exists() else WORK / "Unregistered_cleaned.pkl")
 
 # Load model
 MODEL_PATH = str(BASE / "sbertmodel8")
@@ -33,7 +33,16 @@ def embed(texts):
 sbert_registered_embeddings_finetuned   = embed(reg_texts)
 sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
 
-np.save(f'{WORK}/sbert_registered_embeddings_finetuned.npy', sbert_registered_embeddings_finetuned)
-np.save(f'{WORK}/sbert_unregistered_embeddings_finetuned.npy', sbert_unregistered_embeddings_finetuned)
+np.save(WORK / 'sbert_registered_embeddings_finetuned.npy', sbert_registered_embeddings_finetuned)
+try:
+    np.save(WORK / 'registered_embeddings.npy', sbert_registered_embeddings_finetuned)
+except Exception:
+    pass
+
+np.save(WORK / 'sbert_unregistered_embeddings_finetuned.npy', sbert_unregistered_embeddings_finetuned)
+try:
+    np.save(WORK / 'unregistered_embeddings.npy', sbert_unregistered_embeddings_finetuned)
+except Exception:
+    pass
 
 print(sbert_registered_embeddings_finetuned.shape, sbert_unregistered_embeddings_finetuned.shape)
