@@ -13,6 +13,7 @@ import faiss
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from rank_bm25 import BM25Okapi
@@ -24,6 +25,48 @@ from nlp.retrieval.retrieval import (
 )
 
 logger = logging.getLogger(__name__)
+
+NLTK_RESOURCES = [
+    ('punkt', 'tokenizers/punkt'),
+    ('punkt_tab', 'tokenizers/punkt_tab'),
+    ('stopwords', 'corpora/stopwords'),
+]
+
+
+def ensure_nltk_resources():
+    for pkg, path in NLTK_RESOURCES:
+        try:
+            nltk.data.find(path)
+        except LookupError:
+            try:
+                nltk.download(pkg, quiet=True)
+            except Exception:
+                pass
+
+
+ensure_nltk_resources()
+
+
+def safe_tokenize(text: Any) -> list:
+    if not text:
+        return []
+    s = str(text).strip()
+    try:
+        return word_tokenize(s)
+    except Exception:
+        return s.split()
+
+
+def get_stopwords() -> set:
+    try:
+        return set(stopwords.words("english"))
+    except Exception:
+        try:
+            nltk.download("stopwords", quiet=True)
+            return set(stopwords.words("english"))
+        except Exception:
+            return set()
+
 
 _SYNC_LOCK = threading.Lock()
 _REG_SYNC_LOCK = threading.Lock()
@@ -165,14 +208,10 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
         cleaned_df = cleaned_df.reset_index(drop=True)
 
         # 4. Tokenize for BM25
-        try:
-            stop_words = set(stopwords.words("english"))
-        except Exception:
-            stop_words = set()
-
-        cleaned_df['tokens'] = cleaned_df['cleaned_title'].apply(word_tokenize)
-        cleaned_df['filtered'] = cleaned_df['cleaned_title'].apply(
-            lambda t: [w for w in word_tokenize(t) if w not in stop_words]
+        stop_words = get_stopwords()
+        cleaned_df['tokens'] = cleaned_df['cleaned_title'].apply(safe_tokenize)
+        cleaned_df['filtered'] = cleaned_df['tokens'].apply(
+            lambda toks: [w for w in toks if w.lower() not in stop_words]
         )
 
         n_rows = len(cleaned_df)
@@ -335,14 +374,10 @@ def rebuild_registered_assets_and_reload() -> Dict[str, Any]:
         )
 
         # 3. Tokenize for BM25
-        try:
-            stop_words = set(stopwords.words("english"))
-        except Exception:
-            stop_words = set()
-
-        cleaned_df['tokens'] = cleaned_df['full_product_info'].apply(word_tokenize)
-        cleaned_df['filtered'] = cleaned_df['full_product_info'].apply(
-            lambda t: [w for w in word_tokenize(t) if w not in stop_words]
+        stop_words = get_stopwords()
+        cleaned_df['tokens'] = cleaned_df['full_product_info'].apply(safe_tokenize)
+        cleaned_df['filtered'] = cleaned_df['tokens'].apply(
+            lambda toks: [w for w in toks if w.lower() not in stop_words]
         )
 
         n_rows = len(cleaned_df)
