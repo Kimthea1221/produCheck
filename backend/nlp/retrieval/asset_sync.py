@@ -2,6 +2,7 @@ import logging
 import os
 import pickle
 import re
+import sys
 import threading
 import time
 import unicodedata
@@ -83,6 +84,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
             return {"status": "error", "message": f"CSV not found: {unreg_csv_path}"}
 
         logger.info("Starting fast rebuild of unregistered NLP assets from %s...", unreg_csv_path)
+        print(f"[NLP-Sync] Starting fast rebuild of unregistered NLP assets from {unreg_csv_path.name}...", file=sys.stderr, flush=True)
 
         # 1. Read raw unregistered CSV
         raw_df = pd.read_csv(unreg_csv_path, dtype=str, low_memory=False)
@@ -153,6 +155,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
 
         if titles_to_encode:
             logger.info("Encoding %d newly added titles with SentenceTransformer...", len(titles_to_encode))
+            print(f"[NLP-Sync] Encoding {len(titles_to_encode)} new titles with SentenceTransformer...", file=sys.stderr, flush=True)
             new_vecs = finetuned_model.encode(
                 titles_to_encode,
                 batch_size=128,
@@ -164,6 +167,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
                 cached_vecs[title] = new_vecs[enc_idx]
         else:
             logger.info("All %d titles already have cached embeddings.", n_rows)
+            print(f"[NLP-Sync] All {n_rows} titles have cached embeddings.", file=sys.stderr, flush=True)
 
         final_embeddings = np.array([cached_vecs[t] for t in cleaned_df['cleaned_title']], dtype="float32")
 
@@ -211,6 +215,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
             total_duration,
             n_rows,
         )
+        print(f"[NLP-Sync] Hot-reload complete in {total_duration:.2f}s! In-memory unregistered count: {n_rows}", file=sys.stderr, flush=True)
         return {
             "status": "success",
             "unregistered_count": n_rows,
@@ -220,6 +225,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
 
     except Exception as exc:
         logger.error("Error rebuilding unregistered NLP assets: %s", exc, exc_info=True)
+        print(f"[NLP-Sync] ERROR rebuilding unregistered NLP assets: {exc}", file=sys.stderr, flush=True)
         return {"status": "error", "message": str(exc)}
     finally:
         _SYNC_LOCK.release()
