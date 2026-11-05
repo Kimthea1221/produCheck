@@ -37,7 +37,7 @@ def increment_marketplace_detection_count(db: Session, product_id) -> bool:
 
 
 def increment_registered_detection_by_name(db: Session, product_name: str, brand_name: str | None = None) -> bool:
-    """Increment marketplace detection count for a registered product by name/brand."""
+
     if not product_name or not product_name.strip():
         return False
 
@@ -145,7 +145,7 @@ def get_all_registered_products(db: Session, current_user: User):
 
 
 def create_registered_product(db: Session, data: RegisteredProductCreate, current_user, request: Request = None):
-    # Check duplicate product name
+
     existing_name = db.query(RegisteredProduct).filter(
         func.lower(RegisteredProduct.product_name) == func.lower(data.product_name),
         RegisteredProduct.deleted_at.is_(None)
@@ -236,7 +236,6 @@ def update_registered_product(db: Session, product_id, data: RegisteredProductUp
             detail="Registered product not found."
         )
 
-    # Check duplicate product name excluding current product
     existing_name = db.query(RegisteredProduct).filter(
         func.lower(RegisteredProduct.product_name) == func.lower(data.product_name),
         RegisteredProduct.product_id != product_id,
@@ -264,7 +263,6 @@ def update_registered_product(db: Session, product_id, data: RegisteredProductUp
                 detail="Duplicate product name detected. This product already exists in the database."
             )
 
-    # Check unique constraint excluding current product
     existing = db.query(RegisteredProduct).filter(
         RegisteredProduct.registration_number == data.registration_number,
         RegisteredProduct.product_id != product_id,
@@ -347,11 +345,9 @@ def convert_advisory_to_product(db: Session, advisory_id, data: RegisteredProduc
 
     source_advisory_name = advisory.product_name
 
-    # Soft delete the advisory
     advisory.deleted_at = func.now()
     advisory.deleted_by = current_user_id
 
-    # Create new registered product
     new_product = RegisteredProduct(
         product_name=data.product_name,
         brand_name=data.brand_name,
@@ -389,7 +385,6 @@ def convert_advisory_to_product(db: Session, advisory_id, data: RegisteredProduc
         region_code=region_code,
     )
 
-    # Schedule email notification to the officer
     if background_tasks and officer_email:
         background_tasks.add_task(
             send_converted_product_email,

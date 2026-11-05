@@ -133,3 +133,15 @@ async def rebuild_assets_endpoint():
     except Exception as exc:
         logger.error("Failed to rebuild and reload assets: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/rebuild-registered-assets")
+async def rebuild_registered_assets_endpoint():
+    """Rebuild registered assets from CSV and hot-reload them into memory."""
+    try:
+        from nlp.retrieval.asset_sync import rebuild_registered_assets_and_reload
+        res = rebuild_registered_assets_and_reload()
+        return res
+    except Exception as exc:
+        logger.error("Failed to rebuild and reload registered assets: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -193,6 +193,16 @@ def sync_registered_products_to_csv(db: Session):
         new_df.to_csv(target_path, index=False)
         logger.info("Successfully synced database registered products to %s (total rows: %d)", target_path, len(new_df))
         print(f"Successfully synced database changes to {target_path}.", file=sys.stderr)
+
+        # Trigger hot rebuild & reload of registered NLP vector assets in background
+        try:
+            from nlp.retrieval.asset_sync import trigger_registered_rebuild_async
+            trigger_registered_rebuild_async()
+            logger.info("Triggered async NLP asset rebuild and hot-reload for registered products.")
+            print("[NLP-Sync] Triggered background rebuild and hot-reload of registered assets.", file=sys.stderr, flush=True)
+        except Exception as sync_err:
+            logger.warning("Could not trigger NLP registered asset rebuild: %s", sync_err)
+            print(f"[NLP-Sync] Warning: Could not trigger NLP registered asset rebuild: {sync_err}", file=sys.stderr, flush=True)
     except Exception as e:
         logger.error("Error syncing registered products to CSV: %s", e, exc_info=True)
         print(f"Warning: Error syncing registered products to CSV: {e}", file=sys.stderr)
