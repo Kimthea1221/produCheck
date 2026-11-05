@@ -295,7 +295,11 @@ def update_registered_product(db: Session, product_id, data: RegisteredProductUp
 
     db.commit()
     db.refresh(product)
-    sync_registered_products_to_csv(db)
+    sync_registered_products_to_csv(
+        db,
+        old_registration_number=old_value.get("registration_number"),
+        old_product_name=old_value.get("product_name"),
+    )
 
     write_audit_log(
         db,
@@ -364,7 +368,7 @@ def convert_advisory_to_product(db: Session, advisory_id, data: RegisteredProduc
     db.commit()
     db.refresh(new_product)
     sync_registered_products_to_csv(db)
-    sync_unregistered_advisories_to_csv(db)
+    sync_unregistered_advisories_to_csv(db, old_product_name=source_advisory_name)
 
     write_audit_log(
         db,
@@ -430,7 +434,11 @@ def delete_registered_product(db: Session, product_id, current_user, request: Re
     product.deleted_by = current_user_id
 
     db.commit()
-    sync_registered_products_to_csv(db)
+    sync_registered_products_to_csv(
+        db,
+        old_registration_number=old_value.get("registration_number"),
+        old_product_name=old_value.get("product_name"),
+    )
 
     write_audit_log(
         db,

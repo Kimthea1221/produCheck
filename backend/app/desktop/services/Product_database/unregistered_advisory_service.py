@@ -254,7 +254,7 @@ def update_unregistered_advisory(db: Session, advisory_id, data: UnregisteredAdv
 
     db.commit()
     db.refresh(advisory)
-    sync_unregistered_advisories_to_csv(db)
+    sync_unregistered_advisories_to_csv(db, old_product_name=old_value.get("product_name"))
 
     write_audit_log(
         db,
@@ -322,7 +322,7 @@ def convert_product_to_advisory(db: Session, product_id, data: UnregisteredAdvis
     db.add(new_advisory)
     db.commit()
     db.refresh(new_advisory)
-    sync_registered_products_to_csv(db)
+    sync_registered_products_to_csv(db, old_registration_number=source_reg_number, old_product_name=source_product_name)
     sync_unregistered_advisories_to_csv(db)
 
     write_audit_log(
@@ -389,7 +389,7 @@ def delete_unregistered_advisory(db: Session, advisory_id, current_user, request
     advisory.deleted_by = current_user_id
 
     db.commit()
-    sync_unregistered_advisories_to_csv(db)
+    sync_unregistered_advisories_to_csv(db, old_product_name=old_value.get("product_name"))
 
     write_audit_log(
         db,

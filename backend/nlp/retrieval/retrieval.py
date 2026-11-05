@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 import faiss
 import numpy as np
 import pandas as pd
+from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -108,73 +109,152 @@ def _find_file(filename: str, *fallbacks: str) -> str:
 
 finetuned_model = SentenceTransformer(MODEL_PATH)
 
-registered_df = pd.read_pickle(_find_file('registered_cleaned.pkl', 'Registered_cleaned.pkl')).reset_index(drop=True)
-unregistered_df = pd.read_pickle(_find_file('unregistered_cleaned.pkl', 'Unregistered_cleaned.pkl')).reset_index(drop=True)
 
-with open(_find_file('reg_bm25.pkl', 'bm25_registered.pkl'), 'rb') as f:
-    bm25_registered = pickle.load(f)
-with open(_find_file('unreg_bm25.pkl', 'bm25_unregistered.pkl'), 'rb') as f:
-    bm25_unregistered = pickle.load(f)
-
-registered_index = faiss.read_index(_find_file('faiss_registered.index', 'registered.index'))
-unregistered_index = faiss.read_index(_find_file('faiss_unregistered.index', 'unregistered.index'))
-
-sbert_registered_embeddings_finetuned = np.load(_find_file('sbert_registered_embeddings_finetuned.npy', 'registered_embeddings.npy'))
-sbert_unregistered_embeddings_finetuned = np.load(_find_file('sbert_unregistered_embeddings_finetuned.npy', 'unregistered_embeddings.npy'))
-
-for name, df, idx, bm25, emb in [
-    ("Registered", registered_df, registered_index, bm25_registered, sbert_registered_embeddings_finetuned),
-    ("Unregistered", unregistered_df, unregistered_index, bm25_unregistered, sbert_unregistered_embeddings_finetuned),
-]:
-    n = len(df)
-    assert n == idx.ntotal == len(bm25.doc_freqs) == emb.shape[0], f"{name}: size mismatch"
-    assert df.index.equals(pd.RangeIndex(n)), f"{name}: index not consecutive"
+def _create_empty_reg_assets():
+    df = pd.DataFrame(columns=[
+        "ACCOUNTCODE", "PRODUCT_NAME", "BRAND_NAME", "PROD_VARIANTS",
+        "PRODUCT_INTENDED_USE", "COMPANY_NAME", "NOTIFICATION_DECISION_DATE",
+        "NOTIFICATION_VALIDITY", "NOTIFICATION_DECISION", "cleaned_title",
+        "full_product_info", "tokens", "filtered"
+    ])
+    d = 768
+    idx = faiss.IndexFlatIP(d)
+    bm25 = BM25Okapi([['empty']])
+    emb = np.empty((0, d), dtype="float32")
+    return df, idx, bm25, emb
 
 
-def reload_retrieval_assets() -> Dict[str, Any]:
+def _create_empty_unreg_assets():
+    df = pd.DataFrame(columns=[
+        "Date Published", "Product Title", "Advisory Title", "Category",
+        "Post Link", "cleaned_title", "tokens", "filtered"
+    ])
+    d = 768
+    idx = faiss.IndexFlatIP(d)
+    bm25 = BM25Okapi([['empty']])
+    emb = np.empty((0, d), dtype="float32")
+    return df, idx, bm25, emb
+
+
+def _init_assets():
+    reg_pkl = _find_file('registered_cleaned.pkl', 'Registered_cleaned.pkl')
+    reg_bm25_file = _find_file('reg_bm25.pkl', 'bm25_registered.pkl')
+    reg_idx_file = _find_file('faiss_registered.index', 'registered.index')
+    reg_emb_file = _find_file('sbert_registered_embeddings_finetuned.npy', 'registered_embeddings.npy')
+
+    if Path(reg_pkl).exists() and Path(reg_bm25_file).exists() and Path(reg_idx_file).exists() and Path(reg_emb_file).exists():
+        r_df = pd.read_pickle(reg_pkl).reset_index(drop=True)
+        with open(reg_bm25_file, 'rb') as f:
+            r_bm25 = pickle.load(f)
+        r_idx = faiss.read_index(reg_idx_file)
+        r_emb = np.load(reg_emb_file)
+        n = len(r_df)
+        if n == 0:
+            assert r_idx.ntotal == 0 and r_emb.shape[0] == 0, f"Registered: empty df but non-empty index/emb ({r_idx.ntotal}, {r_emb.shape[0]})"
+        else:
+            assert n == r_idx.ntotal == len(r_bm25.doc_freqs) == r_emb.shape[0], f"Registered: size mismatch ({n} vs {r_idx.ntotal} vs {len(r_bm25.doc_freqs)} vs {r_emb.shape[0]})"
+    else:
+        r_df, r_idx, r_bm25, r_emb = _create_empty_reg_assets()
+
+    unreg_pkl = _find_file('unregistered_cleaned.pkl', 'Unregistered_cleaned.pkl')
+    unreg_bm25_file = _find_file('unreg_bm25.pkl', 'bm25_unregistered.pkl')
+    unreg_idx_file = _find_file('faiss_unregistered.index', 'unregistered.index')
+    unreg_emb_file = _find_file('sbert_unregistered_embeddings_finetuned.npy', 'unregistered_embeddings.npy')
+
+    if Path(unreg_pkl).exists() and Path(unreg_bm25_file).exists() and Path(unreg_idx_file).exists() and Path(unreg_emb_file).exists():
+        u_df = pd.read_pickle(unreg_pkl).reset_index(drop=True)
+        with open(unreg_bm25_file, 'rb') as f:
+            u_bm25 = pickle.load(f)
+        u_idx = faiss.read_index(unreg_idx_file)
+        u_emb = np.load(unreg_emb_file)
+        n = len(u_df)
+        if n == 0:
+            assert u_idx.ntotal == 0 and u_emb.shape[0] == 0, f"Unregistered: empty df but non-empty index/emb ({u_idx.ntotal}, {u_emb.shape[0]})"
+        else:
+            assert n == u_idx.ntotal == len(u_bm25.doc_freqs) == u_emb.shape[0], f"Unregistered: size mismatch ({n} vs {u_idx.ntotal} vs {len(u_bm25.doc_freqs)} vs {u_emb.shape[0]})"
+    else:
+        u_df, u_idx, u_bm25, u_emb = _create_empty_unreg_assets()
+
+    return r_df, r_idx, r_bm25, r_emb, u_df, u_idx, u_bm25, u_emb
+
+
+registered_df, registered_index, bm25_registered, sbert_registered_embeddings_finetuned, \
+unregistered_df, unregistered_index, bm25_unregistered, sbert_unregistered_embeddings_finetuned = _init_assets()
+
+
+def reload_retrieval_assets(reload_registered: bool = True, reload_unregistered: bool = True) -> Dict[str, Any]:
     global registered_df, unregistered_df
     global bm25_registered, bm25_unregistered
     global registered_index, unregistered_index
     global sbert_registered_embeddings_finetuned, sbert_unregistered_embeddings_finetuned
 
-    new_reg_df = pd.read_pickle(_find_file('registered_cleaned.pkl', 'Registered_cleaned.pkl')).reset_index(drop=True)
-    new_unreg_df = pd.read_pickle(_find_file('unregistered_cleaned.pkl', 'Unregistered_cleaned.pkl')).reset_index(drop=True)
+    result = {"status": "success"}
 
-    with open(_find_file('reg_bm25.pkl', 'bm25_registered.pkl'), 'rb') as f:
-        new_bm25_reg = pickle.load(f)
-    with open(_find_file('unreg_bm25.pkl', 'bm25_unregistered.pkl'), 'rb') as f:
-        new_bm25_unreg = pickle.load(f)
+    if reload_registered:
+        reg_pkl = _find_file('registered_cleaned.pkl', 'Registered_cleaned.pkl')
+        reg_bm25_file = _find_file('reg_bm25.pkl', 'bm25_registered.pkl')
+        reg_idx_file = _find_file('faiss_registered.index', 'registered.index')
+        reg_emb_file = _find_file('sbert_registered_embeddings_finetuned.npy', 'registered_embeddings.npy')
 
-    new_reg_idx = faiss.read_index(_find_file('faiss_registered.index', 'registered.index'))
-    new_unreg_idx = faiss.read_index(_find_file('faiss_unregistered.index', 'unregistered.index'))
+        if Path(reg_pkl).exists() and Path(reg_bm25_file).exists() and Path(reg_idx_file).exists() and Path(reg_emb_file).exists():
+            new_reg_df = pd.read_pickle(reg_pkl).reset_index(drop=True)
+            with open(reg_bm25_file, 'rb') as f:
+                new_bm25_reg = pickle.load(f)
+            new_reg_idx = faiss.read_index(reg_idx_file)
+            new_reg_emb = np.load(reg_emb_file)
 
-    new_reg_emb = np.load(_find_file('sbert_registered_embeddings_finetuned.npy', 'registered_embeddings.npy'))
-    new_unreg_emb = np.load(_find_file('sbert_unregistered_embeddings_finetuned.npy', 'unregistered_embeddings.npy'))
+            n = len(new_reg_df)
+            if n == 0:
+                assert new_reg_idx.ntotal == 0 and new_reg_emb.shape[0] == 0, (
+                    f"Registered: empty df but non-empty index/emb ({new_reg_idx.ntotal}, {new_reg_emb.shape[0]})"
+                )
+            else:
+                assert n == new_reg_idx.ntotal == len(new_bm25_reg.doc_freqs) == new_reg_emb.shape[0], (
+                    f"Registered: size mismatch (df: {n}, index: {new_reg_idx.ntotal}, bm25: {len(new_bm25_reg.doc_freqs)}, emb: {new_reg_emb.shape[0]})"
+                )
+            assert new_reg_df.index.equals(pd.RangeIndex(n)), "Registered: index not consecutive"
 
-    for name, df, idx, bm25, emb in [
-        ("Registered", new_reg_df, new_reg_idx, new_bm25_reg, new_reg_emb),
-        ("Unregistered", new_unreg_df, new_unreg_idx, new_bm25_unreg, new_unreg_emb),
-    ]:
-        n = len(df)
-        assert n == idx.ntotal == len(bm25.doc_freqs) == emb.shape[0], (
-            f"{name}: size mismatch (df: {n}, index: {idx.ntotal}, bm25: {len(bm25.doc_freqs)}, emb: {emb.shape[0]})"
-        )
-        assert df.index.equals(pd.RangeIndex(n)), f"{name}: index not consecutive"
+            registered_df = new_reg_df
+            bm25_registered = new_bm25_reg
+            registered_index = new_reg_idx
+            sbert_registered_embeddings_finetuned = new_reg_emb
+            result["registered_count"] = n
+        else:
+            result["registered_status"] = "assets_not_found"
 
-    registered_df = new_reg_df
-    unregistered_df = new_unreg_df
-    bm25_registered = new_bm25_reg
-    bm25_unregistered = new_bm25_unreg
-    registered_index = new_reg_idx
-    unregistered_index = new_unreg_idx
-    sbert_registered_embeddings_finetuned = new_reg_emb
-    sbert_unregistered_embeddings_finetuned = new_unreg_emb
+    if reload_unregistered:
+        unreg_pkl = _find_file('unregistered_cleaned.pkl', 'Unregistered_cleaned.pkl')
+        unreg_bm25_file = _find_file('unreg_bm25.pkl', 'bm25_unregistered.pkl')
+        unreg_idx_file = _find_file('faiss_unregistered.index', 'unregistered.index')
+        unreg_emb_file = _find_file('sbert_unregistered_embeddings_finetuned.npy', 'unregistered_embeddings.npy')
 
-    return {
-        "status": "success",
-        "registered_count": len(registered_df),
-        "unregistered_count": len(unregistered_df),
-    }
+        if Path(unreg_pkl).exists() and Path(unreg_bm25_file).exists() and Path(unreg_idx_file).exists() and Path(unreg_emb_file).exists():
+            new_unreg_df = pd.read_pickle(unreg_pkl).reset_index(drop=True)
+            with open(unreg_bm25_file, 'rb') as f:
+                new_bm25_unreg = pickle.load(f)
+            new_unreg_idx = faiss.read_index(unreg_idx_file)
+            new_unreg_emb = np.load(unreg_emb_file)
+
+            n = len(new_unreg_df)
+            if n == 0:
+                assert new_unreg_idx.ntotal == 0 and new_unreg_emb.shape[0] == 0, (
+                    f"Unregistered: empty df but non-empty index/emb ({new_unreg_idx.ntotal}, {new_unreg_emb.shape[0]})"
+                )
+            else:
+                assert n == new_unreg_idx.ntotal == len(new_bm25_unreg.doc_freqs) == new_unreg_emb.shape[0], (
+                    f"Unregistered: size mismatch (df: {n}, index: {new_unreg_idx.ntotal}, bm25: {len(new_bm25_unreg.doc_freqs)}, emb: {new_unreg_emb.shape[0]})"
+                )
+            assert new_unreg_df.index.equals(pd.RangeIndex(n)), "Unregistered: index not consecutive"
+
+            unregistered_df = new_unreg_df
+            bm25_unregistered = new_bm25_unreg
+            unregistered_index = new_unreg_idx
+            sbert_unregistered_embeddings_finetuned = new_unreg_emb
+            result["unregistered_count"] = n
+        else:
+            result["unregistered_status"] = "assets_not_found"
+
+    return result
 
 
 def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = False) -> Dict[str, Any]:
@@ -206,8 +286,17 @@ def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = Fa
     q_vecs = finetuned_model.encode(cand_queries, convert_to_numpy=True).astype("float32")
     faiss.normalize_L2(q_vecs)
 
-    r_scores_all, r_indices_all = registered_index.search(q_vecs, 5)
-    u_scores_all, u_indices_all = unregistered_index.search(q_vecs, 1)
+    if registered_index.ntotal > 0:
+        r_scores_all, r_indices_all = registered_index.search(q_vecs, min(5, registered_index.ntotal))
+    else:
+        r_scores_all = np.full((len(cand_queries), 1), -1.0, dtype="float32")
+        r_indices_all = np.full((len(cand_queries), 1), -1, dtype="int64")
+
+    if unregistered_index.ntotal > 0:
+        u_scores_all, u_indices_all = unregistered_index.search(q_vecs, 1)
+    else:
+        u_scores_all = np.full((len(cand_queries), 1), -1.0, dtype="float32")
+        u_indices_all = np.full((len(cand_queries), 1), -1, dtype="int64")
 
     best_r_idx = int(np.argmax(r_scores_all[:, 0]))
     best_u_idx = int(np.argmax(u_scores_all[:, 0]))
