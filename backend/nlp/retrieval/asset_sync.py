@@ -12,12 +12,12 @@ from typing import Any, Dict, Optional
 import faiss
 import numpy as np
 import pandas as pd
+from bs4 import BeautifulSoup
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from rank_bm25 import BM25Okapi
 
 from nlp.retrieval.retrieval import (
-    clean_productTitle,
     finetuned_model,
     reload_retrieval_assets,
     registered_df,
@@ -30,6 +30,57 @@ _REG_SYNC_LOCK = threading.Lock()
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
+
+DATASET_MARKETING_PATTERNS = [
+    r'\bbuy\s*(?:\d+|one|two)\s*(?:take|get)\s*(?:\d+|one|two)(?:\s*free)?\b',
+    r'\bb\d+\s*t\d+\b',
+    r'\bbuy\s*\d+\s*(?:and|&)?\s*get\s*\d+\s*(?:free)?\b',
+    r'\b\d+\s*for\s*\d+\b',
+    r'\b\d+\s*%\s*off\b',
+    r'\b(?:up\s*to\s*)?\d+\s*%\s*(?:off|discount)\b',
+    r'\b(?:free\s*(?:shipping|gift|delivery)|freebie|best\s*seller|bestseller)\b',
+    r'\b(?:hot\s*(?:deal|sale)|flash\s*sale|big\s*sale|on\s*sale|sale|promo|bundle|set\s*of)\b',
+    r'\b(?:brand\s*new|new\s*arrival|new\s*stock|ready\s*stock|in\s*stock)\b',
+    r'\b(?:authentic|original|legit|official\s*(?:store|shop)|genuine)\b',
+    r'\b(?:limited\s*edition|while\s*supplies\s*last|must\s*have|trending|viral)\b',
+    r'\b(?:cod|cash\s*on\s*delivery|lowest\s*price|cheap|affordable|sulit)\b',
+    r'\b(?:(?:free|fast|express|worldwide|international|global|same\s*day)\s*)?(?:shipping|delivery)\b',
+    r'\bships?\s+(?:from|to)\s+\w+\b',
+    r'\bfrom\s+(?:korea|japan|usa|thailand)\b',
+    r'\bmade\s+(?:in|from)\s+\w+\b',
+    r'\bsold\s+per\s+(?:piece|pc|pcs|item)\b',
+    r'^\s*(?:new|hot|sale)\b[\s:!-]*',
+    r'\(?\s*\d+\s*(?:box|boxes|pcs|pc|pieces|sachets?|sets?)\s*\)?',
+]
+DATASET_MARKETING_RE = re.compile('|'.join(DATASET_MARKETING_PATTERNS), flags=re.IGNORECASE)
+
+
+def clean_dataset_title(text: Any) -> str:
+    """Exact cleaning function matching clean.py to guarantee 100% cache hits against precomputed embeddings."""
+    if pd.isna(text) or text is None:
+        return ""
+    text = str(text).lower()
+    text = re.sub(r'[®©™]', '', text)
+    text = re.sub(r'\bmake[\s-]?up\b', 'makeup', text)
+    text = BeautifulSoup(text, 'html.parser').get_text()
+    text = re.sub(r'http\S+|www\S+', '', text)
+    text = DATASET_MARKETING_RE.sub(' ', text)
+    text = re.sub(
+        r'\b\d+\s*(?:h|hours?)\b(?:\s+(?:(?:sweat|odor|odour|wetness)\s*(?:&|and)?\s*)?(?:protection|freshness|control))?',
+        ' ',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r'(?<![a-z0-9])\d+(?:[.,]\d+)?\s*(?:fl\s?oz|ml|mg|mcg|kg|g|l|oz|iu|pcs|pc)\b',
+        ' ',
+        text,
+    )
+    text = re.sub(r'(?<![a-z0-9])\d+(?:[.,]\d+)?%?(?![a-z0-9+])', ' ', text)
+    text = text.replace('_', ' ')
+    text = re.sub(r'(\d+\+|\bpa\++)|[^\w\s.\'&]', lambda m: m.group(1) or ' ', text)
+    text = re.sub(r'(?<![^\W_])[.\'&]|[.\'&](?![^\W_])', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
 
 
 def get_paths():
@@ -108,7 +159,7 @@ def rebuild_unregistered_assets_and_reload() -> Dict[str, Any]:
         cleaned_df = cleaned_df.drop(columns='norm_key')
 
         # 3. Clean product titles and drop duplicates
-        cleaned_df['cleaned_title'] = cleaned_df['Product Title'].apply(clean_productTitle)
+        cleaned_df['cleaned_title'] = cleaned_df['Product Title'].apply(clean_dataset_title)
         cleaned_df = cleaned_df[cleaned_df['cleaned_title'].str.strip() != ""]
         cleaned_df = cleaned_df.drop_duplicates(subset='cleaned_title', keep='first')
         cleaned_df = cleaned_df.reset_index(drop=True)
@@ -274,14 +325,14 @@ def rebuild_registered_assets_and_reload() -> Dict[str, Any]:
             return {"status": "error", "message": "Missing 'PRODUCT_NAME' column in CSV"}
 
         # 2. Clean product titles and drop duplicates
-        raw_df['cleaned_title'] = raw_df['PRODUCT_NAME'].apply(clean_productTitle)
+        raw_df['cleaned_title'] = raw_df['PRODUCT_NAME'].apply(clean_dataset_title)
         cleaned_df = raw_df[raw_df['cleaned_title'].str.strip() != ""]
         cleaned_df = cleaned_df.drop_duplicates(subset='cleaned_title', keep='first')
         cleaned_df = cleaned_df.reset_index(drop=True)
 
         cleaned_df['full_product_info'] = (
             cleaned_df['BRAND_NAME'].fillna('') + ' ' + cleaned_df['cleaned_title'].fillna('')
-        ).str.strip()
+        )
 
         # 3. Tokenize for BM25
         try:

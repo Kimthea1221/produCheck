@@ -1,4 +1,3 @@
-# backend/app/desktop/services/Product_database/csv_sync.py
 from datetime import date, datetime, timezone
 import logging
 import os
@@ -14,17 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def clean_title(title: str) -> str:
-    """Cleans and standardizes product titles."""
     if not title:
         return ""
     return " ".join(str(title).strip().split())
 
 
 def is_date_expired(val) -> bool:
-    """
-    Checks if a given date string or date/datetime object is expired.
-    Returns True if expired (date < date.today()), False otherwise (valid or not set).
-    """
+
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return False
 
@@ -50,25 +45,17 @@ def is_date_expired(val) -> bool:
 
 
 def get_datasets_dir() -> Path:
-    """
-    Resolves the datasets directory path based on docker-compose volume mapping
-    or local repository structure.
-    In docker-compose: /etc/dokploy/data/everifymo/datasets -> /everifymo/backend/nlp/datasets
-    """
-    # 1. Explicit environment variable if provided
+
     env_dir = os.environ.get("DATASETS_DIR")
     if env_dir:
         p = Path(env_dir)
         if p.exists():
             return p
 
-    # 2. Container mount path as defined in docker-compose.yml
     container_mount = Path("/everifymo/backend/nlp/datasets")
     if container_mount.exists():
         return container_mount
 
-    # 3. Relative to this source file (backend/app/desktop/services/Product_database/csv_sync.py)
-    # parents[4] is backend/
     try:
         rel_path = Path(__file__).resolve().parents[4] / "nlp" / "datasets"
         if rel_path.exists():
@@ -76,12 +63,10 @@ def get_datasets_dir() -> Path:
     except Exception:
         pass
 
-    # 4. Current working directory fallback
     cwd_path = Path.cwd() / "backend" / "nlp" / "datasets"
     if cwd_path.exists():
         return cwd_path
 
-    # Fallback default
     return Path(__file__).resolve().parents[4] / "nlp" / "datasets"
 
 
@@ -97,7 +82,6 @@ def get_unregistered_csv_path() -> Path:
     return datasets_dir / "unregistered.csv"
 
 
-# Module-level paths for direct access / backwards compatibility
 DATASETS_DIR = get_datasets_dir()
 REGISTERED_CSV_PATH = get_registered_csv_path()
 UNREGISTERED_CSV_PATH = get_unregistered_csv_path()
@@ -129,7 +113,6 @@ def sync_registered_products_to_csv(db: Session):
 
         records = df.to_dict(orient="records")
 
-        # Fast O(1) index lookup by ACCOUNTCODE
         code_to_idx = {}
         for i, r in enumerate(records):
             code = str(r.get("ACCOUNTCODE", "")).strip().upper()
@@ -194,7 +177,6 @@ def sync_registered_products_to_csv(db: Session):
         logger.info("Successfully synced database registered products to %s (total rows: %d)", target_path, len(new_df))
         print(f"Successfully synced database changes to {target_path}.", file=sys.stderr)
 
-        # Trigger hot rebuild & reload of registered NLP vector assets in background
         try:
             from nlp.retrieval.asset_sync import trigger_registered_rebuild_async
             trigger_registered_rebuild_async()
@@ -232,7 +214,6 @@ def sync_unregistered_advisories_to_csv(db: Session):
 
         records = df.to_dict(orient="records")
 
-        # Fast O(1) index lookup by Product Title
         title_to_idx = {}
         for i, r in enumerate(records):
             title = str(r.get("Product Title", "")).strip().upper()
@@ -289,7 +270,6 @@ def sync_unregistered_advisories_to_csv(db: Session):
         logger.info("Successfully synced database unregistered advisories to %s (total rows: %d)", target_path, len(new_df))
         print(f"Successfully synced database changes to {target_path}.", file=sys.stderr)
 
-        # Trigger hot rebuild & reload of NLP vector assets in background
         try:
             from nlp.retrieval.asset_sync import trigger_unregistered_rebuild_async
             trigger_unregistered_rebuild_async()
