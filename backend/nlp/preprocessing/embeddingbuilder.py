@@ -10,11 +10,11 @@ WORK = BASE / "assets"
 WORK.mkdir(parents=True, exist_ok=True)
 
 # Load cleaned datasets
-registered_df = pd.read_pickle(WORK / "Registered_cleaned.pkl")
-unregistered_df = pd.read_pickle(WORK / "Unregistered_cleaned.pkl")
+registered_df = pd.read_pickle(WORK / "registered_cleaned.pkl" if (WORK / "registered_cleaned.pkl").exists() else WORK / "Registered_cleaned.pkl")
+unregistered_df = pd.read_pickle(WORK / "unregistered_cleaned.pkl" if (WORK / "unregistered_cleaned.pkl").exists() else WORK / "Unregistered_cleaned.pkl")
 
 # Load model
-MODEL_PATH = str(BASE / "sbertmodel4")
+MODEL_PATH = str(BASE / "sbertmodel8")
 finetuned_model = SentenceTransformer(MODEL_PATH)
 
 USE_CLEANED_DOCS = True
@@ -30,10 +30,54 @@ def embed(texts):
     faiss.normalize_L2(vecs)
     return vecs
 
-sbert_registered_embeddings_finetuned   = embed(reg_texts)
-sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+# Check if registered embeddings can be reused
+reg_cache_path = WORK / 'sbert_registered_embeddings_finetuned.npy'
+if not reg_cache_path.exists():
+    reg_cache_path = WORK / 'registered_embeddings.npy'
 
-np.save(f'{WORK}/sbert_registered_embeddings_finetuned.npy', sbert_registered_embeddings_finetuned)
-np.save(f'{WORK}/sbert_unregistered_embeddings_finetuned.npy', sbert_unregistered_embeddings_finetuned)
+if reg_cache_path.exists():
+    try:
+        cached_reg = np.load(reg_cache_path)
+        if cached_reg.shape[0] == len(reg_texts):
+            print(f"Reusing cached registered embeddings: {cached_reg.shape}")
+            sbert_registered_embeddings_finetuned = cached_reg
+        else:
+            print(f"Registered row count changed ({cached_reg.shape[0]} -> {len(reg_texts)}), re-embedding...")
+            sbert_registered_embeddings_finetuned = embed(reg_texts)
+    except Exception:
+        sbert_registered_embeddings_finetuned = embed(reg_texts)
+else:
+    sbert_registered_embeddings_finetuned = embed(reg_texts)
+
+# Check if unregistered embeddings can be reused
+unreg_cache_path = WORK / 'sbert_unregistered_embeddings_finetuned.npy'
+if not unreg_cache_path.exists():
+    unreg_cache_path = WORK / 'unregistered_embeddings.npy'
+
+if unreg_cache_path.exists():
+    try:
+        cached_unreg = np.load(unreg_cache_path)
+        if cached_unreg.shape[0] == len(unreg_texts):
+            print(f"Reusing cached unregistered embeddings: {cached_unreg.shape}")
+            sbert_unregistered_embeddings_finetuned = cached_unreg
+        else:
+            print(f"Unregistered row count changed ({cached_unreg.shape[0]} -> {len(unreg_texts)}), re-embedding...")
+            sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+    except Exception:
+        sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+else:
+    sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+
+np.save(WORK / 'sbert_registered_embeddings_finetuned.npy', sbert_registered_embeddings_finetuned)
+try:
+    np.save(WORK / 'registered_embeddings.npy', sbert_registered_embeddings_finetuned)
+except Exception:
+    pass
+
+np.save(WORK / 'sbert_unregistered_embeddings_finetuned.npy', sbert_unregistered_embeddings_finetuned)
+try:
+    np.save(WORK / 'unregistered_embeddings.npy', sbert_unregistered_embeddings_finetuned)
+except Exception:
+    pass
 
 print(sbert_registered_embeddings_finetuned.shape, sbert_unregistered_embeddings_finetuned.shape)

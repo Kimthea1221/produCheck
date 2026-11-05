@@ -1,6 +1,5 @@
-# backend/app/desktop/services/Product_database/unregistered_advisory_service.py
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import func
+from sqlalchemy import func, text
 from fastapi import HTTPException, status, Request, BackgroundTasks
 from app.core.audit import write_audit_log, get_user_region_code
 from app.core.constants import AuditAction
@@ -33,6 +32,36 @@ def increment_marketplace_detection_count(db: Session, advisory_id) -> bool:
         return False
     db.commit()
     return True
+
+
+def increment_unregistered_detection_by_title(db: Session, product_title: str) -> bool:
+    
+    if not product_title or not product_title.strip():
+        return False
+
+    clean_name = product_title.strip()
+    try:
+        db.execute(text("SET app.bypass_rls = 'true'"))
+        advisory = db.query(UnregisteredAdvisory).filter(
+            func.lower(func.trim(UnregisteredAdvisory.product_name)) == clean_name.lower(),
+            UnregisteredAdvisory.deleted_at.is_(None),
+        ).first()
+
+        if not advisory:
+            advisory = db.query(UnregisteredAdvisory).filter(
+                UnregisteredAdvisory.product_name.ilike(f"%{clean_name}%"),
+                UnregisteredAdvisory.deleted_at.is_(None),
+            ).first()
+
+        if not advisory:
+            return False
+
+        advisory.marketplace_detection_count = (advisory.marketplace_detection_count or 0) + 1
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
 
 
 def format_advisory_response(advisory: UnregisteredAdvisory, db: Session):
@@ -103,7 +132,7 @@ def get_all_unregistered_advisories(db: Session, current_user: User):
 
 
 def create_unregistered_advisory(db: Session, data: UnregisteredAdvisoryCreate, current_user, request: Request = None):
-    # Check duplicate product name
+   
     existing_name = db.query(UnregisteredAdvisory).filter(
         func.lower(UnregisteredAdvisory.product_name) == func.lower(data.product_name),
         UnregisteredAdvisory.deleted_at.is_(None)
@@ -181,7 +210,6 @@ def update_unregistered_advisory(db: Session, advisory_id, data: UnregisteredAdv
             detail="Unregistered advisory not found."
         )
 
-    # Check duplicate product name excluding current advisory
     existing_name = db.query(UnregisteredAdvisory).filter(
         func.lower(UnregisteredAdvisory.product_name) == func.lower(data.product_name),
         UnregisteredAdvisory.advisory_id != advisory_id,
@@ -278,11 +306,9 @@ def convert_product_to_advisory(db: Session, product_id, data: UnregisteredAdvis
     source_brand_name = product.brand_name or "-"
     source_category = product.product_category or "Cosmetics"
 
-    # Soft delete the product
     product.deleted_at = func.now()
     product.deleted_by = current_user_id
 
-    # Create new unregistered advisory
     new_advisory = UnregisteredAdvisory(
         product_name=data.product_name,
         advisory_details=data.advisory_details,
@@ -318,7 +344,6 @@ def convert_product_to_advisory(db: Session, product_id, data: UnregisteredAdvis
         region_code=region_code,
     )
 
-    # Schedule email notification to the officer
     if background_tasks and officer_email:
         background_tasks.add_task(
             send_converted_product_email,

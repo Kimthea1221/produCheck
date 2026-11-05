@@ -14,9 +14,17 @@ d = sbert_registered_embeddings_finetuned.shape[1]
 registered_index = faiss.IndexFlatIP(d)
 registered_index.add(sbert_registered_embeddings_finetuned)
 faiss.write_index(registered_index, str(WORK / "faiss_registered.index"))
+try:
+    faiss.write_index(registered_index, str(WORK / "registered.index"))
+except Exception:
+    pass
 
 unregistered_index = faiss.IndexFlatIP(d)
 unregistered_index.add(sbert_unregistered_embeddings_finetuned)
 faiss.write_index(unregistered_index, str(WORK / "faiss_unregistered.index"))
+try:
+    faiss.write_index(unregistered_index, str(WORK / "unregistered.index"))
+except Exception:
+    pass
 
 print("FAISS indexes built and saved successfully in:", WORK)

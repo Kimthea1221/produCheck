@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 from app.database.sessions import get_db
 from app.desktop.services.Product_database.registered_product_service import (
     increment_marketplace_detection_count as increment_registered_detection,
+    increment_registered_detection_by_name,
 )
 from app.desktop.services.Product_database.unregistered_advisory_service import (
     increment_marketplace_detection_count as increment_unregistered_detection,
+    increment_unregistered_detection_by_title,
 )
 from app.models.registered_products import RegisteredProduct
 from app.models.unregistered_advisories import UnregisteredAdvisory
@@ -60,8 +62,11 @@ def increment_displayed_detection(
             ]
             record = max(matches, key=lambda item: len(item.product_name), default=None)
         if record is None:
-            raise HTTPException(status_code=404, detail="Displayed registered record not found")
-        incremented = increment_registered_detection(db, record.product_id)
+            incremented = increment_registered_detection_by_name(db, title)
+            if not incremented:
+                raise HTTPException(status_code=404, detail="Displayed registered record not found")
+        else:
+            incremented = increment_registered_detection(db, record.product_id)
     else:
         records = db.query(UnregisteredAdvisory).filter(
             UnregisteredAdvisory.deleted_at.is_(None),
@@ -78,8 +83,11 @@ def increment_displayed_detection(
             ]
             record = max(matches, key=lambda item: len(item.product_name), default=None)
         if record is None:
-            raise HTTPException(status_code=404, detail="Displayed unregistered record not found")
-        incremented = increment_unregistered_detection(db, record.advisory_id)
+            incremented = increment_unregistered_detection_by_title(db, title)
+            if not incremented:
+                raise HTTPException(status_code=404, detail="Displayed unregistered record not found")
+        else:
+            incremented = increment_unregistered_detection(db, record.advisory_id)
 
     if not incremented:
         raise HTTPException(status_code=404, detail="Displayed record not found")
