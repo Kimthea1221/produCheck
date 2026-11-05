@@ -278,6 +278,14 @@ def sync_unregistered_advisories_to_csv(db: Session):
         new_df.to_csv(target_path, index=False)
         logger.info("Successfully synced database unregistered advisories to %s (total rows: %d)", target_path, len(new_df))
         print(f"Successfully synced database changes to {target_path}.", file=sys.stderr)
+
+        # Trigger hot rebuild & reload of NLP vector assets in background
+        try:
+            from nlp.retrieval.asset_sync import trigger_unregistered_rebuild_async
+            trigger_unregistered_rebuild_async()
+            logger.info("Triggered async NLP asset rebuild and hot-reload for unregistered advisories.")
+        except Exception as sync_err:
+            logger.warning("Could not trigger NLP asset rebuild: %s", sync_err)
     except Exception as e:
         logger.error("Error syncing unregistered advisories to CSV: %s", e, exc_info=True)
         print(f"Warning: Error syncing unregistered advisories to CSV: {e}", file=sys.stderr)

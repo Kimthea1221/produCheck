@@ -111,6 +111,53 @@ for name, df, idx, bm25, emb in [
     assert df.index.equals(pd.RangeIndex(n)), f"{name}: index not consecutive"
 
 
+def reload_retrieval_assets() -> Dict[str, Any]:
+    """Hot-reload all retrieval assets from disk into memory without restarting the process."""
+    global registered_df, unregistered_df
+    global bm25_registered, bm25_unregistered
+    global registered_index, unregistered_index
+    global sbert_registered_embeddings_finetuned, sbert_unregistered_embeddings_finetuned
+
+    new_reg_df = pd.read_pickle(_find_file('registered_cleaned.pkl', 'Registered_cleaned.pkl')).reset_index(drop=True)
+    new_unreg_df = pd.read_pickle(_find_file('unregistered_cleaned.pkl', 'Unregistered_cleaned.pkl')).reset_index(drop=True)
+
+    with open(_find_file('reg_bm25.pkl', 'bm25_registered.pkl'), 'rb') as f:
+        new_bm25_reg = pickle.load(f)
+    with open(_find_file('unreg_bm25.pkl', 'bm25_unregistered.pkl'), 'rb') as f:
+        new_bm25_unreg = pickle.load(f)
+
+    new_reg_idx = faiss.read_index(_find_file('faiss_registered.index', 'registered.index'))
+    new_unreg_idx = faiss.read_index(_find_file('faiss_unregistered.index', 'unregistered.index'))
+
+    new_reg_emb = np.load(_find_file('sbert_registered_embeddings_finetuned.npy', 'registered_embeddings.npy'))
+    new_unreg_emb = np.load(_find_file('sbert_unregistered_embeddings_finetuned.npy', 'unregistered_embeddings.npy'))
+
+    for name, df, idx, bm25, emb in [
+        ("Registered", new_reg_df, new_reg_idx, new_bm25_reg, new_reg_emb),
+        ("Unregistered", new_unreg_df, new_unreg_idx, new_bm25_unreg, new_unreg_emb),
+    ]:
+        n = len(df)
+        assert n == idx.ntotal == len(bm25.doc_freqs) == emb.shape[0], (
+            f"{name}: size mismatch (df: {n}, index: {idx.ntotal}, bm25: {len(bm25.doc_freqs)}, emb: {emb.shape[0]})"
+        )
+        assert df.index.equals(pd.RangeIndex(n)), f"{name}: index not consecutive"
+
+    registered_df = new_reg_df
+    unregistered_df = new_unreg_df
+    bm25_registered = new_bm25_reg
+    bm25_unregistered = new_bm25_unreg
+    registered_index = new_reg_idx
+    unregistered_index = new_unreg_idx
+    sbert_registered_embeddings_finetuned = new_reg_emb
+    sbert_unregistered_embeddings_finetuned = new_unreg_emb
+
+    return {
+        "status": "success",
+        "registered_count": len(registered_df),
+        "unregistered_count": len(unregistered_df),
+    }
+
+
 def evaluate_match(query: str, threshold: float = COSINE_THR, verbose: bool = False) -> Dict[str, Any]:
     cleaned_query = clean_productTitle(query)
     if not cleaned_query:

@@ -30,8 +30,43 @@ def embed(texts):
     faiss.normalize_L2(vecs)
     return vecs
 
-sbert_registered_embeddings_finetuned   = embed(reg_texts)
-sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+# Check if registered embeddings can be reused
+reg_cache_path = WORK / 'sbert_registered_embeddings_finetuned.npy'
+if not reg_cache_path.exists():
+    reg_cache_path = WORK / 'registered_embeddings.npy'
+
+if reg_cache_path.exists():
+    try:
+        cached_reg = np.load(reg_cache_path)
+        if cached_reg.shape[0] == len(reg_texts):
+            print(f"Reusing cached registered embeddings: {cached_reg.shape}")
+            sbert_registered_embeddings_finetuned = cached_reg
+        else:
+            print(f"Registered row count changed ({cached_reg.shape[0]} -> {len(reg_texts)}), re-embedding...")
+            sbert_registered_embeddings_finetuned = embed(reg_texts)
+    except Exception:
+        sbert_registered_embeddings_finetuned = embed(reg_texts)
+else:
+    sbert_registered_embeddings_finetuned = embed(reg_texts)
+
+# Check if unregistered embeddings can be reused
+unreg_cache_path = WORK / 'sbert_unregistered_embeddings_finetuned.npy'
+if not unreg_cache_path.exists():
+    unreg_cache_path = WORK / 'unregistered_embeddings.npy'
+
+if unreg_cache_path.exists():
+    try:
+        cached_unreg = np.load(unreg_cache_path)
+        if cached_unreg.shape[0] == len(unreg_texts):
+            print(f"Reusing cached unregistered embeddings: {cached_unreg.shape}")
+            sbert_unregistered_embeddings_finetuned = cached_unreg
+        else:
+            print(f"Unregistered row count changed ({cached_unreg.shape[0]} -> {len(unreg_texts)}), re-embedding...")
+            sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+    except Exception:
+        sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
+else:
+    sbert_unregistered_embeddings_finetuned = embed(unreg_texts)
 
 np.save(WORK / 'sbert_registered_embeddings_finetuned.npy', sbert_registered_embeddings_finetuned)
 try:

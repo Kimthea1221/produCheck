@@ -109,3 +109,27 @@ async def top5_registered_endpoint(request: RetrievalRequest):
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/reload-assets")
+async def reload_assets_endpoint():
+    """Hot-reload all retrieval assets from disk into memory without restarting Uvicorn."""
+    try:
+        from nlp.retrieval.retrieval import reload_retrieval_assets
+        res = reload_retrieval_assets()
+        return res
+    except Exception as exc:
+        logger.error("Failed to reload retrieval assets: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/rebuild-assets")
+async def rebuild_assets_endpoint():
+    """Rebuild unregistered assets from CSV and hot-reload them into memory."""
+    try:
+        from nlp.retrieval.asset_sync import rebuild_unregistered_assets_and_reload
+        res = rebuild_unregistered_assets_and_reload()
+        return res
+    except Exception as exc:
+        logger.error("Failed to rebuild and reload assets: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
